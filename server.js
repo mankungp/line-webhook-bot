@@ -4,9 +4,9 @@ const crypto = require('crypto');
 const app = express();
 app.use(express.json());
 
-const CHANNEL_SECRET = proces…RET;
-const CHANNEL_ACCESS_TOKEN = proces…KEN;
-const GROQ_API_KEY = proces…KEY;
+const CHANNEL_SECRET = process.env.CHANNEL_SECRET;
+const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 function verifySignature(signature, body) {
   const hmac = crypto.createHmac('SHA256', CHANNEL_SECRET);
@@ -19,7 +19,7 @@ async function askGroq(userMessage) {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer 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",
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
