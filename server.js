@@ -4,9 +4,9 @@ const crypto = require('crypto');
 const app = express();
 app.use(express.json());
 
-const CHANNEL_SECRET = process.env.CHANNEL_SECRET;
-const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
+const CHANNEL_SECRET = proces…RET;
+const CHANNEL_ACCESS_TOKEN = proces…KEN;
+const GEMINI_API_KEY = proces…KEY;
 
 function verifySignature(signature, body) {
   const hmac = crypto.createHmac('SHA256', CHANNEL_SECRET);
@@ -14,40 +14,43 @@ function verifySignature(signature, body) {
   return signature === hmac.digest('base64');
 }
 
-async function askMiniMax(userMessage) {
+async function askGemini(userMessage) {
   try {
-    console.log('MiniMax API call with key:', MINIMAX_API_KEY ? 'present' : 'missing');
-    
-    const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_v2', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${MINIMAX_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'abab6.5s-chat',
-        max_tokens: 300,
-        temperature: 0.7,
-        messages: [
-          { role: 'system', content: 'คุณคือผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ ชื่อน้องกุ้ง ตอบสุภาพ เป็นกันเอง กระชับ เน้นขายของและบริการลูกค้าให้ดี' },
-          { role: 'user', content: userMessage }
-        ]
-      })
-    });
-    
-    console.log('MiniMax response status:', response.status);
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `คุณคือน้องกุ้ง เลขาผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ชื่อ "เกิดการเกษตร" ตอบสุภาพ เป็นกันเอง กระชับ เน้นบริการลูกค้าให้ดี ถามตอบเรื่องสินค้า ราคา ขายของได้เลย ภาษาไทย`
+            }, {
+              text: userMessage
+            }]
+          }],
+          generationConfig: {
+            maxOutputTokens: 300,
+            temperature: 0.7
+          }
+        })
+      }
+    );
+
     const data = await response.json();
-    console.log('MiniMax response:', JSON.stringify(data).substring(0, 500));
-    
-    if (data.choices && data.choices[0] && data.choices[0].message) {
-      return data.choices[0].message.content;
-    }
+    console.log('Gemini response:', JSON.stringify(data).substring(0, 300));
+
     if (data.error) {
-      return `MiniMax error: ${data.error.message || JSON.stringify(data.error)}`;
+      return `Error: ${data.error.message}`;
     }
+
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      return data.candidates[0].content.parts[0].text;
+    }
+
     return 'ขอโทษค่ะ ตอบไม่ได้ตอนนี้';
   } catch (err) {
-    console.error('MiniMax error:', err.message);
+    console.error('Gemini error:', err.message);
     return `ขอโทษค่ะ ตอบไม่ได้ตอนนี้: ${err.message}`;
   }
 }
@@ -58,14 +61,14 @@ app.post('/webhook', async (req, res) => {
   }
 
   const events = req.body.events;
-  
+
   for (const event of events) {
     if (event.type === 'message' && event.message.type === 'text') {
       const userMessage = event.message.text;
       const replyToken = event.replyToken;
       console.log('User message:', userMessage);
 
-      const replyText = await askMiniMax(userMessage);
+      const replyText = await askGemini(userMessage);
       console.log('Reply:', replyText);
 
       const replyUrl = 'https://api.line.me/v2/bot/message/reply';
@@ -88,5 +91,5 @@ app.post('/webhook', async (req, res) => {
 
 app.get('/', (req, res) => res.send('LINE Webhook Ready 🦐'));
 
-const PORT = process.env.PORT || 3000;
+const PORT = proces…ORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
