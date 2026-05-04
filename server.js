@@ -1,97 +1,122 @@
+/**
+ * LINE Webhook Bot - น้องกุ้ง 🦐
+ * Express.js + Groq API (llama-3.1-8b-instant)
+ * 
+ * ร้านเกิดการเกษตร - อุปกรณ์การเกษตร & อะไหล่มอเตอร์ไซค์
+ */
+
 const express = require('express');
 const crypto = require('crypto');
 
 const app = express();
+
+// ============================================================
+// CONFIG - LINE & Groq Credentials
+// ============================================================
+
+const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || 'YOUR_LINE_CHANNEL_SECRET';
+const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || 'YOUR_LINE_CHANNEL_ACCESS_TOKEN';
+const GROQ_API_KEY = 'gsk_C7…ONfH';  // Groq API Key
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+// System Prompt - กำหนดบทบาทน้องกุ้ง
+const SYSTEM_PROMPT = 'คุณคือน้องกุ้ง 🦐 ผู้หญิงวัยสาว ผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ชื่อ "เกิดการเกษตร" พูดจาสุภาพ เป็นกันเอง กระชับ มีอัธยาศัยดี เน้นบริการลูกค้าให้ดี ชอบช่วยเหลือ ตอบเป็นผู้หญิงใช้คำลงท้าย "ค่ะ" เท่านั้น ภาษาไทย';
+
+// ============================================================
+// MIDDLEWARE
+// ============================================================
+
 app.use(express.json());
 
-const CHANNEL_SECRET = process.env.CHANNEL_SECRET;
-const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-
-function verifySignature(signature, body) {
-  const hmac = crypto.createHmac('SHA256', CHANNEL_SECRET);
-  hmac.update(JSON.stringify(body));
-  return signature === hmac.digest('base64');
-}
-
-async function askGroq(userMessage) {
-  try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer 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",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: "คุณคือน้องกุ้ง เลขาผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ชื่อ \"เกิดการเกษตร\" ตอบสุภาพ เป็นกันเอง กระชับ เน้นบริการลูกค้าให้ดี ถามตอบเรื่องสินค้า ราคา ขายของได้เลย ภาษาไทย"
-          },
-          {
-            role: "user",
-            content: userMessage
-          }
-        ],
-        max_tokens: 300,
-        temperature: 0.7
-      })
-    });
-
-    const data = await response.json();
-    console.log("Groq response status:", response.status);
-
-    if (data.error) {
-      return `Error: ${data.error.message}`;
-    }
-
-    if (data.choices && data.choices[0] && data.choices[0].message) {
-      return data.choices[0].message.content;
-    }
-
-    return "ขอโทษค่ะ ตอบไม่ได้ตอนนี้";
-  } catch (err) {
-    console.error("Groq error:", err.message);
-    return `ขอโทษค่ะ ตอบไม่ได้ตอนนี้: ${err.message}`;
-  }
-}
-
-app.post("/webhook", async (req, res) => {
-  if (!verifySignature(req.get("x-line-signature"), req.body)) {
-    return res.status(403).send("Forbidden");
-  }
-
-  const events = req.body.events;
-
-  for (const event of events) {
-    if (event.type === "message" && event.message.type === "text") {
-      const userMessage = event.message.text;
-      const replyToken = event.replyToken;
-      console.log("User message:", userMessage);
-
-      const replyText = await askGroq(userMessage);
-      console.log("Reply:", replyText);
-
-      const replyUrl = "https://api.line.me/v2/bot/message/reply";
-      await fetch(replyUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${CHANNEL_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          replyToken,
-          messages: [{ type: "text", text: replyText }]
-        })
-      });
-    }
-  }
-
-  res.status(200).send("OK");
+// Log all requests (debug)
+app.use((req, res, next) => {
+  console.log('\n========== NEW REQUEST ==========');
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  if (req.body) console.log('Body:', JSON.stringify(req.body, null, 2));
+  console.log('=================================\n');
+  next();
 });
 
-app.get("/", (req, res) => res.send("LINE Webhook Ready 🦐"));
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.send('🦐 น้องกุ้ง is ALIVE! - LINE Bot Ready');
+});
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'LINE Bot - น้องกุ้ง', timestamp: new Date().toISOString() });
+});
+
+// ============================================================
+// LINE SIGNATURE VERIFICATION
+// ============================================================
+
+function verifyLineSignature(req, res, next) {
+  const signature = req.get('x-line-signature');
+  const bodyString = JSON.stringify(req.body);
+  
+  if (!signature) {
+    console.error('[VERIFY] ❌ NO signature found!');
+    return res.status(401).json({ error: 'No signature' });
+  }
+
+  const expectedSignature = crypto
+    .createHmac('SHA256', LINE_CHANNEL_SECRET)
+    .update(bodyString)
+    .digest('base64');
+
+  if (signature !== expectedSignature) {
+    console.error('[VERIFY] ❌ Signature MISMATCH!');
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  console.log('[VERIFY] ✅ Signature OK');
+  next();
+}
+
+// ============================================================
+// GROQ API CALL
+// ============================================================
+
+async function callGroqAPI(userMessage) {
+  console.log('[GROQ] 📤 Calling Groq API...');
+
+  try {
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: 0.8,
+        max_tokens: 500,
+      }),
+    });
+
+    console.log('[GROQ] Response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[GROQ] ❌ API Error:', response.status, errorText);
+      throw new Error(`Groq API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const assistantReply = data.choices?.[0]?.message?.content || 'ขอโทษค่ะ ตอบไม่ได้ในตอนนี้';
+    console.log('[GROQ] ✅ Reply:', assistantReply);
+
+    return assistantReply;
+
+  } catch (error) {
+    console.error('[GROQ] ❌ Exception:', error.message);
+    throw error;
+  }
+}
+
+// ============================================================
+// LINE REPLY API
