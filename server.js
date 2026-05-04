@@ -16,29 +16,27 @@ function verifySignature(signature, body) {
 
 async function askGemini(userMessage) {
   try {
-    const response = await fetch(
-     `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMI…EY}`
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `คุณคือน้องกุ้ง เลขาผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ชื่อ "เกิดการเกษตร" ตอบสุภาพ เป็นกันเอง กระชับ เน้นบริการลูกค้าให้ดี ถามตอบเรื่องสินค้า ราคา ขายของได้เลย ภาษาไทย`
-            }, {
-              text: userMessage
-            }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 300,
-            temperature: 0.7
-          }
-        })
-      }
-    );
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `คุณคือน้องกุ้ง เลขาผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ชื่อ "เกิดการเกษตร" ตอบสุภาพ เป็นกันเอง กระชับ เน้นบริการลูกค้าให้ดี ถามตอบเรื่องสินค้า ราคา ขายของได้เลย ภาษาไทย`
+          }, {
+            text: userMessage
+          }]
+        }],
+        generationConfig: {
+          maxOutputTokens: 300,
+          temperature: 0.7
+        }
+      })
+    });
 
     const data = await response.json();
-    console.log('Gemini response:', JSON.stringify(data).substring(0, 500));
+    console.log('Gemini response status:', response.status);
 
     if (data.error) {
       return `Error: ${data.error.message}`;
