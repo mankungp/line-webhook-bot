@@ -15,28 +15,41 @@ function verifySignature(signature, body) {
 }
 
 async function askMiniMax(userMessage) {
-  const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_pro?model=abab6.5s-chat', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${MINIMAX_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'abab6.5s-chat',
-      tokens_to_generate: 300,
-      temperature: 0.7,
-      messages: [
-        { role: 'system', content: 'คุณคือผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ ชื่อน้องกุ้ง ตอบสุภาพ เป็นกันเอง กระชับ เน้นขายของและบริการลูกค้าให้ดี' },
-        { role: 'user', content: userMessage }
-      ]
-    })
-  });
-  
-  const data = await response.json();
-  if (data.choices && data.choices[0] && data.choices[0].messages) {
-    return data.choices[0].messages[data.choices[0].messages.length - 1].text;
+  try {
+    console.log('MiniMax API call with key:', MINIMAX_API_KEY ? 'present' : 'missing');
+    
+    const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_v2', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'abab6.5s-chat',
+        max_tokens: 300,
+        temperature: 0.7,
+        messages: [
+          { role: 'system', content: 'คุณคือผู้ช่วยขายของในร้านอุปกรณ์การเกษตรและอะไหล่มอเตอร์ไซค์ ชื่อน้องกุ้ง ตอบสุภาพ เป็นกันเอง กระชับ เน้นขายของและบริการลูกค้าให้ดี' },
+          { role: 'user', content: userMessage }
+        ]
+      })
+    });
+    
+    console.log('MiniMax response status:', response.status);
+    const data = await response.json();
+    console.log('MiniMax response:', JSON.stringify(data).substring(0, 500));
+    
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      return data.choices[0].message.content;
+    }
+    if (data.error) {
+      return `MiniMax error: ${data.error.message || JSON.stringify(data.error)}`;
+    }
+    return 'ขอโทษค่ะ ตอบไม่ได้ตอนนี้';
+  } catch (err) {
+    console.error('MiniMax error:', err.message);
+    return `ขอโทษค่ะ ตอบไม่ได้ตอนนี้: ${err.message}`;
   }
-  return 'ขอโทษค่ะ ตอบไม่ได้ตอนนี้';
 }
 
 app.post('/webhook', async (req, res) => {
@@ -50,8 +63,10 @@ app.post('/webhook', async (req, res) => {
     if (event.type === 'message' && event.message.type === 'text') {
       const userMessage = event.message.text;
       const replyToken = event.replyToken;
+      console.log('User message:', userMessage);
 
       const replyText = await askMiniMax(userMessage);
+      console.log('Reply:', replyText);
 
       const replyUrl = 'https://api.line.me/v2/bot/message/reply';
       await fetch(replyUrl, {
