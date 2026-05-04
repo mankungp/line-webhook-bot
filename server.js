@@ -4,9 +4,9 @@ const crypto = require('crypto');
 const app = express();
 app.use(express.json());
 
-const CHANNEL_SECRET = proces…RET;
-const CHANNEL_ACCESS_TOKEN = proces…KEN;
-const GEMINI_API_KEY = proces…KEY;
+const CHANNEL_SECRET = process.env.CHANNEL_SECRET;
+const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 function verifySignature(signature, body) {
   const hmac = crypto.createHmac('SHA256', CHANNEL_SECRET);
@@ -38,7 +38,7 @@ async function askGemini(userMessage) {
     );
 
     const data = await response.json();
-    console.log('Gemini response:', JSON.stringify(data).substring(0, 300));
+    console.log('Gemini response:', JSON.stringify(data).substring(0, 500));
 
     if (data.error) {
       return `Error: ${data.error.message}`;
@@ -91,5 +91,5 @@ app.post('/webhook', async (req, res) => {
 
 app.get('/', (req, res) => res.send('LINE Webhook Ready 🦐'));
 
-const PORT = proces…ORT || 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
