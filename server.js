@@ -79,7 +79,7 @@ function verifyLineSignature(req, res, next) {
 
 async function getStoreInfo() {
   try {
-    const res = await fetch(`${LOCAL_API_BASE}/api/store`);
+    const res = await fetch(`${LOCAL_API_BASE}/api/shop`);
     if (!res.ok) throw new Error(`Store info error: ${res.status}`);
     return await res.json();
   } catch (err) {
