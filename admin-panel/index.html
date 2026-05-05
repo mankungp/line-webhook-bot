@@ -492,7 +492,7 @@ function updateBotUI(data) {
     var avatarUrl = info.pictureUrl;
 
     html += '<div class="customer-item" style="flex-wrap:wrap;gap:8px;align-items:center;">';
-    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" onclick="toggleCustomer(\'' + userId.replace(/'/g, "\\'") + '\', ' + !isOff + ')" style="min-width:70px;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-user-id="' + userId.replace(/"/g, '&quot;') + '" data-turn-on="' + !isOff + '" style="min-width:70px;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     if (avatarUrl) {
       html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" alt="avatar" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="avatar" style="display:none">👤</div>';
     } else {
