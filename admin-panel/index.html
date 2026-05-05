@@ -3,226 +3,801 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>เกิดการเกษตร - Admin Panel</title>
+<title>🦐 Admin Panel - ร้านเกิดการเกษตร</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
-  .container { max-width: 800px; margin: 0 auto; }
-  h1 { color: #1a1a1a; margin-bottom: 20px; font-size: 24px; }
-  .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-  .status-bar { display: flex; justify-content: space-between; align-items: center; }
-  .status-label { font-size: 16px; font-weight: 600; }
-  .status-value { font-size: 14px; padding: 6px 12px; border-radius: 20px; font-weight: 600; }
-  .status-on { background: #e8f5e9; color: #2e7d32; }
-  .status-off { background: #ffebee; color: #c62828; }
-  .toggle-btn { background: #4caf50; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
-  .toggle-btn:hover { opacity: 0.9; }
-  .toggle-btn.red { background: #f44336; }
-  .customer-list { margin-top: 15px; max-height: 400px; overflow-y: auto; }
-  .customer-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
-  .customer-item:last-child { border-bottom: none; }
-  .customer-name { font-size: 14px; font-weight: 500; }
-  .customer-id { font-size: 11px; color: #999; font-family: monospace; word-break: break-all; }
-  .customer-time { font-size: 11px; color: #999; }
-  .customer-toggle { background: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; min-width: 60px; }
-  .customer-toggle.off { background: #ff9800; }
-  .customer-toggle.on { background: #4caf50; }
-  .section-title { font-size: 14px; color: #666; margin-bottom: 10px; font-weight: 600; }
-  .empty { text-align: center; padding: 30px; color: #999; }
-  .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
-  .error { background: #ffebee; color: #c62828; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
-  .tab-nav { display: flex; gap: 10px; margin-bottom: 15px; }
-  .tab-btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; background: #e0e0e0; }
-  .tab-btn.active { background: #2196F3; color: white; }
-  .search-box { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar { width: 240px; background: #1a1a2e; color: white; padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+.sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid #333; margin-bottom: 15px; }
+.sidebar-logo h1 { font-size: 18px; color: #4fc3f7; }
+.sidebar-logo small { font-size: 12px; color: #888; }
+.sidebar nav a { display: flex; align-items: center; gap: 10px; padding: 12px 20px; color: #aaa; text-decoration: none; font-size: 14px; cursor: pointer; transition: 0.2s; }
+.sidebar nav a:hover { background: #2a2a4a; color: white; }
+.sidebar nav a.active { background: #4fc3f7; color: #1a1a2e; font-weight: 600; }
+.sidebar nav a .icon { font-size: 18px; width: 24px; text-align: center; }
+
+/* Main Content */
+.main { flex: 1; margin-left: 240px; padding: 20px; overflow-x: hidden; }
+.page-header { margin-bottom: 20px; }
+.page-header h2 { font-size: 22px; color: #1a1a1a; }
+.page-header p { color: #666; font-size: 13px; margin-top: 4px; }
+
+/* Cards */
+.card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.card-title { font-size: 14px; color: #666; font-weight: 600; margin-bottom: 12px; }
+
+/* Status badges */
+.status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.on { background: #e8f5e9; color: #2e7d32; }
+.off { background: #ffebee; color: #c62828; }
+.pending { background: #fff3e0; color: #e65100; }
+
+/* Buttons */
+.btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: #4fc3f7; color: #1a1a2e; }
+.btn-danger { background: #ef5350; color: white; }
+.btn-secondary { background: #e0e0e0; color: #333; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn:hover { opacity: 0.9; }
+
+/* Forms */
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Tables */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th { text-align: left; padding: 10px 12px; font-size: 12px; color: #999; border-bottom: 2px solid #eee; }
+.data-table td { padding: 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
+.data-table tr:hover td { background: #fafafa; }
+.data-table .num { text-align: right; }
+
+/* Toolbar */
+.toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+.search-box { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 200px; }
+select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
+/* Product Grid */
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; }
+.product-card { background: white; border-radius: 10px; padding: 15px; border: 1px solid #eee; }
+.product-card img { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; background: #f5f5f5; }
+.product-name { font-size: 15px; font-weight: 600; margin: 8px 0 4px; }
+.product-sku { font-size: 11px; color: #999; }
+.product-price { font-size: 18px; color: #e53935; font-weight: 600; }
+.product-price small { font-size: 12px; color: #999; font-weight: 400; }
+.product-stock { font-size: 13px; margin-top: 4px; }
+.product-stock.low { color: #f44336; }
+.product-stock.ok { color: #4caf50; }
+.product-actions { display: flex; gap: 5px; margin-top: 10px; }
+.badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-agricultural { background: #e8f5e9; color: #2e7d32; }
+.badge-motorcycle { background: #e3f2fd; color: #1565c0; }
+.badge-lawnmower { background: #f1f8e9; color: #558b2f; }
+.badge-pump { background: #e0f7fa; color: #00838f; }
+.badge-other { background: #f5f5f5; color: #666; }
+
+/* Stats Row */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: white; border-radius: 10px; padding: 15px; text-align: center; }
+.stat-number { font-size: 28px; font-weight: 700; color: #1a1a1a; }
+.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+
+/* Modal */
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+.modal.active { display: flex; }
+.modal-content { background: white; border-radius: 12px; padding: 24px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+.modal h2 { font-size: 18px; margin-bottom: 20px; }
+.close-btn { float: right; background: none; border: none; font-size: 24px; cursor: pointer; line-height: 1; }
+.close-btn:hover { opacity: 0.7; }
+
+/* Customer List */
+.customer-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+.customer-item:last-child { border-bottom: none; }
+.customer-name { font-size: 14px; font-weight: 500; }
+.customer-id { font-size: 11px; color: #999; font-family: monospace; word-break: break-all; }
+.customer-meta { font-size: 11px; color: #999; }
+.customer-toggle { border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; min-width: 60px; color: white; }
+.customer-toggle.off { background: #ff9800; }
+.customer-toggle.on { background: #4caf50; }
+.empty-state { text-align: center; padding: 40px; color: #999; }
+.error-msg { background: #ffebee; color: #c62828; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: none; }
+.footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
+
+/* Order Status Colors */
+.order-status-pending { color: #e65100; }
+.order-status-confirmed { color: #1565c0; }
+.order-status-paid { color: #2e7d32; }
+.order-status-shipped { color: #6a1b9a; }
+.order-status-completed { color: #2e7d32; }
+.order-status-cancelled { color: #c62828; }
+
+/* Customer Avatar */
+.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #e0e0e0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>🦐 Admin Panel<br><small style="font-weight:400;color:#666;">ร้านเกิดการเกษตร</small></h1>
 
-  <div id="errorMsg" class="error" style="display:none;">ไม่สามารถเชื่อมต่อ Bot Server ได้ ลองรีเฟรชอีกครั้ง</div>
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🦐 กุ้งเลขา</h1>
+    <small>ร้านเกิดการเกษตร</small>
+  </div>
+  <nav>
+    <a class="active" onclick="showPage('bot')" data-page="bot">
+      <span class="icon">🤖</span> Bot Control
+    </a>
+    <a onclick="showPage('products')" data-page="products">
+      <span class="icon">📦</span> สินค้า
+    </a>
+    <a onclick="showPage('orders')" data-page="orders">
+      <span class="icon">🧾</span> ออร์เดอร์
+    </a>
+    <a onclick="showPage('customers')" data-page="customers">
+      <span class="icon">👥</span> ลูกค้า
+    </a>
+  </nav>
+</div>
 
-  <!-- Status Card -->
-  <div class="card">
-    <div class="status-bar">
-      <span class="status-label">สถานะ Bot ทั้งหมด</span>
-      <span class="status-value" id="globalStatus">...</span>
+<!-- Main Content -->
+<div class="main">
+
+  <!-- ============ BOT CONTROL PAGE ============ -->
+  <div id="page-bot" class="page">
+    <div class="page-header">
+      <h2>🤖 Bot Control</h2>
+      <p>ควบคุมการทำงานของ AI ผู้ช่วย</p>
     </div>
-    <button class="toggle-btn" id="globalToggle" onclick="toggleGlobal()">กดปิด/เปิด</button>
-  </div>
 
-  <!-- Tab Navigation -->
-  <div class="tab-nav">
-    <button class="tab-btn active" onclick="showTab('all')">ลูกค้าทั้งหมด</button>
-    <button class="tab-btn" onclick="showTab('off')">ถูกปิด Bot</button>
-  </div>
+    <div id="botError" class="error-msg">ไม่สามารถเชื่อมต่อ Bot Server ได้ ลองรีเฟรชอีกครั้ง</div>
 
-  <!-- Customer List -->
-  <div class="card">
-    <input type="text" class="search-box" id="searchBox" placeholder="ค้นหาลูกค้า..." onkeyup="filterCustomers()">
-    <div class="section-title">รายชื่อลูกค้า</div>
-    <div class="customer-list" id="customerList">
-      <div class="empty">กำลังโหลด...</div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:16px;font-weight:600;">สถานะ Bot ทั้งหมด</span>
+        <span class="status-badge" id="globalStatusBadge">...</span>
+      </div>
+      <button class="btn btn-primary" id="globalToggleBtn" onclick="toggleGlobal()" style="width:100%;margin-top:12px;">กดปิด/เปิด</button>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="loadBotCustomers()">รีเฟรช</button>
+      </div>
+      <div style="margin-bottom:12px;font-size:14px;color:#666;font-weight:600;">รายชื่อลูกค้า</div>
+      <div id="botCustomerList" style="max-height:500px;overflow-y:auto;">
+        <div class="empty-state">กำลังโหลด...</div>
+      </div>
     </div>
   </div>
 
-  <!-- Refresh -->
-  <div class="card">
-    <button class="toggle-btn" onclick="loadStatus()" style="background:#666;">รีเฟรชข้อมูล</button>
+  <!-- ============ PRODUCTS PAGE ============ -->
+  <div id="page-products" class="page" style="display:none;">
+    <div class="page-header">
+      <h2>📦 ระบบสินค้า</h2>
+      <p>จัดการสินค้าและสต็อก</p>
+    </div>
+
+    <div class="stats-row" id="productStats">
+      <div class="stat-card">
+        <div class="stat-number" id="pstat-total">0</div>
+        <div class="stat-label">ทั้งหมด</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="pstat-stock">0</div>
+        <div class="stat-label">มีสินค้า</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="pstat-agri">0</div>
+        <div class="stat-label">เครื่องเกษตร</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="pstat-moto">0</div>
+        <div class="stat-label">อะไหล่มอเตอร์ไซค์</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openProductModal()">+ เพิ่มสินค้าใหม่</button>
+        <button class="btn btn-secondary" onclick="loadProducts()">รีเฟรช</button>
+      </div>
+      <div class="toolbar">
+        <input type="text" class="search-box" id="pSearchBox" placeholder="ค้นหาสินค้า..." onkeyup="loadProducts()">
+        <select id="pCategoryFilter" onchange="loadProducts()">
+          <option value="">ทุกหมวดหมู่</option>
+          <option value="agricultural">เครื่องเกษตร</option>
+          <option value="motorcycle">อะไหล่มอเตอร์ไซค์</option>
+          <option value="lawnmower">เครื่องตัดหญ้า</option>
+          <option value="pump">เครื่องสูบน้ำ</option>
+          <option value="other">อื่นๆ</option>
+        </select>
+      </div>
+      <div class="product-grid" id="productGrid">
+        <div class="empty-state">กำลังโหลด...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ORDERS PAGE ============ -->
+  <div id="page-orders" class="page" style="display:none;">
+    <div class="page-header">
+      <h2>🧾 ออร์เดอร์</h2>
+      <p>ติดตามและจัดการคำสั่งซื้อ</p>
+    </div>
+
+    <div class="stats-row" id="orderStats">
+      <div class="stat-card">
+        <div class="stat-number" id="ostat-total">0</div>
+        <div class="stat-label">ทั้งหมด</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="ostat-pending">0</div>
+        <div class="stat-label">รอดำเนินการ</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="ostat-paid">0</div>
+        <div class="stat-label">ชำระแล้ว</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="ostat-cancelled">0</div>
+        <div class="stat-label">ยกเลิก</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="loadOrders()">รีเฟรช</button>
+        <select id="oStatusFilter" onchange="loadOrders()">
+          <option value="">ทุกสถานะ</option>
+          <option value="pending">รอดำเนินการ</option>
+          <option value="confirmed">ยืนยันแล้ว</option>
+          <option value="paid">ชำระเงินแล้ว</option>
+          <option value="shipped">จัดส่งแล้ว</option>
+          <option value="completed">เสร็จสิ้น</option>
+          <option value="cancelled">ยกเลิก</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="ordersTable">
+          <thead>
+            <tr>
+              <th>เลขที่</th>
+              <th>ลูกค้า</th>
+              <th>รายการ</th>
+              <th>ยอดรวม</th>
+              <th>สถานะ</th>
+              <th>วันที่</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody">
+            <tr><td colspan="7" class="empty-state">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CUSTOMERS PAGE ============ -->
+  <div id="page-customers" class="page" style="display:none;">
+    <div class="page-header">
+      <h2>👥 ลูกค้า</h2>
+      <p>ข้อมูลลูกค้าที่สนทนากับ Bot</p>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="loadCustomers()">รีเฟรช</button>
+        <input type="text" class="search-box" id="cSearchBox" placeholder="ค้นหาลูกค้า..." onkeyup="loadCustomers()">
+      </div>
+      <div style="margin-bottom:12px;font-size:14px;color:#666;font-weight:600;">รายชื่อลูกค้า</div>
+      <div id="customerList" style="max-height:600px;overflow-y:auto;">
+        <div class="empty-state">กำลังโหลด...</div>
+      </div>
+    </div>
   </div>
 
   <div class="footer">
-    อัปเดตล่าสุด: <span id="lastUpdate">-</span>
+    อัปเดตล่าสุด: <span id="lastUpdate">-</span> | ร้านเกิดการเกษตร
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal" id="productModal">
+  <div class="modal-content">
+    <button class="close-btn" onclick="closeProductModal()">×</button>
+    <h2 id="pModalTitle">เพิ่มสินค้าใหม่</h2>
+    <form id="pForm" onsubmit="saveProduct(event)">
+      <input type="hidden" id="pId">
+      <div class="form-group">
+        <label>ชื่อสินค้า *</label>
+        <input type="text" id="pName" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>SKU / รหัสสินค้า</label>
+          <input type="text" id="pSku">
+        </div>
+        <div class="form-group">
+          <label>หมวดหมู่ *</label>
+          <select id="pCategory" required>
+            <option value="agricultural">เครื่องเกษตร</option>
+            <option value="motorcycle">อะไหล่มอเตอร์ไซค์</option>
+            <option value="lawnmower">เครื่องตัดหญ้า</option>
+            <option value="pump">เครื่องสูบน้ำ</option>
+            <option value="other">อื่นๆ</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>รายละเอียด</label>
+        <textarea id="pDesc" style="height:70px;resize:vertical;"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ราคาปลีก (บาท) *</label>
+          <input type="number" id="pPrice" required min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>ราคาส่ง (บาท)</label>
+          <input type="number" id="pPriceWs" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>สต็อก *</label>
+          <input type="number" id="pStock" required min="0">
+        </div>
+        <div class="form-group">
+          <label>หน่วย</label>
+          <input type="text" id="pUnit" value="ชิ้น">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>น้ำหนัก</label>
+          <input type="number" id="pWeight" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>หน่วยน้ำหนัก</label>
+          <select id="pWeightUnit">
+            <option value="กก.">กิโลกรัม</option>
+            <option value="กรัม">กรัม</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>รูปสินค้า</label>
+        <input type="file" id="pImage" accept="image/*">
+        <img id="pImagePreview" style="display:none;width:200px;margin-top:10px;border-radius:8px;">
+      </div>
+      <div class="form-group">
+        <label>Tags (คั่นด้วย ,)</label>
+        <input type="text" id="pTags" placeholder="เช่น ตัดหญ้า, ไฟฟ้า">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button type="submit" class="btn btn-primary">บันทึก</button>
+        <button type="button" class="btn btn-secondary" onclick="closeProductModal()">ยกเลิก</button>
+      </div>
+    </form>
   </div>
 </div>
 
 <script>
-var API_BASE = 'https://line-webhook-bot-yniv.onrender.com';
-var currentTab = 'all';
+// ============ CONFIG ============
+var API_BASE = ''; // Uses relative proxy on same origin
+
+// ============ PAGE NAVIGATION ============
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(function(p) { p.style.display = 'none'; });
+  document.getElementById('page-' + page).style.display = 'block';
+  document.querySelectorAll('.sidebar nav a').forEach(function(a) { a.classList.remove('active'); });
+  document.querySelector('[data-page="' + page + '"]').classList.add('active');
+
+  // Load data for the page
+  if (page === 'bot') loadBotCustomers();
+  if (page === 'products') loadProducts();
+  if (page === 'orders') loadOrders();
+  if (page === 'customers') loadCustomers();
+}
+
+// ============ BOT CONTROL ============
 var allCustomerData = {};
 
-async function loadStatus() {
+async function loadBotCustomers() {
   try {
-    var response = await fetch(API_BASE + '/api/admin/status');
-    if (!response.ok) throw new Error('Failed');
-    var data = await response.json();
-    document.getElementById('errorMsg').style.display = 'none';
-    updateUI(data);
+    var res = await fetch('/api/admin/status');
+    if (!res.ok) throw new Error();
+    var data = await res.json();
+    document.getElementById('botError').style.display = 'none';
+    updateBotUI(data);
   } catch (e) {
-    console.error(e);
-    document.getElementById('errorMsg').style.display = 'block';
-    document.getElementById('globalStatus').textContent = 'ไม่ได้เชื่อมต่อ';
-    document.getElementById('globalStatus').className = 'status-value status-off';
+    document.getElementById('botError').style.display = 'block';
+    document.getElementById('globalStatusBadge').textContent = 'ไม่ได้เชื่อมต่อ';
+    document.getElementById('globalStatusBadge').className = 'status-badge off';
   }
 }
 
-function updateUI(data) {
-  var globalStatus = data.globalMode;
-  var customerModes = data.customerModes || {};
-  var allCustomers = data.allCustomers || {};
-  allCustomerData = allCustomers;
-  
-  var statusEl = document.getElementById('globalStatus');
-  if (globalStatus) {
-    statusEl.textContent = 'ปิดอยู่';
-    statusEl.className = 'status-value status-off';
-    document.getElementById('globalToggle').textContent = 'เปิด Bot';
-    document.getElementById('globalToggle').className = 'toggle-btn';
+function updateBotUI(data) {
+  var on = data.globalMode;
+  var badge = document.getElementById('globalStatusBadge');
+  var btn = document.getElementById('globalToggleBtn');
+
+  if (on) {
+    badge.textContent = 'ปิดอยู่';
+    badge.className = 'status-badge off';
+    btn.textContent = 'เปิด Bot';
+    btn.style.background = '#4fc3f7';
   } else {
-    statusEl.textContent = 'เปิดอยู่';
-    statusEl.className = 'status-value status-on';
-    document.getElementById('globalToggle').textContent = 'ปิด Bot';
-    document.getElementById('globalToggle').className = 'toggle-btn red';
+    badge.textContent = 'เปิดอยู่';
+    badge.className = 'status-badge on';
+    btn.textContent = 'ปิด Bot';
+    btn.style.background = '#ef5350';
   }
 
-  renderCustomerList(allCustomers, customerModes);
-  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th-TH');
-}
+  var customers = data.allCustomers || {};
+  var modes = data.customerModes || {};
+  allCustomerData = customers;
 
-function renderCustomerList(customers, modes) {
-  var listEl = document.getElementById('customerList');
-  var filtered = [];
-
-  Object.entries(customers).forEach(function(entry) {
-    var userId = entry[0];
-    var info = entry[1];
-    var isOff = modes[userId] === true;
-
-    if (currentTab === 'all') {
-      filtered.push({ userId: userId, info: info, isOff: isOff });
-    } else if (currentTab === 'off' && isOff) {
-      filtered.push({ userId: userId, info: info, isOff: isOff });
-    }
+  var listEl = document.getElementById('botCustomerList');
+  var entries = Object.entries(customers).sort(function(a, b) {
+    return new Date(b[1].lastSeen || 0) - new Date(a[1].lastSeen || 0);
   });
 
-  if (filtered.length === 0) {
-    listEl.innerHTML = '<div class="empty">ไม่มีลูกค้าในหมวดนี้</div>';
+  if (entries.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">ยังไม่มีลูกค้า</div>';
     return;
   }
 
-  // Sort by last seen
-  filtered.sort(function(a, b) {
-    return new Date(b.info.lastSeen) - new Date(a.info.lastSeen);
-  });
-
   var html = '';
-  filtered.forEach(function(item) {
-    var date = new Date(item.info.lastSeen);
-    var dateStr = date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-    var displayName = item.info.displayName || 'ลูกค้า';
-    var avatar = item.info.pictureUrl || '';
+  entries.forEach(function(entry) {
+    var userId = entry[0];
+    var info = entry[1];
+    var isOff = modes[userId] === true;
+    var date = info.lastSeen ? new Date(info.lastSeen) : null;
+    var dateStr = date ? (date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })) : '-';
+    var name = info.displayName || 'ลูกค้า';
 
     html += '<div class="customer-item">';
     html += '<div style="display:flex;align-items:center;gap:10px;">';
-    if (avatar) {
-      html += '<img src="' + avatar + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">';
-    } else {
-      html += '<div style="width:40px;height:40px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;font-size:18px;">👤</div>';
-    }
+    html += '<div class="avatar">👤</div>';
     html += '<div>';
-    html += '<div class="customer-name">' + displayName + '</div>';
-    html += '<div class="customer-id">' + item.userId.substring(0, 20) + '...</div>';
-    html += '<div class="customer-time">เข้าล่าสุด: ' + dateStr + '</div>';
-    html += '</div>';
-    html += '</div>';
-
-    if (item.isOff) {
-      html += '<button class="customer-toggle on" onclick="toggleCustomer(\'' + item.userId + '\', true)">เปิด</button>';
-    } else {
-      html += '<button class="customer-toggle off" onclick="toggleCustomer(\'' + item.userId + '\', false)">ปิด</button>';
-    }
+    html += '<div class="customer-name">' + escapeHtml(name) + '</div>';
+    html += '<div class="customer-id">' + userId.substring(0, 30) + '...</div>';
+    html += '<div class="customer-meta">เข้าล่าสุด: ' + dateStr + '</div>';
+    html += '</div></div>';
+    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" onclick="toggleCustomer(\'' + userId + '\', ' + !isOff + ')">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     html += '</div>';
   });
 
   listEl.innerHTML = html;
-}
-
-function showTab(tab) {
-  currentTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(function(btn) {
-    btn.classList.remove('active');
-  });
-  event.target.classList.add('active');
-  var customerModes = {};
-  try {
-    fetch(API_BASE + '/api/admin/status').then(function(r) { return r.json(); }).then(function(data) {
-      renderCustomerList(data.allCustomers || {}, data.customerModes || {});
-    });
-  } catch (e) {}
-}
-
-function filterCustomers() {
-  // Simple filter - just reload with current data
-  loadStatus();
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th-TH');
 }
 
 async function toggleGlobal() {
   try {
-    var response = await fetch(API_BASE + '/api/admin/toggle-global', { method: 'POST' });
-    if (!response.ok) throw new Error('Failed');
-    loadStatus();
-  } catch (e) {
-    alert('ไม่สามารถเปิด/ปิดได้ในขณะนี้');
-  }
+    var res = await fetch('/api/admin/toggle-global', { method: 'POST' });
+    if (!res.ok) throw new Error();
+    loadBotCustomers();
+  } catch (e) { alert('เกิดข้อผิดพลาด'); }
 }
 
 async function toggleCustomer(userId, turnOn) {
   try {
-    var response = await fetch(API_BASE + '/api/admin/toggle-customer', {
+    var res = await fetch('/api/admin/toggle-customer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId, turnOn: turnOn })
     });
-    if (!response.ok) throw new Error('Failed');
-    loadStatus();
+    if (!res.ok) throw new Error();
+    loadBotCustomers();
+  } catch (e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+// ============ PRODUCTS ============
+var products = [];
+
+async function loadProducts() {
+  var search = encodeURIComponent(document.getElementById('pSearchBox').value);
+  var category = document.getElementById('pCategoryFilter').value;
+  var url = '/api/products?limit=200';
+  if (search) url += '&search=' + search;
+  if (category) url += '&category=' + category;
+
+  try {
+    var res = await fetch(url);
+    var data = await res.json();
+    products = data.products || [];
+    renderProducts(products);
+    updateProductStats(products);
   } catch (e) {
-    alert('ไม่สามารถเปิด/ปิดได้ในขณะนี้');
+    document.getElementById('productGrid').innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อ API ได้ - ตรวจสอบว่า Local API กำลังทำงานอยู่</div>';
   }
 }
 
-loadStatus();
-setInterval(loadStatus, 30000);
+function renderProducts(list) {
+  var grid = document.getElementById('productGrid');
+  if (!list || list.length === 0) {
+    grid.innerHTML = '<div class="empty-state">ไม่มีสินค้า</div>';
+    return;
+  }
+  var html = '';
+  list.forEach(function(p) {
+    var stockClass = p.stock > 0 ? 'ok' : 'low';
+    var stockText = p.stock > 0 ? ('มี ' + p.stock + ' ' + (p.unit || 'ชิ้น')) : 'หมด';
+    html += '<div class="product-card">';
+    if (p.imageUrl) {
+      html += '<img src="' + p.imageUrl + '" onerror="this.outerHTML=\'<svg width=&quot;100%&quot; height=&quot;150&quot; style=&quot;border-radius:8px;background:#f5f5f5;display:block;&quot;><text x=&quot;50%&quot; y=&quot;50%&quot; text-anchor=&quot;middle&quot; dy=&quot;0.35em&quot; fill=&quot;#999&quot; font-size=&quot;40&quot;>📦</text></svg>\'">';
+    } else {
+      html += '<svg width="100%" height="150" style="border-radius:8px;background:#f5f5f5;display:block;"><text x="50%" y="50%" text-anchor="middle" dy="0.35em" fill="#999" font-size="40">📦</text></svg>';
+    }
+    html += '<div class="product-name">' + escapeHtml(p.name) + '</div>';
+    if (p.sku) html += '<div class="product-sku">' + escapeHtml(p.sku) + '</div>';
+    html += '<div style="margin:5px 0;"><span class="badge badge-' + (p.category || 'other') + '">' + getCatName(p.category) + '</span></div>';
+    html += '<div class="product-price">' + numFormat(p.price) + ' บาท <small>/ ' + (p.unit || 'ชิ้น') + '</small></div>';
+    if (p.priceWholesale > 0) html += '<div style="font-size:12px;color:#999;">ส่ง: ' + numFormat(p.priceWholesale) + ' บาท</div>';
+    html += '<div class="product-stock ' + stockClass + '">' + stockText + '</div>';
+    html += '<div class="product-actions">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="editProduct(' + p.id + ')">แก้ไข</button>';
+    html += '<button class="btn btn-danger btn-sm" onclick="deleteProduct(' + p.id + ')">ลบ</button>';
+    html += '</div></div>';
+  });
+  grid.innerHTML = html;
+}
+
+function updateProductStats(list) {
+  var total = list.length;
+  var inStock = 0;
+  var agri = 0, moto = 0;
+  list.forEach(function(p) {
+    if (p.stock > 0) inStock++;
+    if (p.category === 'agricultural') agri++;
+    if (p.category === 'motorcycle') moto++;
+  });
+  document.getElementById('pstat-total').textContent = total;
+  document.getElementById('pstat-stock').textContent = inStock;
+  document.getElementById('pstat-agri').textContent = agri;
+  document.getElementById('pstat-moto').textContent = moto;
+}
+
+function openProductModal() {
+  document.getElementById('productModal').classList.add('active');
+  document.getElementById('pForm').reset();
+  document.getElementById('pId').value = '';
+  document.getElementById('pImagePreview').style.display = 'none';
+  document.getElementById('pModalTitle').textContent = 'เพิ่มสินค้าใหม่';
+}
+
+function editProduct(id) {
+  var p = products.find(function(x) { return x.id === id; });
+  if (!p) return;
+  document.getElementById('productModal').classList.add('active');
+  document.getElementById('pModalTitle').textContent = 'แก้ไข: ' + p.name;
+  document.getElementById('pId').value = p.id;
+  document.getElementById('pName').value = p.name || '';
+  document.getElementById('pSku').value = p.sku || '';
+  document.getElementById('pCategory').value = p.category || 'other';
+  document.getElementById('pDesc').value = p.description || '';
+  document.getElementById('pPrice').value = p.price || 0;
+  document.getElementById('pPriceWs').value = p.priceWholesale || 0;
+  document.getElementById('pStock').value = p.stock || 0;
+  document.getElementById('pUnit').value = p.unit || 'ชิ้น';
+  document.getElementById('pWeight').value = p.weight || '';
+  document.getElementById('pWeightUnit').value = p.weightUnit || 'กก.';
+  document.getElementById('pTags').value = (p.tags || []).join(', ');
+  if (p.imageUrl) {
+    var img = document.getElementById('pImagePreview');
+    img.src = p.imageUrl;
+    img.style.display = 'block';
+  } else {
+    document.getElementById('pImagePreview').style.display = 'none';
+  }
+}
+
+function closeProductModal() {
+  document.getElementById('productModal').classList.remove('active');
+}
+
+async function saveProduct(e) {
+  e.preventDefault();
+  var id = document.getElementById('pId').value;
+  var tagsVal = document.getElementById('pTags').value;
+  var tags = tagsVal ? tagsVal.split(',').map(function(t) { return t.trim(); }) : [];
+  var data = {
+    name: document.getElementById('pName').value,
+    sku: document.getElementById('pSku').value,
+    category: document.getElementById('pCategory').value,
+    description: document.getElementById('pDesc').value,
+    price: parseFloat(document.getElementById('pPrice').value) || 0,
+    priceWholesale: parseFloat(document.getElementById('pPriceWs').value) || 0,
+    stock: parseInt(document.getElementById('pStock').value) || 0,
+    unit: document.getElementById('pUnit').value,
+    weight: parseFloat(document.getElementById('pWeight').value) || 0,
+    weightUnit: document.getElementById('pWeightUnit').value,
+    tags: tags
+  };
+  var method = id ? 'PUT' : 'POST';
+  var url = '/api/products' + (id ? '/' + id : '');
+
+  try {
+    var res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    var result = await res.json();
+    var imgInput = document.getElementById('pImage');
+    if (imgInput.files && imgInput.files[0]) {
+      var formData = new FormData();
+      formData.append('image', imgInput.files[0]);
+      await fetch('/api/products/' + result.id + '/image', { method: 'POST', body: formData });
+    }
+    closeProductModal();
+    loadProducts();
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+  }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('ยืนยันการลบ?')) return;
+  try {
+    await fetch('/api/products/' + id, { method: 'DELETE' });
+    loadProducts();
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+  }
+}
+
+// ============ ORDERS ============
+var orders = [];
+
+async function loadOrders() {
+  var status = document.getElementById('oStatusFilter').value;
+  var url = '/api/orders?limit=100';
+  if (status) url += '&status=' + status;
+
+  try {
+    var res = await fetch(url);
+    orders = await res.json();
+    renderOrders(orders);
+    updateOrderStats(orders);
+  } catch (e) {
+    document.getElementById('ordersBody').innerHTML = '<tr><td colspan="7" class="empty-state">ไม่สามารถเชื่อมต่อ API ได้</td></tr>';
+  }
+}
+
+function renderOrders(list) {
+  var tbody = document.getElementById('ordersBody');
+  if (!list || list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">ยังไม่มีออร์เดอร์</td></tr>';
+    return;
+  }
+  var html = '';
+  list.forEach(function(o) {
+    var date = new Date(o.createdAt || 0);
+    var dateStr = date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    var itemCount = (o.items || []).length;
+    var statusClass = 'order-status-' + (o.status || 'pending');
+    var statusText = { pending: 'รอดำเนินการ', confirmed: 'ยืนยันแล้ว', paid: 'ชำระแล้ว', shipped: 'จัดส่งแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
+    html += '<tr>';
+    html += '<td><strong>' + escapeHtml(o.orderNo || '-') + '</strong></td>';
+    html += '<td><div style="font-weight:500;">' + escapeHtml(o.customerName || '-') + '</div><div style="font-size:12px;color:#999;">' + escapeHtml(o.customerPhone || '') + '</div></td>';
+    html += '<td>' + itemCount + ' รายการ</td>';
+    html += '<td class="num"><strong>' + numFormat(o.total || 0) + '</strong> บาท</td>';
+    html += '<td><span class="' + statusClass + '" style="font-weight:600;">' + (statusText[o.status] || o.status) + '</span></td>';
+    html += '<td style="font-size:12px;color:#999;">' + dateStr + '</td>';
+    html += '<td>';
+    if (o.status === 'pending') {
+      html += '<button class="btn btn-secondary btn-sm" onclick="confirmOrder(' + o.id + ')">ยืนยัน</button> ';
+    }
+    if (o.status === 'confirmed') {
+      html += '<button class="btn btn-primary btn-sm" onclick="markPaid(' + o.id + ')">จ่ายแล้ว</button> ';
+    }
+    if (o.status !== 'cancelled' && o.status !== 'completed') {
+      html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
+    }
+    html += '</td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function updateOrderStats(list) {
+  var total = list.length;
+  var pending = 0, paid = 0, cancelled = 0;
+  list.forEach(function(o) {
+    if (o.status === 'pending') pending++;
+    if (o.status === 'paid' || o.status === 'completed') paid++;
+    if (o.status === 'cancelled') cancelled++;
+  });
+  document.getElementById('ostat-total').textContent = total;
+  document.getElementById('ostat-pending').textContent = pending;
+  document.getElementById('ostat-paid').textContent = paid;
+  document.getElementById('ostat-cancelled').textContent = cancelled;
+}
+
+async function confirmOrder(id) {
+  try {
+    await fetch('/api/orders/' + id + '/confirm', { method: 'POST' });
+    loadOrders();
+  } catch (e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+async function markPaid(id) {
+  try {
+    await fetch('/api/orders/' + id + '/paid', { method: 'POST' });
+    loadOrders();
+  } catch (e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+async function cancelOrder(id) {
+  if (!confirm('ยืนยันยกเลิกออร์เดอร์?')) return;
+  try {
+    await fetch('/api/orders/' + id + '/cancel', { method: 'POST' });
+    loadOrders();
+  } catch (e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+// ============ CUSTOMERS ============
+async function loadCustomers() {
+  var search = encodeURIComponent(document.getElementById('cSearchBox').value);
+  var url = '/api/customers';
+  if (search) url += '?search=' + search;
+
+  try {
+    var res = await fetch(url);
+    var list = await res.json();
+    renderCustomers(list);
+  } catch (e) {
+    document.getElementById('customerList').innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อ API ได้</div>';
+  }
+}
+
+function renderCustomers(list) {
+  var el = document.getElementById('customerList');
+  if (!list || list.length === 0) {
+    el.innerHTML = '<div class="empty-state">ยังไม่มีลูกค้า</div>';
+    return;
+  }
+  var html = '';
+  list.forEach(function(c) {
+    var date = c.lastSeen ? new Date(c.lastSeen) : null;
+    var dateStr = date ? (date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })) : '-';
+    html += '<div class="customer-item">';
+    html += '<div style="display:flex;align-items:center;gap:10px;">';
+    html += '<div class="avatar">👤</div>';
+    html += '<div>';
+    html += '<div class="customer-name">' + escapeHtml(c.displayName || c.name || 'ลูกค้า') + '</div>';
+    if (c.phone) html += '<div style="font-size:12px;color:#666;">📞 ' + escapeHtml(c.phone) + '</div>';
+    html += '<div class="customer-id">' + c.userId.substring(0, 40) + '...</div>';
+    html += '<div class="customer-meta">เข้าล่าสุด: ' + dateStr + '</div>';
+    html += '</div></div>';
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ============ HELPERS ============
+function getCatName(cat) {
+  var names = { agricultural: 'เครื่องเกษตร', motorcycle: 'อะไหล่มอเตอร์ไซค์', lawnmower: 'เครื่องตัดหญ้า', pump: 'เครื่องสูบน้ำ', other: 'อื่นๆ' };
+  return names[cat] || 'อื่นๆ';
+}
+
+function numFormat(num) { return Number(num || 0).toLocaleString('th-TH'); }
+
+function escapeHtml(text) {
+  if (!text) return '';
+  var d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+// Initial load
+loadBotCustomers();
+setInterval(loadBotCustomers, 30000);
 </script>
 </body>
 </html>

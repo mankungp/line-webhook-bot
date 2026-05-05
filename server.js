@@ -509,6 +509,161 @@ app.post('/api/admin/toggle-customer', async function(req, res) {
   }
 });
 
+// ============ PRODUCTS PROXY ============
+app.get('/api/products', async function(req, res) {
+  try {
+    var url = LOCAL_API_BASE + '/api/products?' + (req.url.split('?')[1] || '');
+    var r = await fetch(url);
+    var data = await r.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/products/:id', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/products/' + req.params.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/products/:id', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/products/' + req.params.id, { method: 'DELETE' });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products/:id/image', async function(req, res) {
+  // Multipart upload - pass through as binary
+  try {
+    var http = require('http');
+    var urlObj = new URL(LOCAL_API_BASE + '/api/products/' + req.params.id + '/image');
+    var options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 80,
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: req.headers
+    };
+    var proxyReq = http.request(options, function(proxyRes) {
+      res.status(proxyRes.statusCode).json(proxyRes.statusCode < 300 ? { success: true } : { error: 'upload failed' });
+    });
+    req.pipe(proxyReq);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ ORDERS PROXY ============
+app.get('/api/orders', async function(req, res) {
+  try {
+    var url = LOCAL_API_BASE + '/api/orders?' + (req.url.split('?')[1] || '');
+    var r = await fetch(url);
+    var data = await r.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/orders', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/orders/:id', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/orders/:id/confirm', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/confirm', { method: 'POST' });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/orders/:id/paid', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/paid', { method: 'POST' });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/orders/:id/cancel', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/cancel', { method: 'POST' });
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ CUSTOMERS PROXY ============
+app.get('/api/customers', async function(req, res) {
+  try {
+    var url = LOCAL_API_BASE + '/api/customers?' + (req.url.split('?')[1] || '');
+    var r = await fetch(url);
+    var data = await r.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ STATS PROXY ============
+app.get('/api/stats', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/stats');
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ START ============
 
 app.listen(PORT, function() {
