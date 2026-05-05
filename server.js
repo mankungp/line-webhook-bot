@@ -253,6 +253,12 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
     return true;
   }
 
+  // !myid - check your own user ID (for admin setup)
+  if (msg === '!myid') {
+    await replyToLine(replyToken, [{ type: 'text', text: 'Your User ID: ' + userId }]);
+    return true;
+  }
+
   // !price - admin only (silent ignore for customers)
   if (msg.indexOf('!price ') === 0) {
     var query = msg.substring(7).trim();
@@ -309,6 +315,7 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
     helpText += '!price [product] - Search price\n';
     helpText += '!order - Place order\n';
     helpText += '!shop - Store info\n';
+    helpText += '!myid - Show your User ID\n';
     helpText += '!help - Show commands';
     await replyToLine(replyToken, [{ type: 'text', text: helpText }]);
     return true;
