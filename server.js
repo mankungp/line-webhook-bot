@@ -238,10 +238,10 @@ app.post('/webhook', verifyLineSignature, async (req, res) => {
           storeContext += `ชื่อร้าน: ${storeInfo.name || 'เกิดการเกษตร'}\n`;
           if (storeInfo.address) storeContext += `ที่อยู่: ${storeInfo.address}\n`;
           if (storeInfo.phone) storeContext += `โทร: ${storeInfo.phone}\n`;
-          if (storeInfo.openingHours) storeContext += `เปิด: ${storeInfo.openingHours}\n`;
+          if (storeInfo.openHours) storeContext += `เปิด: ${storeInfo.openHours}\n`;
         }
-        if (allProducts && allProducts.products) {
-          const topProducts = allProducts.products.slice(0, 20);
+        if (allProducts && Array.isArray(allProducts)) {
+          const topProducts = allProducts.slice(0, 20);
           storeContext += '\nสินค้าในร้าน:\n';
           for (const p of topProducts) {
             storeContext += `- ${p.name} ราคา ${p.price} บาท`;
