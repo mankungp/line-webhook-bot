@@ -29,11 +29,14 @@
   .section-title { font-size: 14px; color: #666; margin-bottom: 10px; font-weight: 600; }
   .empty { text-align: center; padding: 30px; color: #999; }
   .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
+  .error { background: #ffebee; color: #c62828; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>🦐 Admin Panel<br><small style="font-weight:400;color:#666;">ร้านเกิดการเกษตร</small></h1>
+
+  <div id="errorMsg" class="error" style="display:none;">ไม่สามารถเชื่อมต่อ Bot Server ได้ ลองรีเฟรชอีกครั้ง</div>
 
   <!-- Status Card -->
   <div class="card">
@@ -63,18 +66,19 @@
 </div>
 
 <script>
-var API_BASE = ''; // Will be set to local server
+var API_BASE = 'https://line-webhook-bot-yniv.onrender.com';
 
 async function loadStatus() {
   try {
-    // Try to fetch from local API or via proxy
-    var response = await fetch('/api/admin/status');
+    var response = await fetch(API_BASE + '/api/admin/status');
     if (!response.ok) throw new Error('Failed');
     var data = await response.json();
+    document.getElementById('errorMsg').style.display = 'none';
     updateUI(data);
   } catch (e) {
-    // If no server, show instructions
-    document.getElementById('globalStatus').textContent = 'ต้องเชื่อมต่อ Render';
+    console.error(e);
+    document.getElementById('errorMsg').style.display = 'block';
+    document.getElementById('globalStatus').textContent = 'ไม่ได้เชื่อมต่อ';
     document.getElementById('globalStatus').className = 'status-value status-off';
   }
 }
@@ -83,7 +87,6 @@ function updateUI(data) {
   var globalStatus = data.globalMode;
   var customers = data.customerModes || {};
   
-  // Update global status
   var statusEl = document.getElementById('globalStatus');
   if (globalStatus) {
     statusEl.textContent = 'ปิดอยู่';
@@ -97,7 +100,6 @@ function updateUI(data) {
     document.getElementById('globalToggle').className = 'toggle-btn red';
   }
 
-  // Update customer list
   var listEl = document.getElementById('customerList');
   var offCustomers = Object.entries(customers).filter(function(e) { return e[1] === true; });
   
@@ -109,7 +111,7 @@ function updateUI(data) {
       html += '<div class="customer-item">';
       html += '<div><div class="customer-name">ลูกค้า</div>';
       html += '<div class="customer-id">' + item[0] + '</div></div>';
-      html += '<button class="customer-toggle on" onclick="toggleCustomer(\'' + item[0] + '\', false)">เปิด</button>';
+      html += '<button class="customer-toggle on" onclick="toggleCustomer(\'' + item[0] + '\', true)">เปิด</button>';
       html += '</div>';
     });
     listEl.innerHTML = html;
@@ -120,7 +122,8 @@ function updateUI(data) {
 
 async function toggleGlobal() {
   try {
-    await fetch('/api/admin/toggle-global', { method: 'POST' });
+    var response = await fetch(API_BASE + '/api/admin/toggle-global', { method: 'POST' });
+    if (!response.ok) throw new Error('Failed');
     loadStatus();
   } catch (e) {
     alert('ไม่สามารถเปิด/ปิดได้ในขณะนี้');
@@ -129,20 +132,20 @@ async function toggleGlobal() {
 
 async function toggleCustomer(userId, turnOn) {
   try {
-    await fetch('/api/admin/toggle-customer', {
+    var response = await fetch(API_BASE + '/api/admin/toggle-customer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId, turnOn: turnOn })
     });
+    if (!response.ok) throw new Error('Failed');
     loadStatus();
   } catch (e) {
     alert('ไม่สามารถเปิด/ปิดได้ในขณะนี้');
   }
 }
 
-// Load on start
 loadStatus();
-setInterval(loadStatus, 30000); // Refresh every 30s
+setInterval(loadStatus, 30000);
 </script>
 </body>
 </html>
