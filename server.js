@@ -6,6 +6,7 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,7 +30,7 @@ app.use(function(req, res, next) {
   next();
 });
 
-// Health check
+app.use('/admin', express.static(path.join(__dirname, 'admin-panel')));
 app.get('/', function(req, res) {
   res.send('Kerdkarnkaset is ALIVE!');
 });
