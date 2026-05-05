@@ -491,19 +491,20 @@ function updateBotUI(data) {
     var name = info.displayName || 'ลูกค้า';
     var avatarUrl = info.pictureUrl;
 
-    html += '<div class="customer-item" style="flex-wrap:wrap;gap:8px;align-items:center;">';
-    html += '<button id="tc_' + userId.replace(/[^a-zA-Z0-9]/g, '_') + '" class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-uid="' + userId + '" style="min-width:70px;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    var btnId = 'tc_' + userId.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Math.random().toString(36).substr(2, 5);
+    html += '<div class="customer-item" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;">';
+    html += '<button id="' + btnId + '" class="customer-toggle ' + (isOff ? 'on' : 'off') + '" style="min-width:75px;height:48px;border:none;border-radius:8px;color:white;font-weight:bold;font-size:14px;cursor:pointer;" onclick="window.tc(\'' + userId.replace(/'/g, "\\'") + '\', ' + !isOff + ');return false;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     if (avatarUrl) {
-      html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" alt="avatar" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="avatar" style="display:none">👤</div>';
+      html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">';
     } else {
-      html += '<div class="avatar">👤</div>';
+      html += '<div class="avatar" style="width:48px;height:48px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;">👤</div>';
     }
     html += '<div style="flex:1;min-width:0;">';
-    html += '<div class="customer-name">' + escapeHtml(name) + '</div>';
-    html += '<div class="customer-id">' + userId.substring(0, 30) + '...</div>';
-    html += '<div class="customer-meta">เข้าล่าสุด: ' + dateStr + '</div>';
+    html += '<div class="customer-name" style="font-size:15px;font-weight:600;">' + escapeHtml(name) + '</div>';
+    html += '<div class="customer-meta" style="font-size:12px;color:#999;">เข้าล่าสุด: ' + dateStr + '</div>';
     html += '</div>';
     html += '</div>';
+    html += '<script>document.getElementById("' + btnId + '").onclick = function() { toggleCustomer("' + userId.replace(/"/g, '\"') + '", ' + !isOff + '); };</script>';
   });
 
   listEl.innerHTML = html;
@@ -536,6 +537,8 @@ async function toggleCustomer(userId, turnOn) {
     alert('เกิดข้อผิดพลาด: ' + e.message); 
   }
 }
+
+window.tc = toggleCustomer;
 
 // Event delegation for dynamically rendered customer-toggle buttons
 document.addEventListener('click', function(e) {
