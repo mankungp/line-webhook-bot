@@ -19,6 +19,7 @@ const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const LOCAL_API_BASE = process.env.LOCAL_API_BASE || '';
+const ADMIN_USER_ID = process.env.ADMIN_USER_ID || 'Ud75471b7c313436141ce8d09f23472ef';
 
 // Middleware
 app.use(express.json());
@@ -243,8 +244,16 @@ async function buildStoreContext() {
 
 // Command handlers - ALL SILENTLY IGNORED for customers
 async function handleCommand(msg, replyToken, userId, sourceType) {
-  // !admin - toggle admin mode
+  // Helper: check if user is admin
+  function isAdmin(uid) {
+    return uid === ADMIN_USER_ID;
+  }
+
+  // !admin - toggle admin mode (admin only)
   if (msg === '!admin') {
+    if (!isAdmin(userId)) {
+      return true; // silent ignore for non-admin
+    }
     var newState = toggleAdminMode();
     var replyText = newState
       ? 'Admin Mode ON - Bot paused'
@@ -261,6 +270,9 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
 
   // !price - admin only (silent ignore for customers)
   if (msg.indexOf('!price ') === 0) {
+    if (!isAdmin(userId)) {
+      return true; // silent ignore for non-admin
+    }
     var query = msg.substring(7).trim();
     var results = await searchProducts(query);
     var replyText = '';
@@ -285,6 +297,9 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
 
   // !order - admin only
   if (msg === '!order') {
+    if (!isAdmin(userId)) {
+      return true; // silent ignore for non-admin
+    }
     var replyText = await callGroqAPI('Customer wants to order. Collect: name, phone, address, product name, quantity.', '', 'sales');
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
@@ -292,6 +307,9 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
 
   // !shop - admin only
   if (msg === '!shop') {
+    if (!isAdmin(userId)) {
+      return true; // silent ignore for non-admin
+    }
     var storeInfo = await getStoreInfo();
     if (!storeInfo) {
       await replyToLine(replyToken, [{ type: 'text', text: 'Sorry ka, cannot get store info right now' }]);
@@ -310,6 +328,9 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
 
   // !help - admin only
   if (msg === '!help' || msg === '!help') {
+    if (!isAdmin(userId)) {
+      return true; // silent ignore for non-admin
+    }
     var helpText = 'Commands:\n\n';
     helpText += '!admin - Toggle admin mode\n';
     helpText += '!price [product] - Search price\n';
