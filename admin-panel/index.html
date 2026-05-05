@@ -93,13 +93,16 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
 .close-btn { float: right; background: none; border: none; font-size: 24px; cursor: pointer; line-height: 1; }
 .close-btn:hover { opacity: 0.7; }
 
-/* Customer List */
-.customer-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
-.customer-item:last-child { border-bottom: none; }
+/* Customer Avatar */
+.avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+
+/* Customer List - responsive row */
+.customer-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; flex-wrap: nowrap; gap: 10px; }
+.customer-item > div:first-child { display: flex; align-items: center; gap: 10px; min-width: 0; flex-shrink: 1; }
 .customer-name { font-size: 14px; font-weight: 500; }
 .customer-id { font-size: 11px; color: #999; font-family: monospace; word-break: break-all; }
 .customer-meta { font-size: 11px; color: #999; }
-.customer-toggle { border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; min-width: 60px; color: white; }
+.customer-toggle { border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; min-width: 64px; min-height: 44px; color: white; flex-shrink: 0; }
 .customer-toggle.off { background: #ff9800; }
 .customer-toggle.on { background: #4caf50; }
 .empty-state { text-align: center; padding: 40px; color: #999; }
@@ -114,8 +117,34 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
 .order-status-completed { color: #2e7d32; }
 .order-status-cancelled { color: #c62828; }
 
-/* Customer Avatar */
-.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #e0e0e0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+/* Mobile Responsive */
+@media (max-width: 600px) {
+  .sidebar { width: 60px; padding: 15px 0; }
+  .sidebar-logo { padding: 0 10px 15px; border-bottom: none; margin-bottom: 0; }
+  .sidebar-logo h1 { font-size: 0; }
+  .sidebar-logo small { display: none; }
+  .sidebar nav a { padding: 12px 8px; justify-content: center; }
+  .sidebar nav a .icon { width: auto; font-size: 20px; }
+  .sidebar nav a span:not(.icon) { display: none; }
+  .main { margin-left: 60px; padding: 12px; }
+  .page-header h2 { font-size: 18px; }
+  .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .form-row { grid-template-columns: 1fr; gap: 8px; }
+  .toolbar { gap: 6px; }
+  .search-box { min-width: 120px; font-size: 13px; }
+  .product-grid { grid-template-columns: 1fr; }
+  .customer-item { flex-wrap: wrap; padding: 10px 0; }
+  .customer-item > div:first-child { flex: 1 1 calc(100% - 80px); min-width: 0; }
+  .customer-toggle { min-width: 76px; padding: 10px 12px; font-size: 14px; }
+  .modal-content { padding: 16px; }
+  .data-table { font-size: 12px; }
+  .data-table td, .data-table th { padding: 8px 6px; }
+}
+@media (max-width: 400px) {
+  .customer-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .customer-item > div:first-child { width: 100%; }
+  .customer-toggle { width: 100%; min-height: 44px; }
+}
 </style>
 </head>
 <body>
@@ -128,16 +157,16 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
   </div>
   <nav>
     <a class="active" onclick="showPage('bot')" data-page="bot">
-      <span class="icon">🤖</span> Bot Control
+      <span class="icon">🤖</span> <span>Bot Control</span>
     </a>
     <a onclick="showPage('products')" data-page="products">
-      <span class="icon">📦</span> สินค้า
+      <span class="icon">📦</span> <span>สินค้า</span>
     </a>
     <a onclick="showPage('orders')" data-page="orders">
-      <span class="icon">🧾</span> ออร์เดอร์
+      <span class="icon">🧾</span> <span>ออร์เดอร์</span>
     </a>
     <a onclick="showPage('customers')" data-page="customers">
-      <span class="icon">👥</span> ลูกค้า
+      <span class="icon">👥</span> <span>ลูกค้า</span>
     </a>
   </nav>
 </div>
@@ -460,10 +489,14 @@ function updateBotUI(data) {
     var date = info.lastSeen ? new Date(info.lastSeen) : null;
     var dateStr = date ? (date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })) : '-';
     var name = info.displayName || 'ลูกค้า';
+    var avatarUrl = info.avatarUrl;
 
     html += '<div class="customer-item">';
-    html += '<div style="display:flex;align-items:center;gap:10px;">';
-    html += '<div class="avatar">👤</div>';
+    if (avatarUrl) {
+      html += '<div><img src="' + escapeHtml(avatarUrl) + '" class="avatar" alt="avatar" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="avatar" style="display:none">👤</div>';
+    } else {
+      html += '<div><div class="avatar">👤</div>';
+    }
     html += '<div>';
     html += '<div class="customer-name">' + escapeHtml(name) + '</div>';
     html += '<div class="customer-id">' + userId.substring(0, 30) + '...</div>';
@@ -767,8 +800,7 @@ function renderCustomers(list) {
     var date = c.lastSeen ? new Date(c.lastSeen) : null;
     var dateStr = date ? (date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })) : '-';
     html += '<div class="customer-item">';
-    html += '<div style="display:flex;align-items:center;gap:10px;">';
-    html += '<div class="avatar">👤</div>';
+    html += '<div><div class="avatar">👤</div>';
     html += '<div>';
     html += '<div class="customer-name">' + escapeHtml(c.displayName || c.name || 'ลูกค้า') + '</div>';
     if (c.phone) html += '<div style="font-size:12px;color:#666;">📞 ' + escapeHtml(c.phone) + '</div>';
