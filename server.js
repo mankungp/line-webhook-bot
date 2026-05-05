@@ -18,6 +18,16 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const LOCAL_API_BASE = process.env.LOCAL_API_BASE || 'https://rephrase-depict-rubber.ngrok-free.dev';
 const ADMIN_USER_ID = process.env.ADMIN_USER_ID || 'Ud75471b7c313436141ce8d09f23472ef';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+
+// Helper: ใส่ admin token ตอนยิง Local API
+function adminFetch(url, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({}, opts.headers || {}, {
+    'X-Admin-Token': ADMIN_TOKEN
+  });
+  return fetch(url, opts);
+}
 
 // Welcome message
 const WELCOME_MSG = '🌾 สวัสดีค่ะ! ยินดีต้อนรับเข้าสู่ร้านเกิดการเกษตรค่ะ\n\n📍 ที่อยู่ร้าน: อ.โพนทอง จ.ร้อยเอ็ด\n📞 โทร: 091-414-5767\n🗺️ แผนที่: https://maps.app.goo.gl/yq9LvRcEp3xrb7p28\n⏰ เปิดทำการ: ทุกวัน 08:00-17:00 น.\n\n🤖 AI ผู้ช่วยอัจฉริยะ สามารถ:\n• เช็คราคาสินค้าได้ทันที (ราคาปลีก/ราคาส่ง*)\n• สั่งซื้อสินค้าออนไลน์ได้เลย\n• ตอบคำถามทั่วไปเกี่ยวกับสินค้า\n\n*ราคาส่ง ต้องสมัครสมาชิกร้านค้าค่ะ\n\n💬 ติดต่อแอดมิน: 08:00-17:00 น.\n\nมีอะไรให้ช่วยไหมคะ?';
@@ -108,7 +118,7 @@ async function getAdminStatus() {
 
 async function toggleGlobalBot() {
   try {
-    var res = await fetch(LOCAL_API_BASE + '/api/admin/toggle-global', { method: 'POST' });
+    var res = await adminFetch(LOCAL_API_BASE + '/api/admin/toggle-global', { method: 'POST' });
     if (!res.ok) throw new Error('Toggle error');
     return await res.json();
   } catch (err) {
@@ -119,7 +129,7 @@ async function toggleGlobalBot() {
 
 async function toggleCustomerBot(userId, turnOn) {
   try {
-    var res = await fetch(LOCAL_API_BASE + '/api/admin/toggle-customer', {
+    var res = await adminFetch(LOCAL_API_BASE + '/api/admin/toggle-customer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId, turnOn: turnOn })
@@ -145,7 +155,7 @@ async function isWelcomeSent(userId) {
 
 async function markWelcomeSent(userId) {
   try {
-    await fetch(LOCAL_API_BASE + '/api/welcome-sent/' + userId, { method: 'POST' });
+    await adminFetch(LOCAL_API_BASE + '/api/welcome-sent/' + userId, { method: 'POST' });
   } catch (err) {
     console.error('[LOCAL] markWelcomeSent failed:', err.message);
   }
@@ -174,7 +184,7 @@ async function pingCustomer(userId) {
       body.displayName = profile.displayName;
       body.pictureUrl = profile.pictureUrl;
     }
-    await fetch(LOCAL_API_BASE + '/api/customers/' + userId + '/ping', {
+    await adminFetch(LOCAL_API_BASE + '/api/customers/' + userId + '/ping', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -523,7 +533,7 @@ app.get('/api/products', async function(req, res) {
 
 app.post('/api/products', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/products', {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -536,7 +546,7 @@ app.post('/api/products', async function(req, res) {
 
 app.put('/api/products/:id', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/products/' + req.params.id, {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/' + req.params.id, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -549,7 +559,7 @@ app.put('/api/products/:id', async function(req, res) {
 
 app.delete('/api/products/:id', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/products/' + req.params.id, { method: 'DELETE' });
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/' + req.params.id, { method: 'DELETE' });
     res.json(await r.json());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -557,19 +567,35 @@ app.delete('/api/products/:id', async function(req, res) {
 });
 
 app.post('/api/products/:id/image', async function(req, res) {
-  // Multipart upload - pass through as binary
+  // Multipart upload - pass through as binary (ใส่ admin token ไปด้วย)
   try {
+    var https = require('https');
     var http = require('http');
     var urlObj = new URL(LOCAL_API_BASE + '/api/products/' + req.params.id + '/image');
+    var isHttps = urlObj.protocol === 'https:';
+    var lib = isHttps ? https : http;
+    var headers = Object.assign({}, req.headers);
+    delete headers.host;
+    headers['X-Admin-Token'] = ADMIN_TOKEN;
+
     var options = {
       hostname: urlObj.hostname,
-      port: urlObj.port || 80,
+      port: urlObj.port || (isHttps ? 443 : 80),
       path: urlObj.pathname,
       method: 'POST',
-      headers: req.headers
+      headers: headers
     };
-    var proxyReq = http.request(options, function(proxyRes) {
-      res.status(proxyRes.statusCode).json(proxyRes.statusCode < 300 ? { success: true } : { error: 'upload failed' });
+    var proxyReq = lib.request(options, function(proxyRes) {
+      var body = '';
+      proxyRes.on('data', function(c) { body += c; });
+      proxyRes.on('end', function() {
+        res.status(proxyRes.statusCode);
+        try { res.json(JSON.parse(body)); }
+        catch (e) { res.send(body); }
+      });
+    });
+    proxyReq.on('error', function(e) {
+      res.status(500).json({ error: e.message });
     });
     req.pipe(proxyReq);
   } catch (err) {
@@ -591,7 +617,7 @@ app.get('/api/orders', async function(req, res) {
 
 app.post('/api/orders', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders', {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -604,7 +630,7 @@ app.post('/api/orders', async function(req, res) {
 
 app.put('/api/orders/:id', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id, {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -617,7 +643,7 @@ app.put('/api/orders/:id', async function(req, res) {
 
 app.post('/api/orders/:id/confirm', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/confirm', { method: 'POST' });
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/confirm', { method: 'POST' });
     res.json(await r.json());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -626,7 +652,7 @@ app.post('/api/orders/:id/confirm', async function(req, res) {
 
 app.post('/api/orders/:id/paid', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/paid', { method: 'POST' });
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/paid', { method: 'POST' });
     res.json(await r.json());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -635,7 +661,7 @@ app.post('/api/orders/:id/paid', async function(req, res) {
 
 app.post('/api/orders/:id/cancel', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/cancel', { method: 'POST' });
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/cancel', { method: 'POST' });
     res.json(await r.json());
   } catch (err) {
     res.status(500).json({ error: err.message });
