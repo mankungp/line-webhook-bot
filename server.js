@@ -453,6 +453,37 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
   }
 });
 
+// ============ ADMIN PROXY ENDPOINTS (proxies to Local API) ============
+
+app.get('/api/admin/status', async function(req, res) {
+  try {
+    var result = await getAdminStatus();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/toggle-global', async function(req, res) {
+  try {
+    var result = await toggleGlobalBot();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/toggle-customer', async function(req, res) {
+  try {
+    var userId = req.body.userId;
+    var turnOn = req.body.turnOn;
+    var result = await toggleCustomerBot(userId, turnOn);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ START ============
 
 app.listen(PORT, function() {
