@@ -489,7 +489,7 @@ function updateBotUI(data) {
     var date = info.lastSeen ? new Date(info.lastSeen) : null;
     var dateStr = date ? (date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })) : '-';
     var name = info.displayName || 'ลูกค้า';
-    var avatarUrl = info.avatarUrl;
+    var avatarUrl = info.pictureUrl;
 
     html += '<div class="customer-item">';
     if (avatarUrl) {
