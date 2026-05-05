@@ -7,7 +7,7 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
-  .container { max-width: 600px; margin: 0 auto; }
+  .container { max-width: 800px; margin: 0 auto; }
   h1 { color: #1a1a1a; margin-bottom: 20px; font-size: 24px; }
   .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
   .status-bar { display: flex; justify-content: space-between; align-items: center; }
@@ -18,18 +18,23 @@
   .toggle-btn { background: #4caf50; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
   .toggle-btn:hover { opacity: 0.9; }
   .toggle-btn.red { background: #f44336; }
-  .customer-list { margin-top: 15px; }
+  .customer-list { margin-top: 15px; max-height: 400px; overflow-y: auto; }
   .customer-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
   .customer-item:last-child { border-bottom: none; }
   .customer-name { font-size: 14px; font-weight: 500; }
-  .customer-id { font-size: 11px; color: #999; font-family: monospace; }
-  .customer-toggle { background: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .customer-id { font-size: 11px; color: #999; font-family: monospace; word-break: break-all; }
+  .customer-time { font-size: 11px; color: #999; }
+  .customer-toggle { background: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; min-width: 60px; }
   .customer-toggle.off { background: #ff9800; }
   .customer-toggle.on { background: #4caf50; }
   .section-title { font-size: 14px; color: #666; margin-bottom: 10px; font-weight: 600; }
   .empty { text-align: center; padding: 30px; color: #999; }
   .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
   .error { background: #ffebee; color: #c62828; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+  .tab-nav { display: flex; gap: 10px; margin-bottom: 15px; }
+  .tab-btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; background: #e0e0e0; }
+  .tab-btn.active { background: #2196F3; color: white; }
+  .search-box { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -47,11 +52,18 @@
     <button class="toggle-btn" id="globalToggle" onclick="toggleGlobal()">กดปิด/เปิด</button>
   </div>
 
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="showTab('all')">ลูกค้าทั้งหมด</button>
+    <button class="tab-btn" onclick="showTab('off')">ถูกปิด Bot</button>
+  </div>
+
   <!-- Customer List -->
   <div class="card">
-    <div class="section-title">ลูกค้าที่ปิด Bot ไว้</div>
+    <input type="text" class="search-box" id="searchBox" placeholder="ค้นหาลูกค้า..." onkeyup="filterCustomers()">
+    <div class="section-title">รายชื่อลูกค้า</div>
     <div class="customer-list" id="customerList">
-      <div class="empty">ไม่มีลูกค้าที่ถูกปิด Bot</div>
+      <div class="empty">กำลังโหลด...</div>
     </div>
   </div>
 
@@ -67,6 +79,8 @@
 
 <script>
 var API_BASE = 'https://line-webhook-bot-yniv.onrender.com';
+var currentTab = 'all';
+var allCustomerData = {};
 
 async function loadStatus() {
   try {
@@ -85,7 +99,9 @@ async function loadStatus() {
 
 function updateUI(data) {
   var globalStatus = data.globalMode;
-  var customers = data.customerModes || {};
+  var customerModes = data.customerModes || {};
+  var allCustomers = data.allCustomers || {};
+  allCustomerData = allCustomers;
   
   var statusEl = document.getElementById('globalStatus');
   if (globalStatus) {
@@ -100,24 +116,76 @@ function updateUI(data) {
     document.getElementById('globalToggle').className = 'toggle-btn red';
   }
 
+  renderCustomerList(allCustomers, customerModes);
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th-TH');
+}
+
+function renderCustomerList(customers, modes) {
   var listEl = document.getElementById('customerList');
-  var offCustomers = Object.entries(customers).filter(function(e) { return e[1] === true; });
-  
-  if (offCustomers.length === 0) {
-    listEl.innerHTML = '<div class="empty">ไม่มีลูกค้าที่ถูกปิด Bot</div>';
-  } else {
-    var html = '';
-    offCustomers.forEach(function(item) {
-      html += '<div class="customer-item">';
-      html += '<div><div class="customer-name">ลูกค้า</div>';
-      html += '<div class="customer-id">' + item[0] + '</div></div>';
-      html += '<button class="customer-toggle on" onclick="toggleCustomer(\'' + item[0] + '\', true)">เปิด</button>';
-      html += '</div>';
-    });
-    listEl.innerHTML = html;
+  var filtered = [];
+
+  Object.entries(customers).forEach(function(entry) {
+    var userId = entry[0];
+    var info = entry[1];
+    var isOff = modes[userId] === true;
+
+    if (currentTab === 'all') {
+      filtered.push({ userId: userId, info: info, isOff: isOff });
+    } else if (currentTab === 'off' && isOff) {
+      filtered.push({ userId: userId, info: info, isOff: isOff });
+    }
+  });
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div class="empty">ไม่มีลูกค้าในหมวดนี้</div>';
+    return;
   }
 
-  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th-TH');
+  // Sort by last seen
+  filtered.sort(function(a, b) {
+    return new Date(b.info.lastSeen) - new Date(a.info.lastSeen);
+  });
+
+  var html = '';
+  filtered.forEach(function(item) {
+    var date = new Date(item.info.lastSeen);
+    var dateStr = date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+    html += '<div class="customer-item">';
+    html += '<div>';
+    html += '<div class="customer-name">ลูกค้า</div>';
+    html += '<div class="customer-id">' + item.userId.substring(0, 20) + '...</div>';
+    html += '<div class="customer-time">เข้าล่าสุด: ' + dateStr + '</div>';
+    html += '</div>';
+
+    if (item.isOff) {
+      html += '<button class="customer-toggle on" onclick="toggleCustomer(\'' + item.userId + '\', true)">เปิด</button>';
+    } else {
+      html += '<button class="customer-toggle off" onclick="toggleCustomer(\'' + item.userId + '\', false)">ปิด</button>';
+    }
+    html += '</div>';
+  });
+
+  listEl.innerHTML = html;
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.classList.remove('active');
+  });
+  event.target.classList.add('active');
+  var customerModes = {};
+  try {
+    fetch(API_BASE + '/api/admin/status').then(function(r) { return r.json(); }).then(function(data) {
+      renderCustomerList(data.allCustomers || {}, data.customerModes || {});
+    });
+  } catch (e) {}
+}
+
+function filterCustomers() {
+  // Simple filter - just reload with current data
+  loadStatus();
 }
 
 async function toggleGlobal() {
