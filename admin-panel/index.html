@@ -492,8 +492,7 @@ function updateBotUI(data) {
     var avatarUrl = info.pictureUrl;
 
     html += '<div class="customer-item" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;">';
-    var forOnclick = userId.replace(/'/g, "\\'").replace(/"/g, '\\"');
-    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-uid="' + userId.replace(/"/g, '&quot;') + '" data-turn-on="' + !isOff + '" style="min-width:75px;height:48px;border:none;border-radius:8px;color:white;font-weight:bold;font-size:14px;cursor:pointer;" onclick="toggleCustomer(\'' + forOnclick + '\', ' + !isOff + ');return false;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    html += '<button type="button" class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-uid="' + userId.replace(/"/g, '&quot;') + '" data-turn-on="' + !isOff + '" style="min-width:75px;height:48px;border:none;border-radius:8px;color:white;font-weight:bold;font-size:14px;cursor:pointer;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     if (avatarUrl) {
       html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">';
     } else {
@@ -542,11 +541,18 @@ async function toggleCustomer(userId, turnOn) {
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('.customer-toggle');
   if (!btn) return;
+  e.preventDefault();
+  if (btn.dataset.busy === '1') return;
+  btn.dataset.busy = '1';
   var userId = btn.getAttribute('data-uid');
-  // data-turn-on is 'true' or 'false' string; convert to boolean
   var turnOn = btn.getAttribute('data-turn-on') === 'true';
-  if (userId) toggleCustomer(userId, turnOn);
-});
+  console.log('[toggle] click', { userId: userId, turnOn: turnOn });
+  if (userId) {
+    Promise.resolve(toggleCustomer(userId, turnOn)).finally(function(){ btn.dataset.busy = '0'; });
+  } else {
+    btn.dataset.busy = '0';
+  }
+}, true);
 
 // ============ PRODUCTS ============
 var products = [];
