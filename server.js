@@ -1,26 +1,21 @@
 /**
  * LINE Webhook Bot - Kerdkarnkaset
- * Express.js + Groq API + AI Welcome
+ * Express.js + Groq API
+ * Data stored on Mac via Local API
  */
 
 const express = require('express');
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SALES_FILE = '/tmp/sales-inquiries.json';
-const ADMIN_MODE_FILE = '/tmp/bot-admin-mode.json';
-const WELCOME_FILE = '/tmp/welcome-sent.json';
-const CUSTOMER_MODE_FILE = '/tmp/customer-bot-mode.json';
 
 // Config
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const LOCAL_API_BASE = process.env.LOCAL_API_BASE || '';
+const LOCAL_API_BASE = process.env.LOCAL_API_BASE || 'https://rephrase-depict-rubber.ngrok-free.dev';
 const ADMIN_USER_ID = process.env.ADMIN_USER_ID || 'Ud75471b7c313436141ce8d09f23472ef';
 
 // Welcome message
@@ -30,10 +25,7 @@ const WELCOME_MSG = '🌾 สวัสดีค่ะ! ยินดีต้อ�
 app.use(express.json());
 
 app.use(function(req, res, next) {
-  console.log('\n========== NEW REQUEST ==========');
-  console.log('[' + new Date().toISOString() + '] ' + req.method + ' ' + req.path);
-  if (req.body) console.log('Body:', JSON.stringify(req.body, null, 2));
-  console.log('=================================\n');
+  console.log('\n[' + new Date().toISOString() + '] ' + req.method + ' ' + req.path);
   next();
 });
 
@@ -67,7 +59,8 @@ function verifyLineSignature(req, res, next) {
   next();
 }
 
-// Local API calls
+// ============ LOCAL API CALLS ============
+
 async function getStoreInfo() {
   try {
     var res = await fetch(LOCAL_API_BASE + '/api/shop');
@@ -92,7 +85,7 @@ async function getProducts() {
 
 async function searchProducts(query) {
   try {
-    var res = await fetch(LOCAL_API_BASE + '/api/products/search?q=' + encodeURIComponent(query));
+    var res = await fetch(LOCAL_API_BASE + '/api/products/search/' + encodeURIComponent(query));
     if (!res.ok) throw new Error('Search error: ' + res.status);
     return await res.json();
   } catch (err) {
@@ -101,113 +94,78 @@ async function searchProducts(query) {
   }
 }
 
-// Admin mode helpers
-function isGlobalBotOff() {
+async function getAdminStatus() {
   try {
-    if (fs.existsSync(ADMIN_MODE_FILE)) {
-      var data = fs.readFileSync(ADMIN_MODE_FILE, 'utf8');
-      var info = JSON.parse(data);
-      return info && info.on === true;
-    }
-  } catch (e) {}
-  return false;
-}
-
-function toggleGlobalBotMode() {
-  try {
-    var current = isGlobalBotOff();
-    fs.writeFileSync(ADMIN_MODE_FILE, JSON.stringify({ on: !current, updatedAt: new Date().toISOString() }), 'utf8');
-    return !current;
-  } catch (e) {
-    return false;
-  }
-}
-
-// Per-customer bot mode
-function isCustomerBotOff(userId) {
-  try {
-    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
-      var data = fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8');
-      var modeInfo = JSON.parse(data);
-      return modeInfo[userId] === true;
-    }
-  } catch (e) {}
-  return false;
-}
-
-function toggleCustomerBotMode(userId) {
-  try {
-    var modeInfo = {};
-    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
-      var data = fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8');
-      modeInfo = JSON.parse(data);
-    }
-    modeInfo[userId] = !modeInfo[userId];
-    fs.writeFileSync(CUSTOMER_MODE_FILE, JSON.stringify(modeInfo, null, 2), 'utf8');
-    return modeInfo[userId];
-  } catch (e) {
-    return false;
-  }
-}
-
-function getCustomerBotModes() {
-  try {
-    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
-      return JSON.parse(fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8'));
-    }
-  } catch (e) {}
-  return {};
-}
-
-// Welcome message helpers
-function isWelcomeSent(userId) {
-  try {
-    if (fs.existsSync(WELCOME_FILE)) {
-      var data = fs.readFileSync(WELCOME_FILE, 'utf8');
-      var sent = JSON.parse(data);
-      return sent[userId] === true;
-    }
-  } catch (e) {}
-  return false;
-}
-
-function markWelcomeSent(userId) {
-  try {
-    var sent = {};
-    if (fs.existsSync(WELCOME_FILE)) {
-      var data = fs.readFileSync(WELCOME_FILE, 'utf8');
-      sent = JSON.parse(data);
-    }
-    sent[userId] = true;
-    fs.writeFileSync(WELCOME_FILE, JSON.stringify(sent, null, 2), 'utf8');
-  } catch (e) {}
-}
-
-// Save sales inquiry
-function saveSalesInquiry(inquiry) {
-  try {
-    var inquiries = [];
-    if (fs.existsSync(SALES_FILE)) {
-      var data = fs.readFileSync(SALES_FILE, 'utf8');
-      inquiries = JSON.parse(data);
-    }
-    inquiries.push({ ...inquiry, timestamp: new Date().toISOString() });
-    fs.writeFileSync(SALES_FILE, JSON.stringify(inquiries, null, 2), 'utf8');
-    console.log('[SALES] Inquiry saved:', inquiry.product);
+    var res = await fetch(LOCAL_API_BASE + '/api/admin/status');
+    if (!res.ok) throw new Error('Admin status error: ' + res.status);
+    return await res.json();
   } catch (err) {
-    console.error('[SALES] Save failed:', err.message);
+    console.error('[LOCAL] getAdminStatus failed:', err.message);
+    return { globalMode: false, customerModes: {}, allCustomers: {} };
   }
 }
 
-// Groq API call
+async function toggleGlobalBot() {
+  try {
+    var res = await fetch(LOCAL_API_BASE + '/api/admin/toggle-global', { method: 'POST' });
+    if (!res.ok) throw new Error('Toggle error');
+    return await res.json();
+  } catch (err) {
+    console.error('[LOCAL] toggleGlobalBot failed:', err.message);
+    return null;
+  }
+}
+
+async function toggleCustomerBot(userId, turnOn) {
+  try {
+    var res = await fetch(LOCAL_API_BASE + '/api/admin/toggle-customer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: userId, turnOn: turnOn })
+    });
+    if (!res.ok) throw new Error('Toggle error');
+    return await res.json();
+  } catch (err) {
+    console.error('[LOCAL] toggleCustomerBot failed:', err.message);
+    return null;
+  }
+}
+
+async function isWelcomeSent(userId) {
+  try {
+    var sent = await fetch(LOCAL_API_BASE + '/api/welcome-sent');
+    if (!sent.ok) return false;
+    var data = await sent.json();
+    return data[userId] === true;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function markWelcomeSent(userId) {
+  try {
+    await fetch(LOCAL_API_BASE + '/api/welcome-sent/' + userId, { method: 'POST' });
+  } catch (err) {
+    console.error('[LOCAL] markWelcomeSent failed:', err.message);
+  }
+}
+
+async function pingCustomer(userId) {
+  try {
+    await fetch(LOCAL_API_BASE + '/api/customers/' + userId + '/ping', { method: 'POST' });
+  } catch (err) {}
+}
+
+// ============ GROQ API ============
+
 async function callGroqAPI(userMessage, storeContext, commandType) {
   console.log('[GROQ] Calling Groq API...');
 
   var systemPrompt = '';
   if (commandType === 'admin') {
-    systemPrompt = 'You are an admin assistant at Kerdkarnkaset store. Reply in Thai. Admin mode is ON. Tell customer to wait, admin will contact them back. Ask for their name and phone if not provided.';
+    systemPrompt = 'You are an admin assistant at Kerdkarnkaset store. Reply in Thai. Admin mode is ON. Tell customer to wait, admin will contact them back.';
   } else if (commandType === 'price') {
-    systemPrompt = 'You are an AI assistant at Kerdkarnkaset store. Reply in Thai with short answers. When searching price, show product name and price clearly with line breaks. If not found, say "not found".';
+    systemPrompt = 'You are an AI assistant at Kerdkarnkaset store. Reply in Thai with short answers. Show product name and price clearly with line breaks. If not found, say "not found".';
   } else if (commandType === 'sales') {
     systemPrompt = 'You are an AI assistant at Kerdkarnkaset store helping with order. Ask for: name, phone, address, product, quantity. Reply in Thai.';
   } else {
@@ -244,7 +202,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
     var reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
       ? data.choices[0].message.content
       : 'ขอโทษค่ะ ตอบไม่ได้ในตอนนี้';
-    console.log('[GROQ] Reply:', reply);
+    console.log('[GROQ] Reply:', reply.substring(0, 100));
     return reply;
 
   } catch (error) {
@@ -253,7 +211,8 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
   }
 }
 
-// Reply to LINE
+// ============ REPLY TO LINE ============
+
 async function replyToLine(replyToken, messages) {
   try {
     var response = await fetch('https://api.line.me/v2/bot/message/reply', {
@@ -279,7 +238,8 @@ async function replyToLine(replyToken, messages) {
   }
 }
 
-// Build store context
+// ============ BUILD CONTEXT ============
+
 async function buildStoreContext() {
   var storeInfo = await getStoreInfo().catch(function() { return null; });
   var allProducts = await getProducts().catch(function() { return null; });
@@ -303,11 +263,12 @@ async function buildStoreContext() {
     }
   }
 
-  console.log('[CONTEXT] Store context length:', ctx.length);
+  console.log('[CONTEXT] Length:', ctx.length);
   return ctx;
 }
 
-// Command handlers
+// ============ COMMAND HANDLERS ============
+
 async function handleCommand(msg, replyToken, userId) {
   function isAdmin(uid) {
     return uid === ADMIN_USER_ID;
@@ -316,12 +277,10 @@ async function handleCommand(msg, replyToken, userId) {
   // !admin - toggle global bot mode (admin only)
   if (msg === '!admin') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore
+      return true;
     }
-    var newState = toggleGlobalBotMode();
-    var replyText = newState
-      ? 'Bot OFF'
-      : 'Bot ON';
+    var result = await toggleGlobalBot();
+    var replyText = result && result.globalMode ? 'Bot OFF' : 'Bot ON';
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
@@ -335,7 +294,7 @@ async function handleCommand(msg, replyToken, userId) {
   // !price - admin only
   if (msg.indexOf('!price ') === 0) {
     if (!isAdmin(userId)) {
-      return true; // silent ignore
+      return true;
     }
     var query = msg.substring(7).trim();
     var results = await searchProducts(query);
@@ -361,7 +320,7 @@ async function handleCommand(msg, replyToken, userId) {
   // !order - admin only
   if (msg === '!order') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore
+      return true;
     }
     var replyText = await callGroqAPI('Customer wants to order. Collect: name, phone, address, product name, quantity.', '', 'sales');
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
@@ -371,7 +330,7 @@ async function handleCommand(msg, replyToken, userId) {
   // !shop - admin only
   if (msg === '!shop') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore
+      return true;
     }
     var storeInfo = await getStoreInfo();
     if (!storeInfo) {
@@ -384,7 +343,6 @@ async function handleCommand(msg, replyToken, userId) {
     if (storeInfo.address) lines.push({ type: 'text', text: 'Address: ' + storeInfo.address });
     if (storeInfo.phone) lines.push({ type: 'text', text: 'Phone: ' + storeInfo.phone });
     if (storeInfo.openHours) lines.push({ type: 'text', text: 'Hours: ' + storeInfo.openHours });
-    if (storeInfo.line) lines.push({ type: 'text', text: 'Line: ' + storeInfo.line });
     await replyToLine(replyToken, lines);
     return true;
   }
@@ -392,7 +350,7 @@ async function handleCommand(msg, replyToken, userId) {
   // !help - admin only
   if (msg === '!help') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore
+      return true;
     }
     var helpText = 'Commands:\n\n!admin - Toggle bot\n!price [product] - Search price\n!order - Place order\n!shop - Store info\n!myid - Show your ID\n!help - Show this';
     await replyToLine(replyToken, [{ type: 'text', text: helpText }]);
@@ -402,7 +360,8 @@ async function handleCommand(msg, replyToken, userId) {
   return false;
 }
 
-// Webhook endpoint
+// ============ WEBHOOK ENDPOINT ============
+
 app.post('/webhook', verifyLineSignature, async function(req, res) {
   console.log('[WEBHOOK] Incoming webhook event');
 
@@ -423,26 +382,33 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
 
         console.log('[WEBHOOK] User message:', userMessage, '| User:', userId);
 
-        // Check if this is first time user - send welcome
-        if (!isWelcomeSent(userId)) {
+        // Track customer activity
+        pingCustomer(userId);
+
+        // Check if first time user - send welcome
+        var sent = await isWelcomeSent(userId);
+        if (!sent) {
           console.log('[WELCOME] Sending welcome to new user:', userId);
           await replyToLine(replyToken, [{ type: 'text', text: WELCOME_MSG }]);
-          markWelcomeSent(userId);
+          await markWelcomeSent(userId);
           continue;
         }
 
-        // Check commands
+        // Check admin commands
         var handled = await handleCommand(userMessage, replyToken, userId);
         if (handled) continue;
 
+        // Get bot status
+        var adminStatus = await getAdminStatus();
+
         // Check if global bot is OFF
-        if (isGlobalBotOff()) {
+        if (adminStatus.globalMode) {
           console.log('[BOT] Global OFF - not responding');
           continue;
         }
 
         // Check if customer bot is OFF
-        if (isCustomerBotOff(userId)) {
+        if (adminStatus.customerModes && adminStatus.customerModes[userId] === true) {
           console.log('[BOT] Customer', userId, 'bot OFF - not responding');
           continue;
         }
@@ -486,48 +452,11 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
   }
 });
 
-// Admin API endpoints (for Web Admin Panel)
-app.get('/api/admin/status', function(req, res) {
-  res.json({
-    globalMode: isGlobalBotOff(),
-    customerModes: getCustomerBotModes()
-  });
-});
+// ============ START ============
 
-app.post('/api/admin/toggle-global', function(req, res) {
-  var newState = toggleGlobalBotMode();
-  res.json({ success: true, globalMode: newState });
-});
-
-app.post('/api/admin/toggle-customer', function(req, res) {
-  var userId = req.body.userId;
-  var turnOn = req.body.turnOn;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId required' });
-  }
-  // If turnOn is true, set customer bot ON (false in mode file)
-  // If turnOn is false, set customer bot OFF (true in mode file)
-  try {
-    var modeInfo = {};
-    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
-      modeInfo = JSON.parse(fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8'));
-    }
-    modeInfo[userId] = !turnOn; // store true = bot OFF
-    fs.writeFileSync(CUSTOMER_MODE_FILE, JSON.stringify(modeInfo, null, 2), 'utf8');
-    res.json({ success: true, customerMode: modeInfo[userId] });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-
-// Serve admin panel static files
-app.use('/admin', express.static(path.join(__dirname, 'admin-panel')));
-
-// Start server
 app.listen(PORT, function() {
   console.log('Kerdkarnkaset LINE Bot started!');
   console.log('PORT:', PORT);
   console.log('Local API:', LOCAL_API_BASE);
-  console.log('Admin Panel: /admin');
+  console.log('Admin Panel: https://line-webhook-bot-yniv.onrender.com/admin');
 });
