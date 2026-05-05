@@ -139,7 +139,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
 
   var systemPrompt = '';
   if (commandType === 'admin') {
-    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai, end every sentence with "ka". The bot is now in admin mode. Tell customer to wait, admin will contact them back. Ask for their name and phone if not provided.';
+    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai, end every sentence with "ka". Admin mode is ON. Tell customer to wait, admin will contact them back. Ask for their name and phone if not provided.';
   } else if (commandType === 'price') {
     systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai with short answers. When searching price, show product name and price clearly with line breaks. If not found, say "not found ka".';
   } else if (commandType === 'sales') {
@@ -241,36 +241,26 @@ async function buildStoreContext() {
   return ctx;
 }
 
-// Command handlers
+// Command handlers - ALL SILENTLY IGNORED for customers
 async function handleCommand(msg, replyToken, userId, sourceType) {
-  // Check if from LINE Official Account Manager (admin)
-  // sourceType can be: 'user' (customer LINE), 'admin' (from OA Manager)
-  var isFromAdmin = (sourceType === 'admin');
-
-  // !admin - toggle admin mode (admin only)
+  // !admin - toggle admin mode
   if (msg === '!admin') {
     var newState = toggleAdminMode();
     var replyText = newState
-      ? 'Admin Mode: ON\nBot is now paused.\nOnly admin can use commands.\nType !admin again to resume.'
-      : 'Admin Mode: OFF\nBot is now active.\nAll commands available.';
+      ? 'Admin Mode ON - Bot paused'
+      : 'Admin Mode OFF - Bot active';
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // If admin mode is ON and NOT from admin, only show status
-  if (isAdminMode() && !isFromAdmin) {
-    await replyToLine(replyToken, [{ type: 'text', text: 'Bot is paused. Please wait for admin ka' }]);
-    return true;
-  }
-
-  // !price (admin only)
+  // !price - admin only (silent ignore for customers)
   if (msg.indexOf('!price ') === 0) {
     var query = msg.substring(7).trim();
     var results = await searchProducts(query);
     var replyText = '';
 
     if (results && Array.isArray(results) && results.length > 0) {
-      replyText = 'Search result for "' + query + '"\n\n';
+      replyText = 'Result for "' + query + '"\n\n';
       for (var i = 0; i < results.length && i < 10; i++) {
         var p = results[i];
         replyText += p.name + '\n';
@@ -280,21 +270,21 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
       }
       replyText += 'ka';
     } else {
-      replyText = 'Not found "' + query + '" ka. Try other keywords or contact store directly.';
+      replyText = 'Not found "' + query + '" ka';
     }
 
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // !order (admin only)
+  // !order - admin only
   if (msg === '!order') {
     var replyText = await callGroqAPI('Customer wants to order. Collect: name, phone, address, product name, quantity.', '', 'sales');
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // !shop (admin only)
+  // !shop - admin only
   if (msg === '!shop') {
     var storeInfo = await getStoreInfo();
     if (!storeInfo) {
@@ -312,7 +302,7 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
     return true;
   }
 
-  // !help (admin only)
+  // !help - admin only
   if (msg === '!help' || msg === '!help') {
     var helpText = 'Commands:\n\n';
     helpText += '!admin - Toggle admin mode\n';
@@ -352,6 +342,12 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
         // Check commands
         var handled = await handleCommand(userMessage, replyToken, userId, sourceType);
         if (handled) continue;
+
+        // If admin mode is ON, tell customer bot is paused
+        if (isAdminMode()) {
+          await replyToLine(replyToken, [{ type: 'text', text: 'Bot is paused. Please wait ka' }]);
+          continue;
+        }
 
         // Normal conversation
         var storeContext = await buildStoreContext();
