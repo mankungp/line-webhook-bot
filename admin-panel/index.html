@@ -491,9 +491,8 @@ function updateBotUI(data) {
     var name = info.displayName || 'ลูกค้า';
     var avatarUrl = info.pictureUrl;
 
-    var btnId = 'tc_' + userId.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Math.random().toString(36).substr(2, 5);
     html += '<div class="customer-item" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;">';
-    html += '<button id="' + btnId + '" class="customer-toggle ' + (isOff ? 'on' : 'off') + '" style="min-width:75px;height:48px;border:none;border-radius:8px;color:white;font-weight:bold;font-size:14px;cursor:pointer;" onclick="window.tc(\'' + userId.replace(/'/g, "\\'") + '\', ' + !isOff + ');return false;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-uid="' + userId.replace(/"/g, '&quot;') + '" data-turn-on="' + !isOff + '" style="min-width:75px;height:48px;border:none;border-radius:8px;color:white;font-weight:bold;font-size:14px;cursor:pointer;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     if (avatarUrl) {
       html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">';
     } else {
@@ -504,13 +503,11 @@ function updateBotUI(data) {
     html += '<div class="customer-meta" style="font-size:12px;color:#999;">เข้าล่าสุด: ' + dateStr + '</div>';
     html += '</div>';
     html += '</div>';
-    html += '<script>document.getElementById("' + btnId + '").onclick = function() { toggleCustomer("' + userId.replace(/"/g, '\"') + '", ' + !isOff + '); };</script>';
   });
 
   listEl.innerHTML = html;
   document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th-TH');
 }
-
 async function toggleGlobal() {
   try {
     var res = await fetch('/api/admin/toggle-global', { method: 'POST' });
