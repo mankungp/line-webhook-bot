@@ -1,7 +1,6 @@
 /**
- * LINE Webhook Bot - Nong Kung
- * Express.js + Groq API
- * Store: Kerdkarnkaset
+ * LINE Webhook Bot - Kerdkarnkaset
+ * Express.js + Groq API + AI Welcome
  */
 
 const express = require('express');
@@ -12,6 +11,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SALES_FILE = '/tmp/sales-inquiries.json';
 const ADMIN_MODE_FILE = '/tmp/bot-admin-mode.json';
+const WELCOME_FILE = '/tmp/welcome-sent.json';
+const CUSTOMER_MODE_FILE = '/tmp/customer-bot-mode.json';
 
 // Config
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
@@ -20,6 +21,9 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const LOCAL_API_BASE = process.env.LOCAL_API_BASE || '';
 const ADMIN_USER_ID = process.env.ADMIN_USER_ID || 'Ud75471b7c313436141ce8d09f23472ef';
+
+// Welcome message
+const WELCOME_MSG = '🌾 สวัสดีค่ะ! ยินดีต้อนรับเข้าสู่ร้านเกิดการเกษตรค่ะ\n\n📍 ที่อยู่ร้าน: อ.โพนทอง จ.ร้อยเอ็ด\n📞 โทร: 091-414-5767\n🗺️ แผนที่: https://maps.app.goo.gl/yq9LvRcEp3xrb7p28\n⏰ เปิดทำการ: ทุกวัน 08:00-17:00 น.\n\n🤖 AI ผู้ช่วยอัจฉริยะ สามารถ:\n• เช็คราคาสินค้าได้ทันที (ราคาปลีก/ราคาส่ง*)\n• สั่งซื้อสินค้าออนไลน์ได้เลย\n• ตอบคำถามทั่วไปเกี่ยวกับสินค้า\n\n*ราคาส่ง ต้องสมัครสมาชิกร้านค้าค่ะ\n\n💬 ติดต่อแอดมิน: 08:00-17:00 น.\n\nมีอะไรให้ช่วยไหมคะ?';
 
 // Middleware
 app.use(express.json());
@@ -34,7 +38,7 @@ app.use(function(req, res, next) {
 
 // Health check
 app.get('/', function(req, res) {
-  res.send('Nong Kung is ALIVE!');
+  res.send('Kerdkarnkaset is ALIVE!');
 });
 
 app.get('/health', function(req, res) {
@@ -97,7 +101,7 @@ async function searchProducts(query) {
 }
 
 // Admin mode helpers
-function isAdminMode() {
+function isGlobalBotOff() {
   try {
     if (fs.existsSync(ADMIN_MODE_FILE)) {
       var data = fs.readFileSync(ADMIN_MODE_FILE, 'utf8');
@@ -108,14 +112,74 @@ function isAdminMode() {
   return false;
 }
 
-function toggleAdminMode() {
+function toggleGlobalBotMode() {
   try {
-    var current = isAdminMode();
+    var current = isGlobalBotOff();
     fs.writeFileSync(ADMIN_MODE_FILE, JSON.stringify({ on: !current, updatedAt: new Date().toISOString() }), 'utf8');
     return !current;
   } catch (e) {
     return false;
   }
+}
+
+// Per-customer bot mode
+function isCustomerBotOff(userId) {
+  try {
+    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
+      var data = fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8');
+      var modeInfo = JSON.parse(data);
+      return modeInfo[userId] === true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function toggleCustomerBotMode(userId) {
+  try {
+    var modeInfo = {};
+    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
+      var data = fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8');
+      modeInfo = JSON.parse(data);
+    }
+    modeInfo[userId] = !modeInfo[userId];
+    fs.writeFileSync(CUSTOMER_MODE_FILE, JSON.stringify(modeInfo, null, 2), 'utf8');
+    return modeInfo[userId];
+  } catch (e) {
+    return false;
+  }
+}
+
+function getCustomerBotModes() {
+  try {
+    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
+      return JSON.parse(fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return {};
+}
+
+// Welcome message helpers
+function isWelcomeSent(userId) {
+  try {
+    if (fs.existsSync(WELCOME_FILE)) {
+      var data = fs.readFileSync(WELCOME_FILE, 'utf8');
+      var sent = JSON.parse(data);
+      return sent[userId] === true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function markWelcomeSent(userId) {
+  try {
+    var sent = {};
+    if (fs.existsSync(WELCOME_FILE)) {
+      var data = fs.readFileSync(WELCOME_FILE, 'utf8');
+      sent = JSON.parse(data);
+    }
+    sent[userId] = true;
+    fs.writeFileSync(WELCOME_FILE, JSON.stringify(sent, null, 2), 'utf8');
+  } catch (e) {}
 }
 
 // Save sales inquiry
@@ -140,13 +204,13 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
 
   var systemPrompt = '';
   if (commandType === 'admin') {
-    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai, end every sentence with "ka". Admin mode is ON. Tell customer to wait, admin will contact them back. Ask for their name and phone if not provided.';
+    systemPrompt = 'You are an admin assistant at Kerdkarnkaset store. Reply in Thai. Admin mode is ON. Tell customer to wait, admin will contact them back. Ask for their name and phone if not provided.';
   } else if (commandType === 'price') {
-    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai with short answers. When searching price, show product name and price clearly with line breaks. If not found, say "not found ka".';
+    systemPrompt = 'You are an AI assistant at Kerdkarnkaset store. Reply in Thai with short answers. When searching price, show product name and price clearly with line breaks. If not found, say "not found".';
   } else if (commandType === 'sales') {
-    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store helping with order. Ask for: name, phone, address, product, quantity. Reply in Thai, end with "ka".';
+    systemPrompt = 'You are an AI assistant at Kerdkarnkaset store helping with order. Ask for: name, phone, address, product, quantity. Reply in Thai.';
   } else {
-    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store selling agricultural equipment, motorcycle parts, and lawn mower parts. Reply in Thai, end every sentence with "ka". Use clear formatting with line breaks. Do not make up information. Use only the store data provided below.\n\nStore info:\n' + storeContext;
+    systemPrompt = 'You are an AI assistant at Kerdkarnkaset store selling agricultural equipment, motorcycle parts, and lawn mower parts. Reply in Thai. Use clear formatting with line breaks. Do not make up information. Use only the store data provided below.\n\nStore info:\n' + storeContext;
   }
 
   try {
@@ -178,7 +242,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
     var data = await response.json();
     var reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
       ? data.choices[0].message.content
-      : 'Sorry ka, cannot reply right now';
+      : 'ขอโทษค่ะ ตอบไม่ได้ในตอนนี้';
     console.log('[GROQ] Reply:', reply);
     return reply;
 
@@ -242,36 +306,35 @@ async function buildStoreContext() {
   return ctx;
 }
 
-// Command handlers - ALL SILENTLY IGNORED for customers
-async function handleCommand(msg, replyToken, userId, sourceType) {
-  // Helper: check if user is admin
+// Command handlers
+async function handleCommand(msg, replyToken, userId) {
   function isAdmin(uid) {
     return uid === ADMIN_USER_ID;
   }
 
-  // !admin - toggle admin mode (admin only)
+  // !admin - toggle global bot mode (admin only)
   if (msg === '!admin') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore for non-admin
+      return true; // silent ignore
     }
-    var newState = toggleAdminMode();
+    var newState = toggleGlobalBotMode();
     var replyText = newState
-      ? 'Admin Mode ON - Bot paused'
-      : 'Admin Mode OFF - Bot active';
+      ? 'Bot OFF'
+      : 'Bot ON';
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // !myid - check your own user ID (for admin setup)
+  // !myid - check user ID
   if (msg === '!myid') {
-    await replyToLine(replyToken, [{ type: 'text', text: 'Your User ID: ' + userId }]);
+    await replyToLine(replyToken, [{ type: 'text', text: 'ID: ' + userId }]);
     return true;
   }
 
-  // !price - admin only (silent ignore for customers)
+  // !price - admin only
   if (msg.indexOf('!price ') === 0) {
     if (!isAdmin(userId)) {
-      return true; // silent ignore for non-admin
+      return true; // silent ignore
     }
     var query = msg.substring(7).trim();
     var results = await searchProducts(query);
@@ -286,9 +349,8 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
         if (p.stock !== undefined) replyText += 'Stock: ' + p.stock + ' units\n';
         replyText += '\n';
       }
-      replyText += 'ka';
     } else {
-      replyText = 'Not found "' + query + '" ka';
+      replyText = 'Not found "' + query + '"';
     }
 
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
@@ -298,7 +360,7 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
   // !order - admin only
   if (msg === '!order') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore for non-admin
+      return true; // silent ignore
     }
     var replyText = await callGroqAPI('Customer wants to order. Collect: name, phone, address, product name, quantity.', '', 'sales');
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
@@ -308,11 +370,11 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
   // !shop - admin only
   if (msg === '!shop') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore for non-admin
+      return true; // silent ignore
     }
     var storeInfo = await getStoreInfo();
     if (!storeInfo) {
-      await replyToLine(replyToken, [{ type: 'text', text: 'Sorry ka, cannot get store info right now' }]);
+      await replyToLine(replyToken, [{ type: 'text', text: 'Sorry, cannot get store info right now' }]);
       return true;
     }
     var lines = [];
@@ -327,17 +389,11 @@ async function handleCommand(msg, replyToken, userId, sourceType) {
   }
 
   // !help - admin only
-  if (msg === '!help' || msg === '!help') {
+  if (msg === '!help') {
     if (!isAdmin(userId)) {
-      return true; // silent ignore for non-admin
+      return true; // silent ignore
     }
-    var helpText = 'Commands:\n\n';
-    helpText += '!admin - Toggle admin mode\n';
-    helpText += '!price [product] - Search price\n';
-    helpText += '!order - Place order\n';
-    helpText += '!shop - Store info\n';
-    helpText += '!myid - Show your User ID\n';
-    helpText += '!help - Show commands';
+    var helpText = 'Commands:\n\n!admin - Toggle bot\n!price [product] - Search price\n!order - Place order\n!shop - Store info\n!myid - Show your ID\n!help - Show this';
     await replyToLine(replyToken, [{ type: 'text', text: helpText }]);
     return true;
   }
@@ -363,17 +419,30 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
         var userMessage = event.message.text;
         var replyToken = event.replyToken;
         var userId = (event.source && event.source.userId) ? event.source.userId : 'unknown';
-        var sourceType = (event.source && event.source.type) ? event.source.type : 'user';
 
-        console.log('[WEBHOOK] User message:', userMessage, '| Source:', sourceType);
+        console.log('[WEBHOOK] User message:', userMessage, '| User:', userId);
+
+        // Check if this is first time user - send welcome
+        if (!isWelcomeSent(userId)) {
+          console.log('[WELCOME] Sending welcome to new user:', userId);
+          await replyToLine(replyToken, [{ type: 'text', text: WELCOME_MSG }]);
+          markWelcomeSent(userId);
+          continue;
+        }
 
         // Check commands
-        var handled = await handleCommand(userMessage, replyToken, userId, sourceType);
+        var handled = await handleCommand(userMessage, replyToken, userId);
         if (handled) continue;
 
-        // If admin mode is ON, tell customer bot is paused
-        if (isAdminMode()) {
-          await replyToLine(replyToken, [{ type: 'text', text: 'Bot is paused. Please wait ka' }]);
+        // Check if global bot is OFF
+        if (isGlobalBotOff()) {
+          console.log('[BOT] Global OFF - not responding');
+          continue;
+        }
+
+        // Check if customer bot is OFF
+        if (isCustomerBotOff(userId)) {
+          console.log('[BOT] Customer', userId, 'bot OFF - not responding');
           continue;
         }
 
@@ -390,21 +459,20 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
         console.log('[WEBHOOK] Postback:', data);
 
         if (data === 'action_price') {
-          await replyToLine(replyToken, [{ type: 'text', text: 'Type !price [product name] to search ka' }]);
+          await replyToLine(replyToken, [{ type: 'text', text: 'Type !price [product name] to search' }]);
         } else if (data === 'action_order') {
-          await replyToLine(replyToken, [{ type: 'text', text: 'Type !order to place order ka' }]);
+          await replyToLine(replyToken, [{ type: 'text', text: 'Type !order to place order' }]);
         } else if (data === 'action_contact') {
           var storeInfo = await getStoreInfo();
-          var contactText = 'Contact store:\n';
+          var contactText = 'Contact:\n';
           if (storeInfo && storeInfo.phone) contactText += 'Phone: ' + storeInfo.phone + '\n';
           if (storeInfo && storeInfo.line) contactText += 'Line: ' + storeInfo.line + '\n';
-          contactText += 'ka';
           await replyToLine(replyToken, [{ type: 'text', text: contactText }]);
         } else if (data === 'action_admin') {
           var replyText = await callGroqAPI('Customer wants to contact admin', '', 'admin');
           await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
         } else {
-          await replyToLine(replyToken, [{ type: 'text', text: 'Thank you ka' }]);
+          await replyToLine(replyToken, [{ type: 'text', text: 'Thank you' }]);
         }
       }
     }
@@ -419,7 +487,7 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
 
 // Start server
 app.listen(PORT, function() {
-  console.log('Nong Kung LINE Bot started!');
+  console.log('Kerdkarnkaset LINE Bot started!');
   console.log('PORT:', PORT);
   console.log('Local API:', LOCAL_API_BASE);
 });
