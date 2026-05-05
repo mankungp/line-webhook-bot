@@ -1,38 +1,30 @@
 /**
- * LINE Webhook Bot - น้องกุ้ง 🦐
- * Express.js + Groq API (llama-3.1-8b-instant)
- *
- * ร้านเกิดการเกษตร - อุปกรณ์การเกษตร & อะไหล่มอเตอร์ไซค์
+ * LINE Webhook Bot - Nong Kung
+ * Express.js + Groq API
+ * Store: Kerdkarnkaset
  */
 
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SALES_FILE = '/tmp/sales-inquiries.json';
 
-// ============================================================
-// CONFIG - LINE, Groq & Local API Credentials
-// ============================================================
-
-const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || 'YOUR_LINE_CHANNEL_SECRET';
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || 'YOUR_LINE_CHANNEL_ACCESS_TOKEN';
-const GROQ_API_KEY = process.env.GROQ_API_KEY || 'YOUR_GROQ_API_KEY';
+// Config
+const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
+const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const LOCAL_API_BASE = process.env.LOCAL_API_BASE || 'https://rephrase-depict-rubber.ngrok-free.dev';
+const LOCAL_API_BASE = process.env.LOCAL_API_BASE || '';
 
-// ============================================================
-// MIDDLEWARE
-// ============================================================
-
+// Middleware
 app.use(express.json());
 
 app.use((req, res, next) => {
   console.log('\n========== NEW REQUEST ==========');
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  console.log('[' + new Date().toISOString() + '] ' + req.method + ' ' + req.path);
   if (req.body) console.log('Body:', JSON.stringify(req.body, null, 2));
   console.log('=================================\n');
   next();
@@ -40,23 +32,20 @@ app.use((req, res, next) => {
 
 // Health check
 app.get('/', (req, res) => {
-  res.send('🦐 น้องกุ้ง is ALIVE! - LINE Bot Ready');
+  res.send('Nong Kung is ALIVE!');
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'LINE Bot - น้องกุ้ง', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'LINE Bot', timestamp: new Date().toISOString() });
 });
 
-// ============================================================
-// LINE SIGNATURE VERIFICATION
-// ============================================================
-
+// Line signature verification
 function verifyLineSignature(req, res, next) {
   const signature = req.get('x-line-signature');
   const bodyString = JSON.stringify(req.body);
 
   if (!signature) {
-    console.error('[VERIFY] ❌ NO signature found!');
+    console.error('[VERIFY] NO signature found!');
     return res.status(401).json({ error: 'No signature' });
   }
 
@@ -66,55 +55,49 @@ function verifyLineSignature(req, res, next) {
     .digest('base64');
 
   if (signature !== expectedSignature) {
-    console.error('[VERIFY] ❌ Signature MISMATCH!');
+    console.error('[VERIFY] Signature MISMATCH!');
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
-  console.log('[VERIFY] ✅ Signature OK');
+  console.log('[VERIFY] Signature OK');
   next();
 }
 
-// ============================================================
-// LOCAL API CALL
-// ============================================================
-
+// Local API calls
 async function getStoreInfo() {
   try {
-    const res = await fetch(`${LOCAL_API_BASE}/api/shop`);
-    if (!res.ok) throw new Error(`Store info error: ${res.status}`);
+    const res = await fetch(LOCAL_API_BASE + '/api/shop');
+    if (!res.ok) throw new Error('Store info error: ' + res.status);
     return await res.json();
   } catch (err) {
-    console.error('[LOCAL] ❌ getStoreInfo failed:', err.message);
+    console.error('[LOCAL] getStoreInfo failed:', err.message);
     return null;
   }
 }
 
 async function getProducts() {
   try {
-    const res = await fetch(`${LOCAL_API_BASE}/api/products`);
-    if (!res.ok) throw new Error(`Products error: ${res.status}`);
+    const res = await fetch(LOCAL_API_BASE + '/api/products');
+    if (!res.ok) throw new Error('Products error: ' + res.status);
     return await res.json();
   } catch (err) {
-    console.error('[LOCAL] ❌ getProducts failed:', err.message);
+    console.error('[LOCAL] getProducts failed:', err.message);
     return null;
   }
 }
 
 async function searchProducts(query) {
   try {
-    const res = await fetch(`${LOCAL_API_BASE}/api/products/search?q=${encodeURIComponent(query)}`);
-    if (!res.ok) throw new Error(`Search error: ${res.status}`);
+    const res = await fetch(LOCAL_API_BASE + '/api/products/search?q=' + encodeURIComponent(query));
+    if (!res.ok) throw new Error('Search error: ' + res.status);
     return await res.json();
   } catch (err) {
-    console.error('[LOCAL] ❌ searchProducts failed:', err.message);
+    console.error('[LOCAL] searchProducts failed:', err.message);
     return null;
   }
 }
 
-// ============================================================
-// SALES INQUIRY LOG
-// ============================================================
-
+// Save sales inquiry
 function saveSalesInquiry(inquiry) {
   try {
     let inquiries = [];
@@ -122,83 +105,40 @@ function saveSalesInquiry(inquiry) {
       const data = fs.readFileSync(SALES_FILE, 'utf8');
       inquiries = JSON.parse(data);
     }
-    inquiries.push({
-      ...inquiry,
-      timestamp: new Date().toISOString()
-    });
+    inquiries.push({ ...inquiry, timestamp: new Date().toISOString() });
     fs.writeFileSync(SALES_FILE, JSON.stringify(inquiries, null, 2), 'utf8');
-    console.log('[SALES] ✅ Inquiry saved:', inquiry.product);
+    console.log('[SALES] Inquiry saved:', inquiry.product);
   } catch (err) {
-    console.error('[SALES] ❌ Save failed:', err.message);
+    console.error('[SALES] Save failed:', err.message);
   }
 }
 
-// ============================================================
-// GROQ API CALL
-// ============================================================
+// Groq API call
+async function callGroqAPI(userMessage, storeContext, commandType) {
+  console.log('[GROQ] Calling Groq API...');
 
-async function callGroqAPI(userMessage, storeContext = '', commandType = 'normal') {
-  console.log('[GROQ] 📤 Calling Groq API...');
-
-  const styleGuide = `
-## รูปแบบคำตอบ:
-- ขึ้นบรรทัดใหม่ชัดเจน ทุกหัวข้อ
-- ใช้ emoji ประกอบแต่ไม่มากเกินไป
-- เน้นข้อมูลสำคัญด้วยตัวหนา หรือขีดเส้นใต้
-- ราคาให้แสดงชัดเจน ปัดเศษหรือไม่ก็ไม่ต้อง
-- ตอบกระชับ ไม่ยืดเยื้อ
-
-## คำลงท้าย:
-- ทุกประโยคลงท้ายด้วย "ค่ะ" เท่านั้น
-`;
-
-  let systemInstruction = '';
+  var systemPrompt = '';
   if (commandType === 'admin') {
-    systemInstruction = `คุณคือน้องกุ้ง 🦐 ผู้ช่วยขายของร้านเกิดการเกษตร ตอบเป็นผู้หญิงใช้คำลงท้าย "ค่ะ" เท่านั้น ภาษาไทย
-
-⚠️ โหมดแอดมิน: บอทกำลังหยุดทำงานชั่วคราว
-- บอกลูกค้าว่า "ขอบคุณที่ติดต่อมาค่ะ ทางร้านจะติดต่อกลับเร็วๆ นี้นะคะ"
-- จดข้อมูล: ชื่อลูกค้า, เบอร์โทร, สินค้าที่สนใจ, จำนวน ถ้ามี
-${styleGuide}`;
+    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai, end every sentence with "ka". The bot is temporarily stopped. Tell customer to wait for admin to contact back. Ask for their name and phone if not provided.';
   } else if (commandType === 'price') {
-    systemInstruction = `คุณคือน้องกุ้ง 🦐 ผู้ช่วยขายของร้านเกิดการเกษตร ตอบเป็นผู้หญิงใช้คำลงท้าย "ค่ะ" เท่านั้น ภาษาไทย
-
-📋 คำสั่งราคา: ตอบราคาสินค้าที่ค้นหาเท่านั้น ไม่ต้องอธิบายเพิ่ม
-- แสดงชื่อสินค้า ราคา สถานะสต็อก (ถ้ามี)
-- ถ้าไม่พบสินค้า บอกว่า "ไม่พบสินค้าที่ค้นหาค่ะ"
-${styleGuide}`;
+    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai with short answers. When searching price, show product name and price clearly. If not found, say "not found ka".';
   } else if (commandType === 'sales') {
-    systemInstruction = `คุณคือน้องกุ้ง 🦐 ผู้ช่วยขายของร้านเกิดการเกษตร ตอบเป็นผู้หญิงใช้คำลงท้าย "ค่ะ" เท่านั้น ภาษาไทย
-
-🛒 ข้อมูลการสั่งซื้อ: จดบันทึกข้อมูลลูกค้า
-- ถามชื่อ, เบอร์โทร, ที่อยู่จัดส่ง, สินค้าที่ต้องการ, จำนวน
-- ยืนยันคำสั่งซื้อกลับไป
-- เก็บข้อมูลไว้ในระบบ
-${styleGuide}`;
+    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store helping with order. Ask for: name, phone, address, product, quantity. Reply in Thai, end with "ka".';
   } else {
-    systemInstruction = `คุณคือน้องกุ้ง 🦐 ผู้ช่วยขายของร้านเกิดการเกษตร ตอบเป็นผู้หญิงใช้คำลงท้าย "ค่ะ" เท่านั้น ภาษาไทย
-
-## คำสั่งสำคัญ:
-- ห้ามแต่งข้อมูลใดๆ ขึ้นมาเองเด็ดขาด!
-- ตอบคำถามเกี่ยวกับร้าน สินค้า ราคา โดยใช้ข้อมูลที่ให้เท่านั้น
-- ถ้าถามเรื่องที่ไม่มีในข้อมูล ให้ตอบว่า "ข้อมูลนี้ยังไม่มีในระบบค่ะ ติดต่อร้านได้โดยตรงนะคะ"
-${styleGuide}
-
-ข้อมูลร้าน:
-${storeContext}`;
+    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store selling agricultural equipment, motorcycle parts, and lawn mower parts. Reply in Thai, end every sentence with "ka". Use clear formatting with line breaks. Do not make up information. Use only the store data provided below.\n\nStore info:\n' + storeContext;
   }
 
   try {
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Authorization': 'Bearer ' + GROQ_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
         messages: [
-          { role: 'system', content: systemInstruction },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
         temperature: 0.7,
@@ -210,257 +150,219 @@ ${storeContext}`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[GROQ] ❌ API Error:', response.status, errorText);
-      throw new Error(`Groq API error: ${response.status}`);
+      console.error('[GROQ] API Error:', response.status, errorText);
+      throw new Error('Groq API error: ' + response.status);
     }
 
     const data = await response.json();
-    const assistantReply = data.choices?.[0]?.message?.content || 'ขอโทษค่ะ ตอบไม่ได้ในตอนนี้';
-    console.log('[GROQ] ✅ Reply:', assistantReply);
-
-    return assistantReply;
+    const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+      ? data.choices[0].message.content
+      : 'Sorry ka, cannot reply right now';
+    console.log('[GROQ] Reply:', reply);
+    return reply;
 
   } catch (error) {
-    console.error('[GROQ] ❌ Exception:', error.message);
+    console.error('[GROQ] Exception:', error.message);
     throw error;
   }
 }
 
-// ============================================================
-// LINE REPLY API
-// ============================================================
-
+// Reply to LINE
 async function replyToLine(replyToken, messages) {
   try {
     const response = await fetch('https://api.line.me/v2/bot/message/reply', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+        'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        replyToken: replyToken,
-        messages: messages,
-      }),
+      body: JSON.stringify({ replyToken: replyToken, messages: messages }),
     });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error('[LINE] ❌ Reply failed:', response.status, err);
-      throw new Error(`LINE reply error: ${response.status}`);
+      console.error('[LINE] Reply failed:', response.status, err);
+      throw new Error('LINE reply error: ' + response.status);
     }
 
-    console.log('[LINE] ✅ Reply sent successfully');
+    console.log('[LINE] Reply sent successfully');
     return true;
   } catch (error) {
-    console.error('[LINE] ❌ Reply error:', error.message);
+    console.error('[LINE] Reply error:', error.message);
     throw error;
   }
 }
 
-// ============================================================
-// BUILD CONTEXT
-// ============================================================
-
+// Build store context
 async function buildStoreContext() {
   const [storeInfo, allProducts] = await Promise.all([
-    getStoreInfo().catch(() => null),
-    getProducts().catch(() => null)
+    getStoreInfo().catch(function() { return null; }),
+    getProducts().catch(function() { return null; })
   ]);
 
-  let storeContext = '';
+  var ctx = '';
   if (storeInfo) {
-    storeContext += `ชื่อร้าน: ${storeInfo.name || 'เกิดการเกษตร'}\n`;
-    if (storeInfo.address) storeContext += `ที่อยู่: ${storeInfo.address}\n`;
-    if (storeInfo.phone) storeContext += `โทร: ${storeInfo.phone}\n`;
-    if (storeInfo.openHours) storeContext += `เปิด: ${storeInfo.openHours}\n`;
+    ctx += 'Name: ' + (storeInfo.name || 'Kerdkarnkaset') + '\n';
+    if (storeInfo.address) ctx += 'Address: ' + storeInfo.address + '\n';
+    if (storeInfo.phone) ctx += 'Phone: ' + storeInfo.phone + '\n';
+    if (storeInfo.openHours) ctx += 'Hours: ' + storeInfo.openHours + '\n';
   }
   if (allProducts && Array.isArray(allProducts)) {
-    const topProducts = allProducts.slice(0, 20);
-    storeContext += '\nสินค้าในร้าน:\n';
-    for (const p of topProducts) {
-      storeContext += `- ${p.name} | ราคา ${p.price} บาท`;
-      if (p.stock !== undefined) storeContext += ` | สต็อก: ${p.stock}`;
-      if (p.category) storeContext += ` | ${p.category}`;
-      storeContext += '\n';
+    ctx += '\nProducts:\n';
+    var topProducts = allProducts.slice(0, 20);
+    for (var i = 0; i < topProducts.length; i++) {
+      var p = topProducts[i];
+      ctx += '- ' + p.name + ' | Price: ' + p.price + ' THB';
+      if (p.stock !== undefined) ctx += ' | Stock: ' + p.stock;
+      if (p.category) ctx += ' | ' + p.category;
+      ctx += '\n';
     }
   }
 
-  console.log('[CONTEXT] Store context length:', storeContext.length);
-  return storeContext;
+  console.log('[CONTEXT] Store context length:', ctx.length);
+  return ctx;
 }
 
-// ============================================================
-// COMMAND HANDLERS
-// ============================================================
-
-async function handleCommand(message, replyToken, userId) {
-  const msg = message.trim();
-
-  // ===== !แอดมิน =====
-  if (msg === '!แอดมิน') {
-    const replyText = await callGroqAPI('ลูกค้าต้องการติดต่อแอดมิน ขอข้อมูลเบื้องต้น', '', 'admin');
-    await replyToLine(replyToken, [
-      { type: 'text', text: replyText }
-    ]);
+// Command handlers
+async function handleCommand(msg, replyToken, userId) {
+  // !admin
+  if (msg === '!admin') {
+    var replyText = await callGroqAPI('Customer wants to contact admin. Ask for name and phone number.', '', 'admin');
+    await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // ===== !ราคา =====
-  if (msg.startsWith('!ราคา ')) {
-    const query = msg.slice(4).trim();
-    const results = await searchProducts(query);
-    let replyText = '';
+  // !price
+  if (msg.indexOf('!price ') === 0) {
+    var query = msg.substring(7).trim();
+    var results = await searchProducts(query);
+    var replyText = '';
 
     if (results && Array.isArray(results) && results.length > 0) {
-      replyText = `🔍 ผลการค้นหา "${query}"\n\n`;
-      for (const p of results.slice(0, 10)) {
-        replyText += `📦 ${p.name}\n`;
-        replyText += `   💰 ราคา ${p.price} บาท\n`;
-        if (p.stock !== undefined) {
-          replyText += `   📊 สต็อก: ${p.stock} ชิ้น\n`;
-        }
+      replyText = 'Result for "' + query + '"\n\n';
+      for (var i = 0; i < results.length && i < 10; i++) {
+        var p = results[i];
+        replyText += p.name + '\n';
+        replyText += 'Price: ' + p.price + ' THB\n';
+        if (p.stock !== undefined) replyText += 'Stock: ' + p.stock + ' units\n';
         replyText += '\n';
       }
-      replyText += 'ค่ะ';
+      replyText += 'ka';
     } else {
-      replyText = `❌ ไม่พบสินค้าที่ค้นหา "${query}" ค่ะ\n\nลองใช้คำค้นอื่น หรือติดต่อร้านโดยตรงนะคะ';
+      replyText = 'Not found "' + query + '" ka. Try other keywords or contact store directly.';
     }
 
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // ===== !สั่งซื้อ =====
-  if (msg === '!สั่งซื้อ') {
-    const replyText = await callGroqAPI('ลูกค้าต้องการสั่งซื้อ ขอข้อมูลการสั่งซื้อ', '', 'sales');
+  // !order
+  if (msg === '!order') {
+    var replyText = await callGroqAPI('Customer wants to order. Collect: name, phone, address, product name, quantity.', '', 'sales');
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // ===== !ข้อมูลร้าน =====
-  if (msg === '!ข้อมูลร้าน') {
-    const storeInfo = await getStoreInfo();
+  // !shop
+  if (msg === '!shop') {
+    var storeInfo = await getStoreInfo();
     if (!storeInfo) {
-      await replyToLine(replyToken, [{ type: 'text', text: 'ขอโทษค่ะ ดึงข้อมูลร้านไม่ได้ในตอนนี้' }]);
+      await replyToLine(replyToken, [{ type: 'text', text: 'Sorry ka, cannot get store info right now' }]);
       return true;
     }
-    let replyText = `🏪 ข้อมูลร้านเกิดการเกษตร\n\n`;
-    replyText += `📍 ที่อยู่: ${storeInfo.address || '-'}\n`;
-    replyText += `📞 โทร: ${storeInfo.phone || '-'}\n`;
-    replyText += `⏰ เปิด: ${storeInfo.openHours || '-'} (${storeInfo.openDays || ''})\n`;
-    if (storeInfo.line) replyText += `💬 Line: ${storeInfo.line}\n`;
-    if (storeInfo.facebook) replyText += `📱 Facebook: ${storeInfo.facebook}\n`;
-    replyText += '\nค่ะ';
-    await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
+    var lines = [];
+    lines.push({ type: 'text', text: 'Store info\n' });
+    lines.push({ type: 'text', text: 'Name: ' + (storeInfo.name || '-') });
+    if (storeInfo.address) lines.push({ type: 'text', text: 'Address: ' + storeInfo.address });
+    if (storeInfo.phone) lines.push({ type: 'text', text: 'Phone: ' + storeInfo.phone });
+    if (storeInfo.openHours) lines.push({ type: 'text', text: 'Hours: ' + storeInfo.openHours });
+    if (storeInfo.line) lines.push({ type: 'text', text: 'Line: ' + storeInfo.line });
+    await replyToLine(replyToken, lines);
     return true;
   }
 
-  // ===== !ช่วย =====
-  if (msg === '!ช่วย' || msg === '!help') {
-    const replyText = `🦐 คำสั่งน้องกุ้ง\n\n` +
-      `📋 !ราคา [ชื่อสินค้า] - ค้นหาราคา\n` +
-      `🛒 !สั่งซื้อ - สั่งซื้อสินค้า\n` +
-      `📍 !ข้อมูลร้าน - ดูข้อมูลร้าน\n` +
-      `👤 !แอดมิน - ติดต่อแอดมิน\n` +
-      `❓ !ช่วย - แสดงคำสั่งนี้\n\n` +
-      `หรือพิมพ์ถามตรงได้เลยค่ะ 🦐`;
-    await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
+  // !help
+  if (msg === '!help' || msg === '!help') {
+    var helpText = 'Commands:\n\n';
+    helpText += '!price [product] - Search price\n';
+    helpText += '!order - Place order\n';
+    helpText += '!shop - Store info\n';
+    helpText += '!admin - Contact admin\n';
+    helpText += '!help - Show commands';
+    await replyToLine(replyToken, [{ type: 'text', text: helpText }]);
     return true;
   }
 
   return false;
 }
 
-// ============================================================
-// WEBHOOK ENDPOINT
-// ============================================================
-
-app.post('/webhook', verifyLineSignature, async (req, res) => {
-  console.log('[WEBHOOK] 📥 Incoming webhook event');
+// Webhook endpoint
+app.post('/webhook', verifyLineSignature, async function(req, res) {
+  console.log('[WEBHOOK] Incoming webhook event');
 
   try {
-    const events = req.body.events;
-
+    var events = req.body.events;
     if (!events || events.length === 0) {
-      return res.status(200).json({ status: 'ok', message: 'No events' });
+      return res.status(200).json({ status: 'ok' });
     }
 
-    for (const event of events) {
-      console.log('[WEBHOOK] Processing event type:', event.type);
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i];
+      console.log('[WEBHOOK] Event type:', event.type);
 
-      // ===== TEXT MESSAGE =====
       if (event.type === 'message' && event.message.type === 'text') {
-        const userMessage = event.message.text;
-        const replyToken = event.replyToken;
-        const userId = event.source?.userId || 'unknown';
+        var userMessage = event.message.text;
+        var replyToken = event.replyToken;
+        var userId = event.source && event.source.userId ? event.source.userId : 'unknown';
 
-        console.log('[WEBHOOK] 💬 User message:', userMessage);
+        console.log('[WEBHOOK] User message:', userMessage);
 
-        // Check for commands first
-        const handled = await handleCommand(userMessage, replyToken, userId);
+        // Check commands
+        var handled = await handleCommand(userMessage, replyToken, userId);
         if (handled) continue;
 
-        // Normal conversation with context
-        const storeContext = await buildStoreContext();
-        const replyText = await callGroqAPI(userMessage, storeContext, 'normal');
+        // Normal conversation
+        var storeContext = await buildStoreContext();
+        var replyText = await callGroqAPI(userMessage, storeContext, 'normal');
 
-        await replyToLine(replyToken, [
-          {
-            type: 'text',
-            text: replyText
-          }
-        ]);
-        continue;
-      }
+        await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
+      } else if (event.type === 'postback') {
+        var replyToken = event.replyToken;
+        var data = event.postback && event.postback.data ? event.postback.data : '';
 
-      // ===== POSTBACK (Quick Reply buttons) =====
-      if (event.type === 'postback') {
-        const replyToken = event.replyToken;
-        const postbackData = event.postback?.data || '';
+        console.log('[WEBHOOK] Postback:', data);
 
-        console.log('[WEBHOOK] 📌 Postback:', postbackData);
-
-        if (postbackData === 'action_price') {
-          const replyText = '🔍 พิมพ์ !ราคา [ชื่อสินค้า] เช่น !ราคา ยางมอเตอร์ไซค์\n\nแล้วน้องกุ้งจะหาราคาให้ทันทีค่ะ 🦐';
-          await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
-        } else if (postbackData === 'action_order') {
-          const replyText = '🛒 พิมพ์ !สั่งซื้อ เพื่อสั่งสินค้าค่ะ';
-          await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
-        } else if (postbackData === 'action_contact') {
-          const storeInfo = await getStoreInfo();
-          let replyText = `📞 ติดต่อร้านได้เลยค่ะ\n\n`;
-          if (storeInfo?.phone) replyText += `โทร: ${storeInfo.phone}\n`;
-          if (storeInfo?.line) replyText += `Line: ${storeInfo.line}\n`;
-          replyText += '\nยินดีให้บริการค่ะ 🦐';
-          await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
-        } else if (postbackData === 'action_admin') {
-          const replyText = await callGroqAPI('ลูกค้าต้องการติดต่อแอดมิน', '', 'admin');
+        if (data === 'action_price') {
+          await replyToLine(replyToken, [{ type: 'text', text: 'Type !price [product name] to search ka' }]);
+        } else if (data === 'action_order') {
+          await replyToLine(replyToken, [{ type: 'text', text: 'Type !order to place order ka' }]);
+        } else if (data === 'action_contact') {
+          var storeInfo = await getStoreInfo();
+          var contactText = 'Contact store:\n';
+          if (storeInfo && storeInfo.phone) contactText += 'Phone: ' + storeInfo.phone + '\n';
+          if (storeInfo && storeInfo.line) contactText += 'Line: ' + storeInfo.line + '\n';
+          contactText += 'ka';
+          await replyToLine(replyToken, [{ type: 'text', text: contactText }]);
+        } else if (data === 'action_admin') {
+          var replyText = await callGroqAPI('Customer wants to contact admin', '', 'admin');
           await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
         } else {
-          // Echo back
-          await replyToLine(replyToken, [{ type: 'text', text: 'ขอบคุณค่ะ 🦐' }]);
+          await replyToLine(replyToken, [{ type: 'text', text: 'Thank you ka' }]);
         }
-        continue;
       }
     }
 
     res.status(200).json({ status: 'ok' });
 
   } catch (error) {
-    console.error('[WEBHOOK] ❌ Error:', error.message);
+    console.error('[WEBHOOK] Error:', error.message);
     res.status(500).json({ error: 'Internal error' });
   }
 });
 
-// ============================================================
-// START SERVER
-// ============================================================
-
-app.listen(PORT, () => {
-  console.log(`\n🦐 น้องกุ้ง LINE Bot started!`);
-  console.log(`📡 PORT: ${PORT}`);
-  console.log(`🔗 Local API: ${LOCAL_API_BASE}`);
-  console.log(`🌐 ngrok URL: ${LOCAL_API_BASE}`);
-  console.log(`\nReady to receive LINE webhooks!\n`);
+// Start server
+app.listen(PORT, function() {
+  console.log('Nong Kung LINE Bot started!');
+  console.log('PORT:', PORT);
+  console.log('Local API:', LOCAL_API_BASE);
 });
