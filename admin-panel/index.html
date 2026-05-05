@@ -492,7 +492,7 @@ function updateBotUI(data) {
     var avatarUrl = info.pictureUrl;
 
     html += '<div class="customer-item" style="flex-wrap:wrap;gap:8px;align-items:center;">';
-    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-user-id="' + userId.replace(/"/g, '&quot;') + '" data-turn-on="' + !isOff + '" style="min-width:70px;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    html += '<button id="tc_' + userId.replace(/[^a-zA-Z0-9]/g, '_') + '" class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-uid="' + userId + '" style="min-width:70px;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     if (avatarUrl) {
       html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" alt="avatar" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="avatar" style="display:none">👤</div>';
     } else {
@@ -519,24 +519,31 @@ async function toggleGlobal() {
 }
 
 async function toggleCustomer(userId, turnOn) {
+  console.log('toggleCustomer called:', userId, turnOn);
   try {
     var res = await fetch('/api/admin/toggle-customer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId, turnOn: turnOn })
     });
+    console.log('Response:', res.status);
+    var result = await res.json();
+    console.log('Result:', result);
     if (!res.ok) throw new Error();
     loadBotCustomers();
-  } catch (e) { alert('เกิดข้อผิดพลาด'); }
+  } catch (e) { 
+    console.error('toggleCustomer error:', e);
+    alert('เกิดข้อผิดพลาด: ' + e.message); 
+  }
 }
 
 // Event delegation for dynamically rendered customer-toggle buttons
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('.customer-toggle');
   if (!btn) return;
-  var userId = btn.getAttribute('data-user-id');
-  var turnOn = btn.getAttribute('data-turn-on') === 'true';
-  toggleCustomer(userId, turnOn);
+  var userId = btn.getAttribute('data-uid');
+  var turnOn = btn.classList.contains('off'); // off class = want to turn ON (isOff=true)
+  if (userId) toggleCustomer(userId, turnOn);
 });
 
 // ============ PRODUCTS ============
