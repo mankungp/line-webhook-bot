@@ -102,7 +102,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
 .customer-name { font-size: 14px; font-weight: 500; }
 .customer-id { font-size: 11px; color: #999; font-family: monospace; word-break: break-all; }
 .customer-meta { font-size: 11px; color: #999; }
-.customer-toggle { border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; min-width: 64px; min-height: 44px; color: white; flex-shrink: 0; cursor: pointer; }
+.customer-toggle { border: none; padding: 10px 16px; border-radius: 8px; font-size: 14px; min-width: 70px; min-height: 48px; color: white; cursor: pointer; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 .customer-toggle.off { background: #ff9800; }
 .customer-toggle.on { background: #4caf50; }
 .empty-state { text-align: center; padding: 40px; color: #999; }
@@ -491,18 +491,18 @@ function updateBotUI(data) {
     var name = info.displayName || 'ลูกค้า';
     var avatarUrl = info.pictureUrl;
 
-    html += '<div class="customer-item">';
+    html += '<div class="customer-item" style="flex-wrap:wrap;gap:8px;align-items:center;">';
+    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" onclick="toggleCustomer(\'' + userId.replace(/'/g, "\\'") + '\', ' + !isOff + ')" style="min-width:70px;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     if (avatarUrl) {
-      html += '<div><img src="' + escapeHtml(avatarUrl) + '" class="avatar" alt="avatar" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="avatar" style="display:none">👤</div>';
+      html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" alt="avatar" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="avatar" style="display:none">👤</div>';
     } else {
-      html += '<div><div class="avatar">👤</div>';
+      html += '<div class="avatar">👤</div>';
     }
-    html += '<div>';
+    html += '<div style="flex:1;min-width:0;">';
     html += '<div class="customer-name">' + escapeHtml(name) + '</div>';
     html += '<div class="customer-id">' + userId.substring(0, 30) + '...</div>';
     html += '<div class="customer-meta">เข้าล่าสุด: ' + dateStr + '</div>';
-    html += '</div></div>';
-    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" onclick="toggleCustomer(\'' + userId.replace(/'/g, "\\'") + '\', ' + !isOff + ')">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    html += '</div>';
     html += '</div>';
   });
 
