@@ -502,7 +502,7 @@ function updateBotUI(data) {
     html += '<div class="customer-id">' + userId.substring(0, 30) + '...</div>';
     html += '<div class="customer-meta">เข้าล่าสุด: ' + dateStr + '</div>';
     html += '</div></div>';
-    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" onclick="toggleCustomer(\'' + userId + '\', ' + !isOff + ')">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-user-id="' + escapeHtml(userId) + '" data-turn-on="' + !isOff + '">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     html += '</div>';
   });
 
@@ -529,6 +529,15 @@ async function toggleCustomer(userId, turnOn) {
     loadBotCustomers();
   } catch (e) { alert('เกิดข้อผิดพลาด'); }
 }
+
+// Event delegation for dynamically rendered customer-toggle buttons
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.customer-toggle');
+  if (!btn) return;
+  var userId = btn.getAttribute('data-user-id');
+  var turnOn = btn.getAttribute('data-turn-on') === 'true';
+  toggleCustomer(userId, turnOn);
+});
 
 // ============ PRODUCTS ============
 var products = [];
