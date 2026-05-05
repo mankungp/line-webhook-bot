@@ -151,9 +151,34 @@ async function markWelcomeSent(userId) {
   }
 }
 
+// Fetch LINE user profile (display name)
+async function fetchLineUserProfile(userId) {
+  try {
+    var res = await fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(userId), {
+      headers: { 'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN }
+    });
+    if (!res.ok) return null;
+    var data = await res.json();
+    return { displayName: data.displayName, pictureUrl: data.pictureUrl };
+  } catch (err) {
+    return null;
+  }
+}
+
 async function pingCustomer(userId) {
   try {
-    await fetch(LOCAL_API_BASE + '/api/customers/' + userId + '/ping', { method: 'POST' });
+    // Get LINE profile to store display name
+    var profile = await fetchLineUserProfile(userId);
+    var body = {};
+    if (profile) {
+      body.displayName = profile.displayName;
+      body.pictureUrl = profile.pictureUrl;
+    }
+    await fetch(LOCAL_API_BASE + '/api/customers/' + userId + '/ping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
   } catch (err) {}
 }
 
