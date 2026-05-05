@@ -11,6 +11,7 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SALES_FILE = '/tmp/sales-inquiries.json';
+const ADMIN_MODE_FILE = '/tmp/bot-admin-mode.json';
 
 // Config
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
@@ -22,7 +23,7 @@ const LOCAL_API_BASE = process.env.LOCAL_API_BASE || '';
 // Middleware
 app.use(express.json());
 
-app.use((req, res, next) => {
+app.use(function(req, res, next) {
   console.log('\n========== NEW REQUEST ==========');
   console.log('[' + new Date().toISOString() + '] ' + req.method + ' ' + req.path);
   if (req.body) console.log('Body:', JSON.stringify(req.body, null, 2));
@@ -31,28 +32,25 @@ app.use((req, res, next) => {
 });
 
 // Health check
-app.get('/', (req, res) => {
+app.get('/', function(req, res) {
   res.send('Nong Kung is ALIVE!');
 });
 
-app.get('/health', (req, res) => {
+app.get('/health', function(req, res) {
   res.json({ status: 'ok', service: 'LINE Bot', timestamp: new Date().toISOString() });
 });
 
-// Line signature verification
+// LINE signature verification
 function verifyLineSignature(req, res, next) {
-  const signature = req.get('x-line-signature');
-  const bodyString = JSON.stringify(req.body);
+  var signature = req.get('x-line-signature');
+  var bodyString = JSON.stringify(req.body);
 
   if (!signature) {
-    console.error('[VERIFY] NO signature found!');
+    console.error('[VERIFY] No signature found!');
     return res.status(401).json({ error: 'No signature' });
   }
 
-  const expectedSignature = crypto
-    .createHmac('SHA256', LINE_CHANNEL_SECRET)
-    .update(bodyString)
-    .digest('base64');
+  var expectedSignature = crypto.createHmac('SHA256', LINE_CHANNEL_SECRET).update(bodyString).digest('base64');
 
   if (signature !== expectedSignature) {
     console.error('[VERIFY] Signature MISMATCH!');
@@ -66,7 +64,7 @@ function verifyLineSignature(req, res, next) {
 // Local API calls
 async function getStoreInfo() {
   try {
-    const res = await fetch(LOCAL_API_BASE + '/api/shop');
+    var res = await fetch(LOCAL_API_BASE + '/api/shop');
     if (!res.ok) throw new Error('Store info error: ' + res.status);
     return await res.json();
   } catch (err) {
@@ -77,7 +75,7 @@ async function getStoreInfo() {
 
 async function getProducts() {
   try {
-    const res = await fetch(LOCAL_API_BASE + '/api/products');
+    var res = await fetch(LOCAL_API_BASE + '/api/products');
     if (!res.ok) throw new Error('Products error: ' + res.status);
     return await res.json();
   } catch (err) {
@@ -88,7 +86,7 @@ async function getProducts() {
 
 async function searchProducts(query) {
   try {
-    const res = await fetch(LOCAL_API_BASE + '/api/products/search?q=' + encodeURIComponent(query));
+    var res = await fetch(LOCAL_API_BASE + '/api/products/search?q=' + encodeURIComponent(query));
     if (!res.ok) throw new Error('Search error: ' + res.status);
     return await res.json();
   } catch (err) {
@@ -97,12 +95,34 @@ async function searchProducts(query) {
   }
 }
 
+// Admin mode helpers
+function isAdminMode() {
+  try {
+    if (fs.existsSync(ADMIN_MODE_FILE)) {
+      var data = fs.readFileSync(ADMIN_MODE_FILE, 'utf8');
+      var info = JSON.parse(data);
+      return info && info.on === true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function toggleAdminMode() {
+  try {
+    var current = isAdminMode();
+    fs.writeFileSync(ADMIN_MODE_FILE, JSON.stringify({ on: !current, updatedAt: new Date().toISOString() }), 'utf8');
+    return !current;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Save sales inquiry
 function saveSalesInquiry(inquiry) {
   try {
-    let inquiries = [];
+    var inquiries = [];
     if (fs.existsSync(SALES_FILE)) {
-      const data = fs.readFileSync(SALES_FILE, 'utf8');
+      var data = fs.readFileSync(SALES_FILE, 'utf8');
       inquiries = JSON.parse(data);
     }
     inquiries.push({ ...inquiry, timestamp: new Date().toISOString() });
@@ -119,9 +139,9 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
 
   var systemPrompt = '';
   if (commandType === 'admin') {
-    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai, end every sentence with "ka". The bot is temporarily stopped. Tell customer to wait for admin to contact back. Ask for their name and phone if not provided.';
+    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai, end every sentence with "ka". The bot is now in admin mode. Tell customer to wait, admin will contact them back. Ask for their name and phone if not provided.';
   } else if (commandType === 'price') {
-    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai with short answers. When searching price, show product name and price clearly. If not found, say "not found ka".';
+    systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store. Reply in Thai with short answers. When searching price, show product name and price clearly with line breaks. If not found, say "not found ka".';
   } else if (commandType === 'sales') {
     systemPrompt = 'You are Nong Kung, a female shop assistant at Kerdkarnkaset store helping with order. Ask for: name, phone, address, product, quantity. Reply in Thai, end with "ka".';
   } else {
@@ -129,7 +149,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
   }
 
   try {
-    const response = await fetch(GROQ_API_URL, {
+    var response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + GROQ_API_KEY,
@@ -149,13 +169,13 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
     console.log('[GROQ] Response status:', response.status);
 
     if (!response.ok) {
-      const errorText = await response.text();
+      var errorText = await response.text();
       console.error('[GROQ] API Error:', response.status, errorText);
       throw new Error('Groq API error: ' + response.status);
     }
 
-    const data = await response.json();
-    const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+    var data = await response.json();
+    var reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
       ? data.choices[0].message.content
       : 'Sorry ka, cannot reply right now';
     console.log('[GROQ] Reply:', reply);
@@ -170,7 +190,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
 // Reply to LINE
 async function replyToLine(replyToken, messages) {
   try {
-    const response = await fetch('https://api.line.me/v2/bot/message/reply', {
+    var response = await fetch('https://api.line.me/v2/bot/message/reply', {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN,
@@ -180,7 +200,7 @@ async function replyToLine(replyToken, messages) {
     });
 
     if (!response.ok) {
-      const err = await response.text();
+      var err = await response.text();
       console.error('[LINE] Reply failed:', response.status, err);
       throw new Error('LINE reply error: ' + response.status);
     }
@@ -195,10 +215,8 @@ async function replyToLine(replyToken, messages) {
 
 // Build store context
 async function buildStoreContext() {
-  const [storeInfo, allProducts] = await Promise.all([
-    getStoreInfo().catch(function() { return null; }),
-    getProducts().catch(function() { return null; })
-  ]);
+  var storeInfo = await getStoreInfo().catch(function() { return null; });
+  var allProducts = await getProducts().catch(function() { return null; });
 
   var ctx = '';
   if (storeInfo) {
@@ -224,22 +242,35 @@ async function buildStoreContext() {
 }
 
 // Command handlers
-async function handleCommand(msg, replyToken, userId) {
-  // !admin
+async function handleCommand(msg, replyToken, userId, sourceType) {
+  // Check if from LINE Official Account Manager (admin)
+  // sourceType can be: 'user' (customer LINE), 'admin' (from OA Manager)
+  var isFromAdmin = (sourceType === 'admin');
+
+  // !admin - toggle admin mode (admin only)
   if (msg === '!admin') {
-    var replyText = await callGroqAPI('Customer wants to contact admin. Ask for name and phone number.', '', 'admin');
+    var newState = toggleAdminMode();
+    var replyText = newState
+      ? 'Admin Mode: ON\nBot is now paused.\nOnly admin can use commands.\nType !admin again to resume.'
+      : 'Admin Mode: OFF\nBot is now active.\nAll commands available.';
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // !price
+  // If admin mode is ON and NOT from admin, only show status
+  if (isAdminMode() && !isFromAdmin) {
+    await replyToLine(replyToken, [{ type: 'text', text: 'Bot is paused. Please wait for admin ka' }]);
+    return true;
+  }
+
+  // !price (admin only)
   if (msg.indexOf('!price ') === 0) {
     var query = msg.substring(7).trim();
     var results = await searchProducts(query);
     var replyText = '';
 
     if (results && Array.isArray(results) && results.length > 0) {
-      replyText = 'Result for "' + query + '"\n\n';
+      replyText = 'Search result for "' + query + '"\n\n';
       for (var i = 0; i < results.length && i < 10; i++) {
         var p = results[i];
         replyText += p.name + '\n';
@@ -256,14 +287,14 @@ async function handleCommand(msg, replyToken, userId) {
     return true;
   }
 
-  // !order
+  // !order (admin only)
   if (msg === '!order') {
     var replyText = await callGroqAPI('Customer wants to order. Collect: name, phone, address, product name, quantity.', '', 'sales');
     await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
     return true;
   }
 
-  // !shop
+  // !shop (admin only)
   if (msg === '!shop') {
     var storeInfo = await getStoreInfo();
     if (!storeInfo) {
@@ -271,7 +302,7 @@ async function handleCommand(msg, replyToken, userId) {
       return true;
     }
     var lines = [];
-    lines.push({ type: 'text', text: 'Store info\n' });
+    lines.push({ type: 'text', text: 'Store Info\n' });
     lines.push({ type: 'text', text: 'Name: ' + (storeInfo.name || '-') });
     if (storeInfo.address) lines.push({ type: 'text', text: 'Address: ' + storeInfo.address });
     if (storeInfo.phone) lines.push({ type: 'text', text: 'Phone: ' + storeInfo.phone });
@@ -281,13 +312,13 @@ async function handleCommand(msg, replyToken, userId) {
     return true;
   }
 
-  // !help
+  // !help (admin only)
   if (msg === '!help' || msg === '!help') {
     var helpText = 'Commands:\n\n';
+    helpText += '!admin - Toggle admin mode\n';
     helpText += '!price [product] - Search price\n';
     helpText += '!order - Place order\n';
     helpText += '!shop - Store info\n';
-    helpText += '!admin - Contact admin\n';
     helpText += '!help - Show commands';
     await replyToLine(replyToken, [{ type: 'text', text: helpText }]);
     return true;
@@ -313,12 +344,13 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
       if (event.type === 'message' && event.message.type === 'text') {
         var userMessage = event.message.text;
         var replyToken = event.replyToken;
-        var userId = event.source && event.source.userId ? event.source.userId : 'unknown';
+        var userId = (event.source && event.source.userId) ? event.source.userId : 'unknown';
+        var sourceType = (event.source && event.source.type) ? event.source.type : 'user';
 
-        console.log('[WEBHOOK] User message:', userMessage);
+        console.log('[WEBHOOK] User message:', userMessage, '| Source:', sourceType);
 
         // Check commands
-        var handled = await handleCommand(userMessage, replyToken, userId);
+        var handled = await handleCommand(userMessage, replyToken, userId, sourceType);
         if (handled) continue;
 
         // Normal conversation
@@ -326,9 +358,10 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
         var replyText = await callGroqAPI(userMessage, storeContext, 'normal');
 
         await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
+
       } else if (event.type === 'postback') {
         var replyToken = event.replyToken;
-        var data = event.postback && event.postback.data ? event.postback.data : '';
+        var data = (event.postback && event.postback.data) ? event.postback.data : '';
 
         console.log('[WEBHOOK] Postback:', data);
 
