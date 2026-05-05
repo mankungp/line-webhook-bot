@@ -6,6 +6,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -485,9 +486,48 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
   }
 });
 
+// Admin API endpoints (for Web Admin Panel)
+app.get('/api/admin/status', function(req, res) {
+  res.json({
+    globalMode: isGlobalBotOff(),
+    customerModes: getCustomerBotModes()
+  });
+});
+
+app.post('/api/admin/toggle-global', function(req, res) {
+  var newState = toggleGlobalBotMode();
+  res.json({ success: true, globalMode: newState });
+});
+
+app.post('/api/admin/toggle-customer', function(req, res) {
+  var userId = req.body.userId;
+  var turnOn = req.body.turnOn;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId required' });
+  }
+  // If turnOn is true, set customer bot ON (false in mode file)
+  // If turnOn is false, set customer bot OFF (true in mode file)
+  try {
+    var modeInfo = {};
+    if (fs.existsSync(CUSTOMER_MODE_FILE)) {
+      modeInfo = JSON.parse(fs.readFileSync(CUSTOMER_MODE_FILE, 'utf8'));
+    }
+    modeInfo[userId] = !turnOn; // store true = bot OFF
+    fs.writeFileSync(CUSTOMER_MODE_FILE, JSON.stringify(modeInfo, null, 2), 'utf8');
+    res.json({ success: true, customerMode: modeInfo[userId] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+// Serve admin panel static files
+app.use('/admin', express.static(path.join(__dirname, 'admin-panel')));
+
 // Start server
 app.listen(PORT, function() {
   console.log('Kerdkarnkaset LINE Bot started!');
   console.log('PORT:', PORT);
   console.log('Local API:', LOCAL_API_BASE);
+  console.log('Admin Panel: /admin');
 });

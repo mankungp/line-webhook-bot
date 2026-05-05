@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เกิดการเกษตร - Admin Panel</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+  .container { max-width: 600px; margin: 0 auto; }
+  h1 { color: #1a1a1a; margin-bottom: 20px; font-size: 24px; }
+  .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .status-bar { display: flex; justify-content: space-between; align-items: center; }
+  .status-label { font-size: 16px; font-weight: 600; }
+  .status-value { font-size: 14px; padding: 6px 12px; border-radius: 20px; font-weight: 600; }
+  .status-on { background: #e8f5e9; color: #2e7d32; }
+  .status-off { background: #ffebee; color: #c62828; }
+  .toggle-btn { background: #4caf50; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
+  .toggle-btn:hover { opacity: 0.9; }
+  .toggle-btn.red { background: #f44336; }
+  .customer-list { margin-top: 15px; }
+  .customer-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+  .customer-item:last-child { border-bottom: none; }
+  .customer-name { font-size: 14px; font-weight: 500; }
+  .customer-id { font-size: 11px; color: #999; font-family: monospace; }
+  .customer-toggle { background: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .customer-toggle.off { background: #ff9800; }
+  .customer-toggle.on { background: #4caf50; }
+  .section-title { font-size: 14px; color: #666; margin-bottom: 10px; font-weight: 600; }
+  .empty { text-align: center; padding: 30px; color: #999; }
+  .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🦐 Admin Panel<br><small style="font-weight:400;color:#666;">ร้านเกิดการเกษตร</small></h1>
+
+  <!-- Status Card -->
+  <div class="card">
+    <div class="status-bar">
+      <span class="status-label">สถานะ Bot ทั้งหมด</span>
+      <span class="status-value" id="globalStatus">...</span>
+    </div>
+    <button class="toggle-btn" id="globalToggle" onclick="toggleGlobal()">กดปิด/เปิด</button>
+  </div>
+
+  <!-- Customer List -->
+  <div class="card">
+    <div class="section-title">ลูกค้าที่ปิด Bot ไว้</div>
+    <div class="customer-list" id="customerList">
+      <div class="empty">ไม่มีลูกค้าที่ถูกปิด Bot</div>
+    </div>
+  </div>
+
+  <!-- Refresh -->
+  <div class="card">
+    <button class="toggle-btn" onclick="loadStatus()" style="background:#666;">รีเฟรชข้อมูล</button>
+  </div>
+
+  <div class="footer">
+    อัปเดตล่าสุด: <span id="lastUpdate">-</span>
+  </div>
+</div>
+
+<script>
+var API_BASE = ''; // Will be set to local server
+
+async function loadStatus() {
+  try {
+    // Try to fetch from local API or via proxy
+    var response = await fetch('/api/admin/status');
+    if (!response.ok) throw new Error('Failed');
+    var data = await response.json();
+    updateUI(data);
+  } catch (e) {
+    // If no server, show instructions
+    document.getElementById('globalStatus').textContent = 'ต้องเชื่อมต่อ Render';
+    document.getElementById('globalStatus').className = 'status-value status-off';
+  }
+}
+
+function updateUI(data) {
+  var globalStatus = data.globalMode;
+  var customers = data.customerModes || {};
+  
+  // Update global status
+  var statusEl = document.getElementById('globalStatus');
+  if (globalStatus) {
+    statusEl.textContent = 'ปิดอยู่';
+    statusEl.className = 'status-value status-off';
+    document.getElementById('globalToggle').textContent = 'เปิด Bot';
+    document.getElementById('globalToggle').className = 'toggle-btn';
+  } else {
+    statusEl.textContent = 'เปิดอยู่';
+    statusEl.className = 'status-value status-on';
+    document.getElementById('globalToggle').textContent = 'ปิด Bot';
+    document.getElementById('globalToggle').className = 'toggle-btn red';
+  }
+
+  // Update customer list
+  var listEl = document.getElementById('customerList');
+  var offCustomers = Object.entries(customers).filter(function(e) { return e[1] === true; });
+  
+  if (offCustomers.length === 0) {
+    listEl.innerHTML = '<div class="empty">ไม่มีลูกค้าที่ถูกปิด Bot</div>';
+  } else {
+    var html = '';
+    offCustomers.forEach(function(item) {
+      html += '<div class="customer-item">';
+      html += '<div><div class="customer-name">ลูกค้า</div>';
+      html += '<div class="customer-id">' + item[0] + '</div></div>';
+      html += '<button class="customer-toggle on" onclick="toggleCustomer(\'' + item[0] + '\', false)">เปิด</button>';
+      html += '</div>';
+    });
+    listEl.innerHTML = html;
+  }
+
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th-TH');
+}
+
+async function toggleGlobal() {
+  try {
+    await fetch('/api/admin/toggle-global', { method: 'POST' });
+    loadStatus();
+  } catch (e) {
+    alert('ไม่สามารถเปิด/ปิดได้ในขณะนี้');
+  }
+}
+
+async function toggleCustomer(userId, turnOn) {
+  try {
+    await fetch('/api/admin/toggle-customer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: userId, turnOn: turnOn })
+    });
+    loadStatus();
+  } catch (e) {
+    alert('ไม่สามารถเปิด/ปิดได้ในขณะนี้');
+  }
+}
+
+// Load on start
+loadStatus();
+setInterval(loadStatus, 30000); // Refresh every 30s
+</script>
+</body>
+</html>
