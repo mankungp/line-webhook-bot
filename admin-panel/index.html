@@ -502,7 +502,7 @@ function updateBotUI(data) {
     html += '<div class="customer-id">' + userId.substring(0, 30) + '...</div>';
     html += '<div class="customer-meta">เข้าล่าสุด: ' + dateStr + '</div>';
     html += '</div></div>';
-    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-user-id="' + escapeHtml(userId) + '" data-turn-on="' + !isOff + '">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    html += '<button class="customer-toggle ' + (isOff ? 'on' : 'off') + '" onclick="toggleCustomer(\'' + userId.replace(/'/g, "\\'") + '\', ' + !isOff + ')">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     html += '</div>';
   });
 
