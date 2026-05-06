@@ -146,6 +146,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
   .customer-toggle { width: 100%; min-height: 44px; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -170,6 +171,9 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     </a>
     <a onclick="showPage('members')" data-page="members">
       <span class="icon">⭐</span> <span>สมาชิก</span>
+    </a>
+    <a onclick="showPage('reports')" data-page="reports">
+      <span class="icon">📊</span> <span>รายงาน</span>
     </a>
   </nav>
 </div>
@@ -333,6 +337,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     <div class="card">
       <div class="toolbar">
         <button class="btn btn-primary" onclick="openMemberModal()">+ เพิ่มสมาชิก</button>
+        <button class="btn btn-secondary" onclick="importLineCustomers()">📋 Import จาก LINE</button>
         <button class="btn btn-secondary" onclick="loadMembers()">รีเฟรช</button>
         <input type="text" class="search-box" id="mSearch" placeholder="🔍 ค้นหา (ชื่อ/เบอร์/code)" oninput="loadMembers()" style="flex:1; min-width:180px;">
         <select id="mTierFilter" onchange="loadMembers()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
@@ -358,6 +363,113 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
           </thead>
           <tbody id="membersBody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REPORTS PAGE ============ -->
+  <div id="page-reports" class="page" style="display:none;">
+    <div class="page-header">
+      <h2>📊 รายงาน</h2>
+      <p>ภาพรวมยอดขาย + วิเคราะห์ลูกค้า/สินค้า</p>
+    </div>
+
+    <!-- Period filter -->
+    <div class="card">
+      <div class="toolbar" style="flex-wrap:wrap; gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="setReportPeriod('today')">วันนี้</button>
+        <button class="btn btn-secondary btn-sm" onclick="setReportPeriod('yesterday')">เมื่อวาน</button>
+        <button class="btn btn-secondary btn-sm" onclick="setReportPeriod('7d')">7 วัน</button>
+        <button class="btn btn-secondary btn-sm" onclick="setReportPeriod('30d')">30 วัน</button>
+        <button class="btn btn-secondary btn-sm" onclick="setReportPeriod('thismonth')">เดือนนี้</button>
+        <input type="date" id="rFrom" style="padding:6px; border-radius:6px; border:1px solid #ddd;">
+        <input type="date" id="rTo" style="padding:6px; border-radius:6px; border:1px solid #ddd;">
+        <button class="btn btn-secondary btn-sm" onclick="loadAllReports()">รีเฟรช</button>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="rRevenue">฿0</div>
+        <div class="stat-label">💰 ยอดขาย</div>
+        <div id="rRevenueChange" style="font-size:12px; margin-top:4px;"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="rOrderCount">0</div>
+        <div class="stat-label">📦 ออเดอร์</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="rAOV">฿0</div>
+        <div class="stat-label">📈 ยอดเฉลี่ย/ออเดอร์</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="rNewMembers">0</div>
+        <div class="stat-label">👥 สมาชิกใหม่</div>
+      </div>
+    </div>
+
+    <!-- Sales Trend Chart -->
+    <div class="card">
+      <h3 style="margin-top:0;">📈 ยอดขายย้อนหลัง</h3>
+      <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="setTrendInterval('hour')">วันนี้</button>
+        <button class="btn btn-sm" onclick="setTrendInterval('day7')">7 วัน</button>
+        <button class="btn btn-sm" onclick="setTrendInterval('day30')">30 วัน</button>
+        <button class="btn btn-sm" onclick="setTrendInterval('month')">12 เดือน</button>
+      </div>
+      <div style="height:280px; position:relative;">
+        <canvas id="rChartTrend"></canvas>
+      </div>
+    </div>
+
+    <!-- Charts row: Channel + Category + Tier -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:16px;">
+      <div class="card">
+        <h3 style="margin-top:0;">🛒 ยอดตาม Channel</h3>
+        <div style="height:240px; position:relative;"><canvas id="rChartChannel"></canvas></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">📁 ยอดตามหมวด</h3>
+        <div style="height:240px; position:relative;"><canvas id="rChartCategory"></canvas></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">⭐ ยอดตาม Tier</h3>
+        <div style="height:240px; position:relative;"><canvas id="rChartTier"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Tables row -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; margin-top:16px;">
+      <div class="card">
+        <h3 style="margin-top:0;">🏆 Top 10 สินค้าขายดี</h3>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>สินค้า</th><th class="num">จำนวน</th><th class="num">ยอด</th></tr></thead>
+            <tbody id="rTopProducts"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">👑 Top 10 ลูกค้า</h3>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>สมาชิก</th><th class="num">ออเดอร์</th><th class="num">ยอดซื้อ</th></tr></thead>
+            <tbody id="rTopCustomers"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts row -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; margin-top:16px;">
+      <div class="card">
+        <h3 style="margin-top:0;">⚠️ สต็อกใกล้หมด</h3>
+        <div id="rStockAlerts" style="max-height:300px; overflow-y:auto;"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">📉 สมาชิกหายตัว (&gt;30 วัน)</h3>
+        <div id="rInactiveMembers" style="max-height:300px; overflow-y:auto;"></div>
       </div>
     </div>
   </div>
@@ -484,6 +596,10 @@ function showPage(page) {
   if (page === 'orders') loadOrders();
   if (page === 'customers') loadCustomers();
   if (page === 'members') loadMembers();
+  if (page === 'reports') {
+    if (!document.getElementById('rFrom').value) setReportPeriod('today');
+    else loadAllReports();
+  }
 }
 
 // ============ BOT CONTROL ============
@@ -2232,6 +2348,275 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
+// ============ REPORTS ============
+var rCharts = {};
+var rTrendInterval = 'day7';
+
+function setReportPeriod(period) {
+  var now = new Date();
+  var from, to;
+  if (period === 'today') {
+    from = to = now.toISOString().substring(0, 10);
+  } else if (period === 'yesterday') {
+    var y = new Date(now.getTime() - 24*60*60*1000);
+    from = to = y.toISOString().substring(0, 10);
+  } else if (period === '7d') {
+    from = new Date(now.getTime() - 6*24*60*60*1000).toISOString().substring(0, 10);
+    to = now.toISOString().substring(0, 10);
+  } else if (period === '30d') {
+    from = new Date(now.getTime() - 29*24*60*60*1000).toISOString().substring(0, 10);
+    to = now.toISOString().substring(0, 10);
+  } else if (period === 'thismonth') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().substring(0, 10);
+    to = now.toISOString().substring(0, 10);
+  }
+  document.getElementById('rFrom').value = from;
+  document.getElementById('rTo').value = to;
+  loadAllReports();
+}
+
+function setTrendInterval(it) {
+  rTrendInterval = it;
+  loadSalesTrend();
+}
+
+function getRangeQS() {
+  var f = document.getElementById('rFrom').value;
+  var t = document.getElementById('rTo').value;
+  var qs = '';
+  if (f) qs += 'from=' + f;
+  if (t) qs += (qs ? '&' : '') + 'to=' + t;
+  return qs;
+}
+
+async function loadAllReports() {
+  await Promise.all([
+    loadDashboard(),
+    loadSalesTrend(),
+    loadByChannel(),
+    loadByCategory(),
+    loadByTier(),
+    loadTopProducts(),
+    loadTopCustomers(),
+    loadStockAlerts(),
+    loadInactiveMembers()
+  ]);
+}
+
+async function loadDashboard() {
+  try {
+    var qs = getRangeQS();
+    var r = await fetch('/api/reports/dashboard' + (qs ? '?' + qs : ''));
+    var d = await r.json();
+    document.getElementById('rRevenue').textContent = '฿' + numFormat(d.current.revenue);
+    document.getElementById('rOrderCount').textContent = d.current.orderCount;
+    document.getElementById('rAOV').textContent = '฿' + numFormat(d.current.avgOrderValue);
+    document.getElementById('rNewMembers').textContent = d.current.newMembers;
+
+    var changeEl = document.getElementById('rRevenueChange');
+    var ch = d.changePercent || 0;
+    var arrow = ch > 0 ? '↑' : (ch < 0 ? '↓' : '→');
+    var color = ch > 0 ? '#0a0' : (ch < 0 ? '#d33' : '#999');
+    changeEl.style.color = color;
+    changeEl.textContent = arrow + ' ' + Math.abs(ch).toFixed(1) + '% เทียบช่วงก่อน';
+  } catch (e) { console.error(e); }
+}
+
+async function loadSalesTrend() {
+  try {
+    var url = '/api/reports/sales-trend?';
+    if (rTrendInterval === 'hour') url += 'interval=hour';
+    else if (rTrendInterval === 'day7') url += 'interval=day&days=7';
+    else if (rTrendInterval === 'day30') url += 'interval=day&days=30';
+    else if (rTrendInterval === 'month') url += 'interval=month';
+
+    var r = await fetch(url);
+    var d = await r.json();
+
+    var ctx = document.getElementById('rChartTrend').getContext('2d');
+    if (rCharts.trend) rCharts.trend.destroy();
+    rCharts.trend = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: d.data.map(function(x){ return x.label; }),
+        datasets: [{
+          label: 'ยอดขาย (฿)',
+          data: d.data.map(function(x){ return x.revenue; }),
+          borderColor: '#0a8',
+          backgroundColor: 'rgba(10,170,140,0.1)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  } catch (e) { console.error(e); }
+}
+
+var CHANNEL_LABELS = {
+  manual: '📝 หน้าร้าน', pos: '⚡ POS', line: '💬 LINE', phone: '📞 โทร',
+  facebook: '📘 Facebook', other: '📦 อื่น ๆ',
+  shopee_main: '🛒 Shopee Main', shopee_sub1: '🛒 Shopee Sub1', shopee_sub2: '🛒 Shopee Sub2',
+  lazada: '🛍️ Lazada', tiktok: '🎵 TikTok'
+};
+
+async function loadByChannel() {
+  try {
+    var qs = getRangeQS();
+    var r = await fetch('/api/reports/by-channel' + (qs ? '?' + qs : ''));
+    var d = await r.json();
+    var ctx = document.getElementById('rChartChannel').getContext('2d');
+    if (rCharts.channel) rCharts.channel.destroy();
+    rCharts.channel = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: d.data.map(function(x){ return CHANNEL_LABELS[x.channel] || x.channel; }),
+        datasets: [{
+          data: d.data.map(function(x){ return x.revenue; }),
+          backgroundColor: ['#0a8','#3498db','#9b59b6','#e67e22','#e74c3c','#f39c12','#1abc9c','#34495e','#95a5a6','#16a085','#27ae60']
+        }]
+      },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+    });
+  } catch (e) { console.error(e); }
+}
+
+async function loadByCategory() {
+  try {
+    var qs = getRangeQS();
+    var r = await fetch('/api/reports/by-category' + (qs ? '?' + qs : ''));
+    var d = await r.json();
+    var ctx = document.getElementById('rChartCategory').getContext('2d');
+    if (rCharts.category) rCharts.category.destroy();
+    rCharts.category = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: d.data.map(function(x){ return getCatName(x.category); }),
+        datasets: [{
+          label: 'ยอดขาย (฿)',
+          data: d.data.map(function(x){ return x.revenue; }),
+          backgroundColor: '#3498db'
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  } catch (e) { console.error(e); }
+}
+
+async function loadByTier() {
+  try {
+    var qs = getRangeQS();
+    var r = await fetch('/api/reports/by-tier' + (qs ? '?' + qs : ''));
+    var d = await r.json();
+    var TIER_LABELS = { regular: '👤 ทั่วไป', wholesale: '🏪 ขายส่ง / ช่าง', vip: '⭐ VIP', walk_in: '🚶 ลูกค้าทั่วไป (POS)' };
+    var ctx = document.getElementById('rChartTier').getContext('2d');
+    if (rCharts.tier) rCharts.tier.destroy();
+    rCharts.tier = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: d.data.map(function(x){ return TIER_LABELS[x.tier] || x.tier; }),
+        datasets: [{
+          data: d.data.map(function(x){ return x.revenue; }),
+          backgroundColor: ['#666','#0a8','#d35400','#95a5a6']
+        }]
+      },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+    });
+  } catch (e) { console.error(e); }
+}
+
+async function loadTopProducts() {
+  try {
+    var qs = getRangeQS();
+    var r = await fetch('/api/reports/top-products' + (qs ? '?' + qs : ''));
+    var d = await r.json();
+    var html = '';
+    d.data.forEach(function(p, i) {
+      html += '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(p.name) + '</td><td class="num">' + p.qty + '</td><td class="num">' + numFormat(p.revenue) + '</td></tr>';
+    });
+    if (html === '') html = '<tr><td colspan="4" style="text-align:center; color:#999; padding:16px;">ยังไม่มีข้อมูล</td></tr>';
+    document.getElementById('rTopProducts').innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+async function loadTopCustomers() {
+  try {
+    var qs = getRangeQS();
+    var r = await fetch('/api/reports/top-customers' + (qs ? '?' + qs : ''));
+    var d = await r.json();
+    var html = '';
+    d.data.forEach(function(c, i) {
+      var tier = { regular: '👤', wholesale: '🏪', vip: '⭐' }[c.tier] || '';
+      html += '<tr><td>' + (i + 1) + '</td><td>' + tier + ' ' + escapeHtml(c.name) + ' <small style="color:#999;">' + (c.memberCode || '') + '</small></td><td class="num">' + c.orderCount + '</td><td class="num">' + numFormat(c.revenue) + '</td></tr>';
+    });
+    if (html === '') html = '<tr><td colspan="4" style="text-align:center; color:#999; padding:16px;">ยังไม่มีข้อมูล (เฉพาะสมาชิก)</td></tr>';
+    document.getElementById('rTopCustomers').innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+async function loadStockAlerts() {
+  try {
+    var r = await fetch('/api/reports/stock-alerts');
+    var d = await r.json();
+    var html = '';
+    if (d.outOfStock.length > 0) {
+      html += '<div style="font-weight:600; color:#d33; margin:6px 0;">❌ หมดสต็อก (' + d.outOfStock.length + ')</div>';
+      d.outOfStock.forEach(function(p) {
+        html += '<div style="padding:4px 8px; background:#ffebee; border-radius:4px; margin:2px 0; font-size:13px;">' + escapeHtml(p.name) + '</div>';
+      });
+    }
+    if (d.lowStock.length > 0) {
+      html += '<div style="font-weight:600; color:#e67e22; margin:6px 0;">⚠️ ใกล้หมด (' + d.lowStock.length + ')</div>';
+      d.lowStock.forEach(function(p) {
+        html += '<div style="padding:4px 8px; background:#fff3e0; border-radius:4px; margin:2px 0; font-size:13px;">' + escapeHtml(p.name) + ' <span style="color:#999;">(' + p.stock + '/' + p.threshold + ')</span></div>';
+      });
+    }
+    if (html === '') html = '<div style="color:#0a0; padding:8px;">✅ ไม่มีสินค้าใกล้หมด</div>';
+    document.getElementById('rStockAlerts').innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+async function loadInactiveMembers() {
+  try {
+    var r = await fetch('/api/reports/inactive-members?days=30');
+    var d = await r.json();
+    var html = '';
+    d.data.slice(0, 15).forEach(function(m) {
+      var tier = { regular: '👤', wholesale: '🏪', vip: '⭐' }[m.tier] || '';
+      html += '<div style="padding:8px; border-bottom:1px solid #eee; font-size:13px;">';
+      html += '<div>' + tier + ' <strong>' + escapeHtml(m.name) + '</strong> <small style="color:#999;">' + (m.memberCode || '') + '</small></div>';
+      html += '<div style="color:#999;">' + m.daysSinceOrder + ' วันก่อน · ฿' + numFormat(m.totalSpent) + ' (' + m.totalOrders + ' ออเดอร์)</div>';
+      html += '</div>';
+    });
+    if (html === '') html = '<div style="color:#0a0; padding:8px;">✅ ไม่มีสมาชิก inactive</div>';
+    document.getElementById('rInactiveMembers').innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+// ============ IMPORT LINE CUSTOMERS ============
+async function importLineCustomers() {
+  if (!confirm('Import LINE customers ทั้งหมดที่ยังไม่มี member ผูก?\n(สร้างเป็นสมาชิก tier ทั่วไป — แก้ทีหลังได้)')) return;
+  try {
+    var r = await fetch('/api/members/import-from-customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    var result = await r.json();
+    if (result.error) { alert('❌ ' + result.error); return; }
+    alert('✅ Import เสร็จ:\n• สร้างใหม่: ' + result.imported + ' คน\n• ข้าม (มีอยู่แล้ว): ' + result.skipped + ' คน');
+    loadMembers();
+  } catch (e) { alert('❌ ' + e.message); }
+}
 </script>
 </body>
 </html>

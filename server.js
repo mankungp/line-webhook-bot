@@ -834,6 +834,32 @@ app.post('/api/members/:id/recalc-stats', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ REPORTS PROXY ============
+['/api/reports/dashboard', '/api/reports/sales-trend', '/api/reports/by-channel',
+ '/api/reports/by-category', '/api/reports/by-tier', '/api/reports/top-products',
+ '/api/reports/top-customers', '/api/reports/stock-alerts', '/api/reports/inactive-members'
+].forEach(function(path) {
+  app.get(path, async function(req, res) {
+    try {
+      var qs = req.url.split('?')[1] || '';
+      var r = await fetch(LOCAL_API_BASE + path + (qs ? '?' + qs : ''));
+      res.json(await r.json());
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+});
+
+// Import LINE customers (admin)
+app.post('/api/members/import-from-customers', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members/import-from-customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ STATS PROXY ============
 app.get('/api/stats', async function(req, res) {
   try {
