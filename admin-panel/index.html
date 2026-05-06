@@ -279,6 +279,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
 
     <div class="card">
       <div class="toolbar">
+        <button class="btn btn-success" onclick="openPosModal()" style="background:#0a8;color:white;">⚡ คีย์บิลด่วน</button>
         <button class="btn btn-primary" onclick="openOrderModal()">+ คีย์ออเดอร์</button>
         <button class="btn btn-secondary" onclick="loadOrders()">รีเฟรช</button>
         <select id="oStatusFilter" onchange="loadOrders()">
@@ -1445,5 +1446,344 @@ setInterval(loadBotCustomers, 30000);
     </div>
   </div>
 </div>
+
+<!-- POS Quick-Bill Modal -->
+<div class="modal" id="posModal">
+  <div class="modal-content" style="max-width: 600px; max-height: 95vh; overflow-y: auto; padding: 16px;">
+    <button class="close-btn" onclick="closePosModal()">×</button>
+    <h2 style="margin: 0 0 12px 0;">⚡ คีย์บิลด่วน (POS)</h2>
+
+    <!-- Search สินค้า -->
+    <div style="position:relative; margin-bottom: 12px;">
+      <input type="text" id="posProductSearch" placeholder="🔍 ค้นหาสินค้า / สแกนบาร์โค้ด..."
+             oninput="searchProductsForPos(this.value)" autocomplete="off"
+             style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #ddd; font-size: 16px;">
+      <div id="posProductResults" style="display:none; position:absolute; z-index:10; left:0; right:0; background:white; max-height:280px; overflow-y:auto; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+    </div>
+
+    <!-- ตะกร้า -->
+    <div style="background:#f9f9f9; border: 1px solid #eee; border-radius: 8px; padding: 8px; margin-bottom: 12px;">
+      <div id="posCartBody" style="font-size: 14px;"></div>
+      <div id="posCartEmpty" style="text-align:center; color:#999; padding:24px; font-size:13px;">— ยังไม่มีสินค้า —</div>
+    </div>
+
+    <!-- ส่วนลด -->
+    <div style="display:flex; gap:8px; margin-bottom: 8px; align-items:center;">
+      <label style="flex-shrink:0; font-size:14px;">ส่วนลด:</label>
+      <input type="number" id="posDiscount" value="0" oninput="updatePosTotal()"
+             style="flex:1; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:15px;">
+      <span style="font-size:13px;color:#999;">บาท</span>
+    </div>
+
+    <!-- รวม (ใหญ่ ๆ) -->
+    <div style="background:#fffaf0; border: 2px solid #f0a500; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <span style="font-size:18px; font-weight:bold;">รวมทั้งสิ้น:</span>
+        <span id="posTotalDisplay" style="font-size:28px; font-weight:bold; color:#d35400;">0.00 บาท</span>
+      </div>
+    </div>
+
+    <!-- รับเงิน + ทอน -->
+    <div style="display:flex; gap:8px; margin-bottom: 12px;">
+      <div style="flex:1;">
+        <label style="font-size:12px; color:#666;">รับเงินสด</label>
+        <input type="number" id="posReceived" value="" placeholder="0" oninput="updatePosChange()"
+               style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd; font-size:16px;">
+      </div>
+      <div style="flex:1;">
+        <label style="font-size:12px; color:#666;">เงินทอน</label>
+        <div id="posChangeDisplay" style="padding:10px; background:#e8f5e9; border-radius:6px; font-size:16px; font-weight:bold; color:#2e7d32; text-align:right;">0.00</div>
+      </div>
+    </div>
+
+    <!-- วิธีชำระ -->
+    <div style="margin-bottom: 12px;">
+      <label style="font-size:12px; color:#666; display:block; margin-bottom:6px;">วิธีชำระ</label>
+      <div style="display:flex; gap:6px;">
+        <button type="button" id="posPayCash" onclick="setPayMethod('cash')"
+                class="pos-pay-btn pos-pay-active" style="flex:1; padding:12px; border-radius:8px; border:2px solid #0a8; background:#0a8; color:white; cursor:pointer; font-size:14px; font-weight:600;">💵 เงินสด</button>
+        <button type="button" id="posPayPromptpay" onclick="setPayMethod('promptpay')"
+                class="pos-pay-btn" style="flex:1; padding:12px; border-radius:8px; border:2px solid #ddd; background:white; cursor:pointer; font-size:14px; font-weight:600;">📱 PromptPay</button>
+        <button type="button" id="posPayTransfer" onclick="setPayMethod('transfer')"
+                class="pos-pay-btn" style="flex:1; padding:12px; border-radius:8px; border:2px solid #ddd; background:white; cursor:pointer; font-size:14px; font-weight:600;">🏦 โอน</button>
+      </div>
+    </div>
+
+    <!-- ประเภทบิล -->
+    <div style="margin-bottom: 12px;">
+      <label style="font-size:12px; color:#666; display:block; margin-bottom:6px;">ประเภทบิล</label>
+      <select id="posBillType" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd; font-size:15px;">
+        <option value="tax_invoice_abbr" selected>ใบกำกับภาษีอย่างย่อ (A5) — POS ⭐</option>
+        <option value="receipt">ใบเสร็จรับเงิน (A4)</option>
+        <option value="tax_invoice">ใบกำกับภาษีเต็มรูปแบบ (A4)</option>
+      </select>
+    </div>
+
+    <div id="posStatus" style="margin: 8px 0; font-size:14px; min-height:18px;"></div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary" style="flex:1; padding:14px; font-size:16px;" onclick="closePosModal()">ยกเลิก</button>
+      <button class="btn btn-primary" style="flex:2; padding:14px; font-size:16px; background:#0a8;" onclick="submitPos()">💾 บันทึก + พิมพ์</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== POS Quick-Bill =====
+var posCart = [];
+var posSearchTimer = null;
+var posPayMethod = 'cash';
+
+function openPosModal() {
+  posCart = [];
+  posPayMethod = 'cash';
+  document.getElementById('posModal').classList.add('active');
+  document.getElementById('posProductSearch').value = '';
+  document.getElementById('posProductResults').style.display = 'none';
+  document.getElementById('posDiscount').value = '0';
+  document.getElementById('posReceived').value = '';
+  document.getElementById('posStatus').textContent = '';
+  document.getElementById('posBillType').value = 'tax_invoice_abbr';
+  setPayMethod('cash');
+  renderPosCart();
+  updatePosTotal();
+  setTimeout(function(){ var s = document.getElementById('posProductSearch'); if (s) s.focus(); }, 100);
+}
+
+function closePosModal() {
+  document.getElementById('posModal').classList.remove('active');
+  posCart = [];
+}
+
+function setPayMethod(method) {
+  posPayMethod = method;
+  ['Cash', 'Promptpay', 'Transfer'].forEach(function(m) {
+    var btn = document.getElementById('posPay' + m);
+    if (!btn) return;
+    var isActive = (method === m.toLowerCase());
+    if (isActive) {
+      btn.style.borderColor = '#0a8';
+      btn.style.background = '#0a8';
+      btn.style.color = 'white';
+    } else {
+      btn.style.borderColor = '#ddd';
+      btn.style.background = 'white';
+      btn.style.color = '';
+    }
+  });
+}
+
+function searchProductsForPos(query) {
+  clearTimeout(posSearchTimer);
+  var box = document.getElementById('posProductResults');
+  if (!query || query.length < 1) { box.style.display = 'none'; return; }
+  posSearchTimer = setTimeout(function() {
+    fetch('/api/products?status=active').then(function(r){ return r.json(); }).then(function(arr) {
+      var q = query.toLowerCase();
+      var matched = (Array.isArray(arr) ? arr : []).filter(function(p) {
+        var name = (p.name || '').toLowerCase();
+        var sku = (p.sku || '').toLowerCase();
+        return name.indexOf(q) >= 0 || sku.indexOf(q) >= 0;
+      }).slice(0, 8);
+
+      if (matched.length === 0) {
+        box.innerHTML = '<div style="padding:10px; color:#999;">ไม่พบสินค้า</div>';
+        box.style.display = 'block';
+        return;
+      }
+
+      var html = '';
+      matched.forEach(function(p) {
+        var stockColor = (p.stock > 0) ? '#0a0' : '#d33';
+        var nameEsc = JSON.stringify(p.name || '').replace(/"/g, '&quot;');
+        html += '<div onclick="addToPosCart(' + p.id + ',' + (p.price || 0) + ',' + (p.stock || 0) + ',' + nameEsc + ')" style="padding:12px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f0f9ff&quot;" onmouseout="this.style.background=&quot;&quot;">';
+        html += '<div style="display:flex; justify-content:space-between;">';
+        html += '<div><strong>' + escapeHtml(p.name) + '</strong>';
+        if (p.sku) html += ' <small style="color:#999;">' + escapeHtml(p.sku) + '</small>';
+        html += '</div>';
+        html += '<div><strong>' + numFormat(p.price || 0) + '</strong></div>';
+        html += '</div>';
+        html += '<div style="font-size:12px; color:' + stockColor + ';">stock: ' + (p.stock || 0) + ' ' + escapeHtml(p.unit || '') + '</div>';
+        html += '</div>';
+      });
+      box.innerHTML = html;
+      box.style.display = 'block';
+    });
+  }, 200);
+}
+
+function addToPosCart(productId, price, stock, name) {
+  var existing = posCart.find(function(it){ return it.productId === productId; });
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    posCart.push({ productId: productId, name: name, quantity: 1, price: price });
+  }
+  document.getElementById('posProductSearch').value = '';
+  document.getElementById('posProductResults').style.display = 'none';
+  renderPosCart();
+  updatePosTotal();
+  setTimeout(function(){ var s = document.getElementById('posProductSearch'); if (s) s.focus(); }, 50);
+}
+
+function renderPosCart() {
+  var body = document.getElementById('posCartBody');
+  var empty = document.getElementById('posCartEmpty');
+  if (posCart.length === 0) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  var html = '';
+  posCart.forEach(function(it, idx) {
+    html += '<div style="display:flex; align-items:center; gap:6px; padding:8px 4px; border-bottom:1px solid #eee;">';
+    html += '<div style="flex:1; font-size:13px;"><strong>' + escapeHtml(it.name) + '</strong></div>';
+    html += '<button onclick="posQtyChange(' + idx + ',-1)" style="width:32px; height:32px; border:1px solid #ddd; background:white; border-radius:4px; cursor:pointer; font-size:18px;">−</button>';
+    html += '<input type="number" value="' + it.quantity + '" min="1" oninput="posQtySet(' + idx + ',this.value)" style="width:50px; text-align:center; padding:4px; border:1px solid #ddd; border-radius:4px;">';
+    html += '<button onclick="posQtyChange(' + idx + ',1)" style="width:32px; height:32px; border:1px solid #ddd; background:white; border-radius:4px; cursor:pointer; font-size:18px;">+</button>';
+    html += '<div style="min-width:80px; text-align:right; font-weight:bold; font-size:14px;">' + numFormat(it.quantity * it.price) + '</div>';
+    html += '<button onclick="posRemoveItem(' + idx + ')" style="width:28px; height:28px; background:#fee; color:#d33; border:none; border-radius:4px; cursor:pointer; font-size:14px;">×</button>';
+    html += '</div>';
+  });
+  body.innerHTML = html;
+}
+
+function posQtyChange(idx, delta) {
+  posCart[idx].quantity = Math.max(1, posCart[idx].quantity + delta);
+  renderPosCart();
+  updatePosTotal();
+}
+function posQtySet(idx, val) {
+  posCart[idx].quantity = Math.max(1, parseInt(val) || 1);
+  updatePosTotal();
+}
+function posRemoveItem(idx) {
+  posCart.splice(idx, 1);
+  renderPosCart();
+  updatePosTotal();
+}
+
+function updatePosTotal() {
+  var subtotal = posCart.reduce(function(s, it){ return s + (it.quantity * it.price); }, 0);
+  var discount = parseFloat(document.getElementById('posDiscount').value) || 0;
+  var total = Math.max(0, subtotal - discount);
+  document.getElementById('posTotalDisplay').textContent = numFormat(total) + ' บาท';
+  updatePosChange();
+}
+
+function updatePosChange() {
+  var subtotal = posCart.reduce(function(s, it){ return s + (it.quantity * it.price); }, 0);
+  var discount = parseFloat(document.getElementById('posDiscount').value) || 0;
+  var total = Math.max(0, subtotal - discount);
+  var received = parseFloat(document.getElementById('posReceived').value) || 0;
+  var change = received - total;
+  var el = document.getElementById('posChangeDisplay');
+  el.textContent = numFormat(change);
+  if (change < 0) {
+    el.style.background = '#ffebee';
+    el.style.color = '#c62828';
+  } else {
+    el.style.background = '#e8f5e9';
+    el.style.color = '#2e7d32';
+  }
+}
+
+async function submitPos() {
+  var statusEl = document.getElementById('posStatus');
+  if (posCart.length === 0) {
+    statusEl.innerHTML = '<span style="color:#d33;">⚠️ กรุณาเลือกสินค้า</span>';
+    return;
+  }
+
+  var subtotal = posCart.reduce(function(s, it){ return s + (it.quantity * it.price); }, 0);
+  var discount = parseFloat(document.getElementById('posDiscount').value) || 0;
+  var total = Math.max(0, subtotal - discount);
+  var billType = document.getElementById('posBillType').value;
+
+  statusEl.style.color = '#666';
+  statusEl.innerHTML = '⏳ กำลังบันทึก...';
+
+  try {
+    // 1. POST /api/orders (POS = ลูกค้าทั่วไป)
+    var orderBody = {
+      source: 'pos',
+      customerId: '',
+      customerName: 'ลูกค้าทั่วไป (POS)',
+      customerPhone: '',
+      customerAddress: '',
+      items: posCart.map(function(it){ return { productId: it.productId, name: it.name, quantity: it.quantity, price: it.price }; }),
+      subtotal: subtotal,
+      discount: discount,
+      shippingFee: 0,
+      total: total,
+      paymentMethod: posPayMethod,
+      notes: ''
+    };
+    var r = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderBody)
+    });
+    var order = await r.json();
+    if (order.error) throw new Error(order.error);
+
+    // 2. Mark paid
+    statusEl.innerHTML = '⏳ บันทึกชำระเงิน...';
+    await fetch('/api/orders/' + order.id + '/paid', { method: 'POST' });
+
+    // 3. Issue invoice
+    statusEl.innerHTML = '⏳ ออกเลขบิล...';
+    var rIssue = await fetch('/api/orders/' + order.id + '/invoice/issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: billType })
+    });
+    var inv = await rIssue.json();
+    if (inv.error) throw new Error(inv.error);
+
+    // 4. เปิด PDF + auto print
+    var pdfUrl = '/api/orders/' + order.id + '/invoice/pdf?type=' + encodeURIComponent(billType) + '&qr_mode=dynamic';
+
+    statusEl.style.color = '#0a0';
+    statusEl.innerHTML = '✅ ' + (order.orderNo || '') + ' / ' + (inv.invoiceNo || '') + ' — เปิดหน้าพิมพ์...';
+
+    // เปิด popup → window.print() (auto print dialog)
+    var popup = window.open(pdfUrl, '_blank');
+    if (popup) {
+      popup.addEventListener('load', function() {
+        try { popup.print(); } catch(e) {}
+      });
+      // fallback: บางเบราว์เซอร์ load event ของ PDF ไม่ trigger
+      setTimeout(function() {
+        try { popup.focus(); popup.print(); } catch(e) {}
+      }, 1500);
+    }
+
+    // 5. ปิด modal + รีเฟรช orders
+    setTimeout(function() {
+      closePosModal();
+      if (typeof loadOrders === 'function') loadOrders();
+      if (typeof loadProducts === 'function') loadProducts();
+    }, 1000);
+  } catch (e) {
+    statusEl.style.color = '#d33';
+    statusEl.innerHTML = '❌ ' + e.message;
+  }
+}
+
+// Enter ในช่อง search ให้เลือกสินค้าตัวแรก (UX สำหรับ barcode scanner)
+document.addEventListener('DOMContentLoaded', function() {
+  var posSearch = document.getElementById('posProductSearch');
+  if (posSearch) {
+    posSearch.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        var firstResult = document.querySelector('#posProductResults > div');
+        if (firstResult && firstResult.onclick) firstResult.click();
+      }
+    });
+  }
+});
+</script>
 </body>
 </html>
