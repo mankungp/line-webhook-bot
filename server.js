@@ -837,12 +837,27 @@ app.post('/api/members/:id/recalc-stats', async function(req, res) {
 // ============ REPORTS PROXY ============
 ['/api/reports/dashboard', '/api/reports/sales-trend', '/api/reports/by-channel',
  '/api/reports/by-category', '/api/reports/by-tier', '/api/reports/top-products',
- '/api/reports/top-customers', '/api/reports/stock-alerts', '/api/reports/inactive-members'
+ '/api/reports/top-customers', '/api/reports/stock-alerts', '/api/reports/inactive-members',
+ '/api/reports/profit'
 ].forEach(function(path) {
   app.get(path, async function(req, res) {
     try {
       var qs = req.url.split('?')[1] || '';
       var r = await fetch(LOCAL_API_BASE + path + (qs ? '?' + qs : ''));
+      res.json(await r.json());
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+});
+
+// ============ PRODUCTS EXTRA PROXY (Phase 2A) ============
+['/api/products/find-duplicates', '/api/products/merge', '/api/products/bulk-import', '/api/products/bulk-edit'].forEach(function(p) {
+  app.post(p, async function(req, res) {
+    try {
+      var r = await adminFetch(LOCAL_API_BASE + p, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+      });
       res.json(await r.json());
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
