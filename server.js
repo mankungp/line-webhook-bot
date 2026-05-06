@@ -40,6 +40,14 @@ app.use(function(req, res, next) {
   next();
 });
 
+// Login page (must come before static middleware so /admin/login is served)
+app.get('/login', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'login.html'));
+});
+app.get('/admin/login', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'login.html'));
+});
+
 app.use('/admin', express.static(path.join(__dirname, 'admin-panel')));
 app.get('/', function(req, res) {
   res.send('Kerdkarnkaset is ALIVE!');
@@ -940,7 +948,7 @@ app.post('/api/members/:id/recalc-stats', async function(req, res) {
 ['/api/reports/dashboard', '/api/reports/sales-trend', '/api/reports/by-channel',
  '/api/reports/by-category', '/api/reports/by-tier', '/api/reports/top-products',
  '/api/reports/top-customers', '/api/reports/stock-alerts', '/api/reports/inactive-members',
- '/api/reports/profit'
+ '/api/reports/profit', '/api/reports/sales-leaderboard'
 ].forEach(function(path) {
   app.get(path, async function(req, res) {
     try {

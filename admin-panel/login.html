@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เข้าสู่ระบบ - เกิดการเกษตร</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Sarabun', sans-serif;
+      background: linear-gradient(135deg, #0a8 0%, #0c9 50%, #4ad 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      background: white;
+      border-radius: 24px;
+      padding: 48px 32px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    .logo-emoji { font-size: 56px; margin-bottom: 16px; }
+    h1 { color: #0a8; font-size: 28px; margin-bottom: 8px; }
+    .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+    .line-btn {
+      width: 100%;
+      background: #06C755;
+      color: white;
+      border: none;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 16px rgba(6,199,85,0.3);
+      font-family: inherit;
+    }
+    .line-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(6,199,85,0.4); }
+    .line-btn:active { transform: translateY(0); }
+    .line-icon {
+      width: 24px; height: 24px;
+      background: white; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: #06C755; font-weight: bold; font-size: 14px;
+    }
+    .info {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #eee;
+      font-size: 12px;
+      color: #999;
+      line-height: 1.6;
+    }
+    .error-banner {
+      background: #fff3e0;
+      color: #e65100;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      text-align: left;
+      display: none;
+    }
+    .error-banner.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo-emoji">🌾</div>
+    <h1>ระบบจัดการร้าน</h1>
+    <p class="subtitle">เกิดการเกษตร · อะไหล่ + เครื่องมือเกษตร</p>
+
+    <div id="errorBanner" class="error-banner"></div>
+
+    <button class="line-btn" onclick="loginWithLine()">
+      <div class="line-icon">L</div>
+      <span>เข้าสู่ระบบด้วย LINE</span>
+    </button>
+
+    <div class="info">
+      <strong>🔒 ปลอดภัย</strong> · ใช้ LINE ID เดิม ไม่ต้องสมัครใหม่<br/>
+      ใช้ได้เฉพาะพนักงานที่ได้รับสิทธิ์<br/>
+      <small style="color:#bbb;">© 2026 หจก.เกิดการเกษตร</small>
+    </div>
+  </div>
+
+  <script>
+    function loginWithLine() {
+      var nextUrl = new URLSearchParams(window.location.search).get('next') || '/admin/';
+      window.location.href = '/auth/login?next=' + encodeURIComponent(nextUrl);
+    }
+
+    // Show error if redirected with ?error=
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('error')) {
+      var b = document.getElementById('errorBanner');
+      var msg = {
+        'pending': '⏳ บัญชีของคุณยังไม่ได้รับสิทธิ์ — กรุณาแจ้งเจ้าของร้าน',
+        'blocked': '🚫 บัญชีถูกระงับ — กรุณาติดต่อเจ้าของร้าน',
+        'expired': '⏰ Session หมดอายุ — กรุณา login ใหม่'
+      }[params.get('error')] || params.get('error');
+      b.textContent = msg;
+      b.classList.add('show');
+    }
+
+    // ถ้า login อยู่แล้ว → redirect /admin
+    fetch('/auth/me').then(function(r){ if(r.ok) window.location.href = '/admin/'; });
+  </script>
+</body>
+</html>

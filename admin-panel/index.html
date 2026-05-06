@@ -9,7 +9,9 @@
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; min-height: 100vh; }
 
 /* Sidebar */
-.sidebar { width: 240px; background: #1a1a2e; color: white; padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+.sidebar { width: 240px; background: #1a1a2e; color: white; padding: 20px 0 80px; position: fixed; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+.user-info-bar { position: fixed; bottom: 0; left: 0; width: 240px; padding: 12px; background: #14142a; border-top: 1px solid #333; display: flex; align-items: center; gap: 8px; z-index: 100; }
+@media (max-width: 768px) { .user-info-bar { width: 60px; padding: 8px; } .user-info-bar .uib-meta { display: none; } }
 .sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid #333; margin-bottom: 15px; }
 .sidebar-logo h1 { font-size: 18px; color: #4fc3f7; }
 .sidebar-logo small { font-size: 12px; color: #888; }
@@ -172,28 +174,34 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     <small>ร้านเกิดการเกษตร</small>
   </div>
   <nav>
-    <a class="active" onclick="showPage('bot')" data-page="bot">
+    <a class="active" onclick="showPage('bot')" data-page="bot" data-perm="users:write">
       <span class="icon">🤖</span> <span>Bot Control</span>
     </a>
-    <a onclick="showPage('products')" data-page="products">
+    <a onclick="showPage('products')" data-page="products" data-perm="products:read">
       <span class="icon">📦</span> <span>สินค้า</span>
     </a>
-    <a onclick="showPage('orders')" data-page="orders">
+    <a onclick="showPage('orders')" data-page="orders" data-perm="orders:read">
       <span class="icon">🧾</span> <span>ออร์เดอร์</span>
     </a>
-    <a onclick="showPage('customers')" data-page="customers">
+    <a onclick="showPage('customers')" data-page="customers" data-perm="members:read">
       <span class="icon">👥</span> <span>ลูกค้า</span>
     </a>
-    <a onclick="showPage('members')" data-page="members">
+    <a onclick="showPage('members')" data-page="members" data-perm="members:read">
       <span class="icon">⭐</span> <span>สมาชิก</span>
     </a>
-    <a onclick="showPage('reports')" data-page="reports">
+    <a onclick="showPage('reports')" data-page="reports" data-perm="reports:read">
       <span class="icon">📊</span> <span>รายงาน</span>
     </a>
-    <a onclick="showPage('cameras')" data-page="cameras">
+    <a onclick="showPage('cameras')" data-page="cameras" data-perm="cameras:read">
       <span class="icon">📷</span> <span>กล้อง</span>
     </a>
+    <a onclick="showPage('users')" data-page="users" data-owner-only>
+      <span class="icon">👥</span> <span>ผู้ใช้ระบบ</span>
+    </a>
   </nav>
+  <div id="userInfoBar" class="user-info-bar">
+    <div style="color:#999;font-size:13px;">⏳ กำลังโหลด...</div>
+  </div>
 </div>
 
 <!-- Main Content -->
@@ -535,6 +543,17 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
           </div>
         </div>
       </div>
+
+      <!-- Sales Leaderboard -->
+      <div class="card" style="margin-top:16px;">
+        <h3 style="margin-top:0;">🏆 ยอดขายต่อพนักงาน (Leaderboard)</h3>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>พนักงาน</th><th class="num">ออเดอร์</th><th class="num">ยอดขาย</th><th class="num">คอม %</th><th class="num">คอม ฿</th></tr></thead>
+            <tbody id="rSalesLeaderboard"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -566,6 +585,45 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     <div class="card">
       <button class="btn btn-secondary" onclick="loadCameras()">รีเฟรช</button>
       <div id="cameraList" style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px;"></div>
+    </div>
+  </div>
+
+  <!-- ============ USERS PAGE (owner only) ============ -->
+  <div id="page-users" class="page" style="display:none;" data-owner-only>
+    <div class="page-header">
+      <h2>👥 ผู้ใช้ระบบ</h2>
+      <p>จัดการสิทธิ์การใช้งาน · เฉพาะ owner เท่านั้น</p>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="loadAdminUsers()">รีเฟรช</button>
+        <input type="text" id="usrSearch" placeholder="🔍 ค้นหา (ชื่อ/LINE ID)" oninput="renderAdminUsersList()" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ddd;">
+        <select id="usrRoleFilter" onchange="renderAdminUsersList()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+          <option value="">ทุก role</option>
+          <option value="owner">Owner</option>
+          <option value="manager">Manager</option>
+          <option value="staff">Staff</option>
+          <option value="technician">Technician</option>
+          <option value="customer">Customer (รออนุมัติ)</option>
+          <option value="blocked">Blocked</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="usersTable">
+          <thead>
+            <tr>
+              <th></th>
+              <th>ชื่อ</th>
+              <th>LINE ID</th>
+              <th>Role</th>
+              <th class="num">คอม %</th>
+              <th>เข้าล่าสุด</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -866,6 +924,7 @@ function showPage(page) {
   if (page === 'customers') loadCustomers();
   if (page === 'members') loadMembers();
   if (page === 'cameras') loadCameras();
+  if (page === 'users') loadAdminUsers();
   if (page === 'reports') {
     if (!document.getElementById('rFrom').value) setReportPeriod('today');
     else loadAllReports();
@@ -2499,6 +2558,7 @@ function selectMemberForOrder(payloadStr) {
   <div class="modal-content" style="max-width: 600px; max-height: 95vh; overflow-y: auto; padding: 16px;">
     <button class="close-btn" onclick="closePosModal()">×</button>
     <h2 style="margin: 0 0 12px 0;">⚡ คีย์บิลด่วน (POS)</h2>
+    <div id="posCurrentSeller" style="background:#e8f5e9;color:#0a8;padding:6px 12px;border-radius:6px;font-size:12px;margin-bottom:8px;display:none;"></div>
 
     <!-- Search สมาชิก (optional) -->
     <div style="margin-bottom: 12px; position:relative;">
@@ -2606,6 +2666,12 @@ function openPosModal() {
   setPayMethod('cash');
   renderPosCart();
   updatePosTotal();
+  // Show current seller
+  var sellerEl = document.getElementById('posCurrentSeller');
+  if (sellerEl && currentUser) {
+    sellerEl.textContent = '👤 ขายในนาม: ' + (currentUser.name || currentUser.displayName || '-');
+    sellerEl.style.display = 'block';
+  }
   setTimeout(function(){ var s = document.getElementById('posProductSearch'); if (s) s.focus(); }, 100);
 }
 
@@ -2898,7 +2964,8 @@ async function loadAllReports() {
     loadTopCustomers(),
     loadStockAlerts(),
     loadInactiveMembers(),
-    loadProfitReport()
+    loadProfitReport(),
+    loadSalesLeaderboard()
   ]);
 }
 
@@ -3562,6 +3629,319 @@ document.addEventListener('click', function(e) {
   var m = document.getElementById('orderVideosModal');
   if (m && e.target === m) closeOrderVideosModal();
 });
+
+// ============ AUTH (Phase 8) ============
+var currentUser = null;
+var currentPermissions = [];
+var __authChecked = false;
+
+async function checkAuth() {
+  if (__authChecked) return true;
+  try {
+    var r = await fetch('/auth/me');
+    if (!r.ok) {
+      window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+      return false;
+    }
+    var data = await r.json();
+    currentUser = data.user || data;
+    currentPermissions = (currentUser && currentUser.permissions) || [];
+    __authChecked = true;
+    renderUserInfo();
+    applyRoleVisibility();
+    return true;
+  } catch (e) {
+    window.location.href = '/admin/login';
+    return false;
+  }
+}
+
+function hasPerm(perm) {
+  if (!currentPermissions || !perm) return false;
+  if (currentPermissions.indexOf('*') >= 0) return true;
+  if (currentPermissions.indexOf(perm) >= 0) return true;
+  // :write covers :read
+  if (perm.indexOf(':read') >= 0) {
+    if (currentPermissions.indexOf(perm.replace(':read', ':write')) >= 0) return true;
+  }
+  return false;
+}
+
+function renderUserInfo() {
+  if (!currentUser) return;
+  var el = document.getElementById('userInfoBar');
+  if (!el) return;
+  var roleBadge = ({
+    owner:     '<span style="background:#d35400;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">⭐ OWNER</span>',
+    manager:   '<span style="background:#2980b9;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">👔 MANAGER</span>',
+    staff:     '<span style="background:#0a8;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">👤 STAFF</span>',
+    technician:'<span style="background:#9b59b6;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">🔧 TECHNICIAN</span>'
+  })[currentUser.role] || ('<span style="background:#999;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">' + (currentUser.role || '?') + '</span>');
+
+  var initial = ((currentUser.name || currentUser.displayName || '?').charAt(0) || '?').toUpperCase();
+  var avatar = currentUser.pictureUrl
+    ? '<img src="' + escapeHtml(currentUser.pictureUrl) + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
+    : '<div style="width:32px;height:32px;border-radius:50%;background:#0a8;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;flex-shrink:0;">' + escapeHtml(initial) + '</div>';
+
+  el.innerHTML = avatar +
+    '<div class="uib-meta" style="flex:1;min-width:0;overflow:hidden;">' +
+      '<div style="font-weight:600;font-size:13px;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(currentUser.name || currentUser.displayName || '') + '</div>' +
+      '<div>' + roleBadge + '</div>' +
+    '</div>' +
+    '<button onclick="doLogout()" class="uib-meta" style="background:none;border:none;cursor:pointer;color:#bbb;font-size:18px;" title="ออกจากระบบ">⏻</button>';
+}
+
+async function doLogout() {
+  if (!confirm('ออกจากระบบ?')) return;
+  try { await fetch('/auth/logout', { method: 'POST' }); } catch (e) {}
+  window.location.href = '/admin/login';
+}
+
+function applyRoleVisibility() {
+  // data-perm: hide if missing perm
+  document.querySelectorAll('[data-perm]').forEach(function(el) {
+    var perm = el.getAttribute('data-perm');
+    if (!hasPerm(perm)) el.style.display = 'none';
+  });
+  // data-role: comma-list of roles allowed
+  document.querySelectorAll('[data-role]').forEach(function(el) {
+    var roles = el.getAttribute('data-role').split(',').map(function(s){ return s.trim(); });
+    if (!currentUser || roles.indexOf(currentUser.role) < 0) el.style.display = 'none';
+  });
+  // data-owner-only
+  document.querySelectorAll('[data-owner-only]').forEach(function(el) {
+    if (!currentUser || currentUser.role !== 'owner') el.style.display = 'none';
+  });
+}
+
+// Run auth check on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkAuth);
+} else {
+  checkAuth();
+}
+
+// ============ USER MANAGEMENT (owner only) ============
+var allAdminUsers = [];
+var editingUserId = null;
+
+async function loadAdminUsers() {
+  try {
+    var r = await fetch('/api/users');
+    var d = await r.json();
+    if (d.error) { console.error(d.error); return; }
+    allAdminUsers = d.users || [];
+    renderAdminUsersList();
+  } catch (e) { console.error(e); }
+}
+
+function renderAdminUsersList() {
+  var search = (document.getElementById('usrSearch') || {value:''}).value.toLowerCase();
+  var roleFilter = (document.getElementById('usrRoleFilter') || {value:''}).value;
+
+  var filtered = allAdminUsers.filter(function(u) {
+    if (roleFilter && u.role !== roleFilter) return false;
+    if (search) {
+      var hay = ((u.name || '') + ' ' + (u.displayName || '') + ' ' + (u.nickname || '') + ' ' + (u.lineUserId || '')).toLowerCase();
+      if (hay.indexOf(search) < 0) return false;
+    }
+    return true;
+  });
+
+  var roleLabel = { owner:'⭐ Owner', manager:'👔 Manager', staff:'👤 Staff', technician:'🔧 Tech', customer:'👋 Customer', blocked:'🚫 Blocked' };
+  var roleColor = { owner:'#d35400', manager:'#2980b9', staff:'#0a8', technician:'#9b59b6', customer:'#999', blocked:'#d33' };
+  var html = '';
+  if (filtered.length === 0) {
+    html = '<tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">ไม่พบผู้ใช้</td></tr>';
+  } else {
+    filtered.forEach(function(u) {
+      var initial = ((u.name || u.displayName || '?').charAt(0) || '?').toUpperCase();
+      var avatar = u.pictureUrl
+        ? '<img src="' + escapeHtml(u.pictureUrl) + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">'
+        : '<div style="width:36px;height:36px;border-radius:50%;background:' + (roleColor[u.role] || '#999') + ';color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;">' + escapeHtml(initial) + '</div>';
+      var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString('th-TH') : '-';
+      var commText = (u.commissionRate > 0)
+        ? (u.commissionRate + '%')
+        : ((u.technicianCommissionRate > 0) ? ('🔧' + u.technicianCommissionRate + '%') : '-');
+      var lineId = u.lineUserId || '';
+
+      html += '<tr>';
+      html += '<td>' + avatar + '</td>';
+      html += '<td><div style="font-weight:600;">' + escapeHtml(u.name || u.displayName || '-') + '</div>';
+      if (u.nickname) html += '<div style="font-size:12px;color:#999;">' + escapeHtml(u.nickname) + '</div>';
+      html += '</td>';
+      html += '<td><code style="font-size:11px;color:#999;">' + escapeHtml(lineId.substring(0, 12)) + (lineId.length > 12 ? '...' : '') + '</code></td>';
+      html += '<td><span style="color:' + (roleColor[u.role] || '#999') + ';font-weight:600;">' + (roleLabel[u.role] || escapeHtml(u.role || '?')) + '</span></td>';
+      html += '<td class="num">' + commText + '</td>';
+      html += '<td style="font-size:12px; color:#999;">' + escapeHtml(lastLogin) + '</td>';
+      html += '<td><button class="btn btn-secondary btn-sm" onclick="editUser(\'' + escapeHtml(lineId) + '\')">แก้ไข</button></td>';
+      html += '</tr>';
+    });
+  }
+  document.getElementById('usersBody').innerHTML = html;
+}
+
+function editUser(lineUserId) {
+  var u = allAdminUsers.find(function(x){ return x.lineUserId === lineUserId; });
+  if (!u) return;
+  editingUserId = lineUserId;
+
+  var avatar = u.pictureUrl
+    ? '<img src="' + escapeHtml(u.pictureUrl) + '" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">'
+    : '';
+  document.getElementById('userEditAvatar').innerHTML = avatar;
+  document.getElementById('userEditLineInfo').innerHTML =
+    '<strong>' + escapeHtml(u.displayName || '-') + '</strong><br/>' +
+    '<small>' + escapeHtml((u.lineUserId || '').substring(0, 16)) + '...</small>';
+
+  document.getElementById('ueName').value = u.name || '';
+  document.getElementById('ueNickname').value = u.nickname || '';
+  document.getElementById('ueRole').value = u.role || 'customer';
+  document.getElementById('ueCommissionRate').value = u.commissionRate || 0;
+  document.getElementById('ueTechCommissionRate').value = u.technicianCommissionRate || 0;
+  document.getElementById('ueSalesEnabled').checked = u.salesEnabled !== false;
+  document.getElementById('ueStatus').textContent = '';
+
+  // ห้ามลบตัวเอง
+  document.getElementById('ueDeleteBtn').style.display =
+    (currentUser && lineUserId !== currentUser.lineUserId) ? 'inline-block' : 'none';
+
+  document.getElementById('userEditModal').classList.add('active');
+}
+
+function closeUserEditModal() {
+  document.getElementById('userEditModal').classList.remove('active');
+  editingUserId = null;
+}
+
+async function saveUser() {
+  if (!editingUserId) return;
+  var data = {
+    name: document.getElementById('ueName').value.trim(),
+    nickname: document.getElementById('ueNickname').value.trim(),
+    role: document.getElementById('ueRole').value,
+    commissionRate: parseFloat(document.getElementById('ueCommissionRate').value) || 0,
+    technicianCommissionRate: parseFloat(document.getElementById('ueTechCommissionRate').value) || 0,
+    salesEnabled: document.getElementById('ueSalesEnabled').checked
+  };
+  document.getElementById('ueStatus').textContent = '⏳ กำลังบันทึก...';
+  try {
+    var r = await fetch('/api/users/' + encodeURIComponent(editingUserId), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    var result = await r.json();
+    if (result.error) {
+      document.getElementById('ueStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(result.error) + '</span>';
+      return;
+    }
+    document.getElementById('ueStatus').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว</span>';
+    setTimeout(function() { closeUserEditModal(); loadAdminUsers(); }, 600);
+  } catch (e) {
+    document.getElementById('ueStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+async function deleteUser() {
+  if (!editingUserId) return;
+  if (!confirm('ลบผู้ใช้นี้? การลบจะทำให้ user คนนี้ login ไม่ได้\n(ออเดอร์เก่ายังอยู่ — แต่ไม่ติด link)')) return;
+  try {
+    var r = await fetch('/api/users/' + encodeURIComponent(editingUserId), { method: 'DELETE' });
+    if (!r.ok) {
+      var d = {};
+      try { d = await r.json(); } catch(e){}
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
+    closeUserEditModal();
+    loadAdminUsers();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+// ============ SALES LEADERBOARD ============
+async function loadSalesLeaderboard() {
+  try {
+    var qs = (typeof getRangeQS === 'function') ? getRangeQS() : '';
+    var r = await fetch('/api/reports/sales-leaderboard' + (qs ? '?' + qs : ''));
+    var d = await r.json();
+    var rows = (d && d.data) ? d.data : [];
+    var html = '';
+    rows.forEach(function(s, i) {
+      var medal = ['🥇','🥈','🥉'][i] || (i + 1);
+      var commRate = s.role === 'technician' ? s.technicianCommissionRate : s.commissionRate;
+      html += '<tr>';
+      html += '<td>' + medal + '</td>';
+      html += '<td><strong>' + escapeHtml(s.name || s.nickname || '-') + '</strong> <small style="color:#999;">' + (s.role === 'technician' ? '🔧' : '👤') + '</small></td>';
+      html += '<td class="num">' + numFormat(s.orderCount || 0) + '</td>';
+      html += '<td class="num">' + numFormat(s.revenue || 0) + '</td>';
+      html += '<td class="num">' + (commRate || 0) + '%</td>';
+      html += '<td class="num" style="color:#0a8;font-weight:600;">' + numFormat(s.commission || 0) + '</td>';
+      html += '</tr>';
+    });
+    if (html === '') html = '<tr><td colspan="6" style="text-align:center;color:#999;padding:16px;">ยังไม่มีข้อมูล</td></tr>';
+    var body = document.getElementById('rSalesLeaderboard');
+    if (body) body.innerHTML = html;
+  } catch (e) { console.error('leaderboard:', e); }
+}
 </script>
+
+<!-- User Edit Modal (owner only) -->
+<div class="modal" id="userEditModal">
+  <div class="modal-content" style="max-width: 480px;">
+    <button class="close-btn" onclick="closeUserEditModal()">×</button>
+    <h2>✏️ แก้ไขผู้ใช้</h2>
+    <div id="userEditAvatar" style="text-align:center; margin-bottom:12px;"></div>
+    <p id="userEditLineInfo" style="text-align:center; color:#666; font-size:13px;"></p>
+
+    <div style="margin: 12px 0;">
+      <label style="font-size:12px; color:#666;">ชื่อจริง (ใช้ในบิล)</label>
+      <input type="text" id="ueName" placeholder="เช่น นายสมชาย" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+    </div>
+
+    <div style="margin: 12px 0;">
+      <label style="font-size:12px; color:#666;">ชื่อเล่น</label>
+      <input type="text" id="ueNickname" placeholder="optional" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+    </div>
+
+    <div style="margin: 12px 0;">
+      <label style="font-size:12px; color:#666;">Role *</label>
+      <select id="ueRole" style="width:100%; padding:10px; border-radius:6px; border:1px solid #ddd;">
+        <option value="owner">⭐ Owner — เห็นทุกอย่าง</option>
+        <option value="manager">👔 Manager — แก้ทุกอย่างยกเว้น users</option>
+        <option value="staff">👤 Staff — คีย์ออเดอร์/POS</option>
+        <option value="technician">🔧 Technician — ดูออเดอร์อย่างเดียว</option>
+        <option value="customer">👋 Customer — ปฏิเสธเข้า admin</option>
+        <option value="blocked">🚫 Blocked — บล็อกถาวร</option>
+      </select>
+    </div>
+
+    <div style="display:flex; gap:8px; margin: 12px 0;">
+      <div style="flex:1;">
+        <label style="font-size:12px; color:#666;">% คอมขาย</label>
+        <input type="number" step="0.1" id="ueCommissionRate" min="0" max="100" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+      </div>
+      <div style="flex:1;">
+        <label style="font-size:12px; color:#666;">% คอมช่าง</label>
+        <input type="number" step="0.1" id="ueTechCommissionRate" min="0" max="100" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+      </div>
+    </div>
+
+    <div style="margin: 12px 0;">
+      <label>
+        <input type="checkbox" id="ueSalesEnabled">
+        เปิดให้ขาย/ออกบิลในนามตัวเองได้
+      </label>
+    </div>
+
+    <div id="ueStatus" style="margin: 8px 0; font-size:13px;"></div>
+
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-danger" id="ueDeleteBtn" onclick="deleteUser()" style="display:none;">🗑️ ลบ</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="closeUserEditModal()">ยกเลิก</button>
+      <button class="btn btn-primary" style="flex:2;" onclick="saveUser()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
