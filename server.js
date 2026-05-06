@@ -875,6 +875,75 @@ app.post('/api/members/import-from-customers', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ SURVEILLANCE PROXY ============
+app.get('/api/cameras', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/cameras');
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/cameras/:id/snapshot', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/cameras/' + encodeURIComponent(req.params.id) + '/snapshot');
+    if (!r.ok) return res.status(r.status).send('snapshot failed');
+    res.setHeader('Content-Type', 'image/jpeg');
+    var buf = Buffer.from(await r.arrayBuffer());
+    res.send(buf);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/orders/:id/videos', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/videos' + (qs ? '?' + qs : ''));
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/videos/:recordingId/stream', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/videos/' + req.params.recordingId + '/stream');
+    if (!r.ok) return res.status(r.status).send('Stream failed');
+    res.setHeader('Content-Type', r.headers.get('content-type') || 'video/mp4');
+    res.setHeader('Content-Disposition', 'inline');
+    var lenHdr = r.headers.get('content-length');
+    if (lenHdr) res.setHeader('Content-Length', lenHdr);
+    var reader = r.body.getReader();
+    res.on('close', function() { try { reader.cancel(); } catch (e) {} });
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      res.write(Buffer.from(chunk.value));
+    }
+    res.end();
+  } catch (err) { if (!res.headersSent) res.status(500).json({ error: err.message }); }
+});
+
+app.get('/snapshots/:filename', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/snapshots/' + encodeURIComponent(req.params.filename));
+    if (!r.ok) return res.status(404).send('not found');
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (err) { res.status(500).send('error'); }
+});
+
+app.post('/api/orders/:id/snapshot', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/snapshot', { method: 'POST' });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET single order (helper for video modal)
+app.get('/api/orders/:id', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id);
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ STATS PROXY ============
 app.get('/api/stats', async function(req, res) {
   try {

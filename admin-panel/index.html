@@ -190,6 +190,9 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     <a onclick="showPage('reports')" data-page="reports">
       <span class="icon">📊</span> <span>รายงาน</span>
     </a>
+    <a onclick="showPage('cameras')" data-page="cameras">
+      <span class="icon">📷</span> <span>กล้อง</span>
+    </a>
   </nav>
 </div>
 
@@ -554,6 +557,18 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     </div>
   </div>
 
+  <!-- ============ CAMERAS PAGE ============ -->
+  <div id="page-cameras" class="page" style="display:none;">
+    <div class="page-header">
+      <h2>📷 กล้องวงจรปิด</h2>
+      <p>ดูสถานะกล้อง + snapshots ตอน paid</p>
+    </div>
+    <div class="card">
+      <button class="btn btn-secondary" onclick="loadCameras()">รีเฟรช</button>
+      <div id="cameraList" style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px;"></div>
+    </div>
+  </div>
+
   <div class="footer">
     อัปเดตล่าสุด: <span id="lastUpdate">-</span> | ร้านเกิดการเกษตร
   </div>
@@ -850,6 +865,7 @@ function showPage(page) {
   if (page === 'orders') loadOrders();
   if (page === 'customers') loadCustomers();
   if (page === 'members') loadMembers();
+  if (page === 'cameras') loadCameras();
   if (page === 'reports') {
     if (!document.getElementById('rFrom').value) setReportPeriod('today');
     else loadAllReports();
@@ -1386,6 +1402,7 @@ function renderOrders(list) {
       html += '<button class="btn btn-primary btn-sm" onclick="markPaid(' + o.id + ')">จ่ายแล้ว</button> ';
     }
     // ปุ่มพิมพ์แสดงทุกสถานะ (รวม cancelled เผื่อดูประวัติ/พิมพ์ซ้ำ)
+    html += '<button class="btn btn-secondary btn-sm" onclick="openOrderVideos(' + o.id + ')">🎥 วิดีโอ</button> ';
     html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
     if (o.status !== 'cancelled' && o.status !== 'completed') {
       html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
@@ -1910,6 +1927,26 @@ async function deleteCategory(id) {
 loadBotCustomers();
 setInterval(loadBotCustomers, 30000);
 </script>
+
+<!-- Order Videos Modal -->
+<div class="modal" id="orderVideosModal">
+  <div class="modal-content" style="max-width: 900px; max-height: 95vh; overflow-y: auto;">
+    <button class="close-btn" onclick="closeOrderVideosModal()">×</button>
+    <h2>🎥 วิดีโอจุดแพ็ค</h2>
+    <p id="ovOrderInfo" style="color:#666;"></p>
+    <div style="margin: 12px 0;">
+      <label>ช่วงเวลา (นาทีก่อน-หลัง):</label>
+      <input type="number" id="ovWindow" value="10" min="1" max="60" style="width:80px; padding:6px; border-radius:4px; border:1px solid #ddd;">
+      <button class="btn btn-primary btn-sm" onclick="loadOrderVideos()">ค้นหา</button>
+    </div>
+    <div id="ovStatus" style="margin: 8px 0; font-size:13px;"></div>
+    <div id="ovList"></div>
+    <div id="ovPlayer" style="display:none; margin-top:16px;">
+      <h3 style="font-size:14px;">▶️ Playing</h3>
+      <video id="ovVideo" controls style="width:100%; max-height:500px; background:#000;"></video>
+    </div>
+  </div>
+</div>
 
 <!-- Invoice Modal -->
 <div id="invoiceModal" class="modal" style="display:none;">
@@ -3401,6 +3438,130 @@ async function importLineCustomers() {
     loadMembers();
   } catch (e) { alert('❌ ' + e.message); }
 }
+
+// ============ SURVEILLANCE / VIDEOS ============
+var ovCurrentOrderId = null;
+
+async function openOrderVideos(orderId) {
+  ovCurrentOrderId = orderId;
+  document.getElementById('orderVideosModal').classList.add('active');
+  document.getElementById('ovWindow').value = '10';
+  document.getElementById('ovList').innerHTML = '';
+  document.getElementById('ovPlayer').style.display = 'none';
+  document.getElementById('ovOrderInfo').textContent = '';
+  document.getElementById('ovStatus').textContent = '';
+
+  try {
+    var r = await fetch('/api/orders/' + orderId);
+    var o = await r.json();
+    var info = '📦 <strong>' + escapeHtml(o.orderNo || '-') + '</strong> · ' +
+               '🕐 ' + new Date(o.createdAt).toLocaleString('th-TH');
+    if (o.paymentSnapshot) {
+      info += '<br/>📸 มี snapshot ตอน paid: <a href="' + o.paymentSnapshot + '" target="_blank">เปิดดู</a>';
+      if (o.paymentSnapshotCameraName) info += ' (' + escapeHtml(o.paymentSnapshotCameraName) + ')';
+    }
+    document.getElementById('ovOrderInfo').innerHTML = info;
+    loadOrderVideos();
+  } catch (e) {
+    document.getElementById('ovStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
+}
+
+function closeOrderVideosModal() {
+  var v = document.getElementById('ovVideo');
+  if (v) { try { v.pause(); } catch(e){} v.removeAttribute('src'); v.load && v.load(); }
+  document.getElementById('orderVideosModal').classList.remove('active');
+  ovCurrentOrderId = null;
+}
+
+async function loadOrderVideos() {
+  if (!ovCurrentOrderId) return;
+  var win = parseInt(document.getElementById('ovWindow').value) || 10;
+  document.getElementById('ovStatus').textContent = '⏳ กำลังค้นหา...';
+  document.getElementById('ovList').innerHTML = '';
+
+  try {
+    var r = await fetch('/api/orders/' + ovCurrentOrderId + '/videos?windowMin=' + win);
+    var d = await r.json();
+    if (d.error) {
+      document.getElementById('ovStatus').innerHTML = '<span style="color:#d33;">❌ ' + d.error + '</span>';
+      return;
+    }
+    if (!d.recordings || d.recordings.length === 0) {
+      document.getElementById('ovStatus').innerHTML = '<span style="color:#999;">ไม่พบคลิปในช่วงเวลานี้ (' + win + ' นาที ก่อน-หลัง)</span>';
+      return;
+    }
+
+    document.getElementById('ovStatus').innerHTML = '<span style="color:#0a0;">✅ พบ ' + d.recordings.length + ' คลิป</span>';
+    var html = '<div style="display:grid; gap:8px;">';
+    d.recordings.forEach(function(rec) {
+      var startStr = new Date(rec.startTime * 1000).toLocaleString('th-TH');
+      var dur = Math.round(rec.duration / 60 * 10) / 10;
+      var sizeMB = Math.round((rec.fileSize || 0) / 1024 / 1024 * 10) / 10;
+      html += '<div style="border:1px solid #eee; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; gap:8px;">';
+      html += '<div>';
+      html += '<div><strong>📹 ' + escapeHtml(rec.cameraName || ('Camera ' + rec.cameraId)) + '</strong></div>';
+      html += '<div style="font-size:12px; color:#999;">' + startStr + ' · ' + dur + ' นาที · ' + sizeMB + ' MB</div>';
+      html += '</div>';
+      html += '<button class="btn btn-primary btn-sm" onclick="playRecording(\'' + rec.streamUrl + '\')">▶️ Play</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+    document.getElementById('ovList').innerHTML = html;
+  } catch (e) {
+    document.getElementById('ovStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
+}
+
+function playRecording(url) {
+  var v = document.getElementById('ovVideo');
+  v.src = url;
+  document.getElementById('ovPlayer').style.display = 'block';
+  v.play().catch(function(){ /* autoplay blocked */ });
+  setTimeout(function() {
+    document.getElementById('ovPlayer').scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+}
+
+async function loadCameras() {
+  var box = document.getElementById('cameraList');
+  if (!box) return;
+  box.innerHTML = '<div style="color:#999; padding:24px; text-align:center;">⏳ กำลังโหลด...</div>';
+  try {
+    var r = await fetch('/api/cameras');
+    var d = await r.json();
+    if (d.error) {
+      box.innerHTML = '<div style="color:#d33; padding:24px; text-align:center;">❌ ' + escapeHtml(d.error) + '</div>';
+      return;
+    }
+    if (!d.cameras || d.cameras.length === 0) {
+      box.innerHTML = '<div style="color:#999; padding:24px; text-align:center;">⚠️ ยังไม่มีกล้องเชื่อมเข้า Synology<br/><small>เพิ่มกล้องผ่าน Surveillance Station ใน DSM ก่อน</small></div>';
+      return;
+    }
+    var html = '';
+    d.cameras.forEach(function(c) {
+      var isOnline = c.status === 1;
+      html += '<div class="card" style="padding:12px;">';
+      html += '<div style="position:relative;">';
+      html += '<img src="/api/cameras/' + c.id + '/snapshot?t=' + Date.now() + '" style="width:100%; border-radius:6px; aspect-ratio:16/9; object-fit:cover; background:#000;" onerror="this.style.background=\'#333\';this.alt=\'⚠️ no snapshot\';">';
+      html += '<div style="position:absolute; top:8px; right:8px; background:' + (isOnline ? '#0a0' : '#d33') + '; color:white; padding:2px 6px; border-radius:4px; font-size:11px;">' + (isOnline ? '🟢 LIVE' : '🔴 OFFLINE') + '</div>';
+      html += '</div>';
+      html += '<div style="margin-top:8px;"><strong>' + escapeHtml(c.newName || ('Camera ' + c.id)) + '</strong></div>';
+      html += '<div style="font-size:12px; color:#999;">' + escapeHtml(c.vendor || '') + ' ' + escapeHtml(c.model || '') + '</div>';
+      html += '<div style="font-size:12px; color:#999;">' + escapeHtml(c.ip || '') + (c.port ? ':' + c.port : '') + '</div>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div style="color:#d33; padding:24px; text-align:center;">❌ ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+// Close videos modal on outside click
+document.addEventListener('click', function(e) {
+  var m = document.getElementById('orderVideosModal');
+  if (m && e.target === m) closeOrderVideosModal();
+});
 </script>
 </body>
 </html>
