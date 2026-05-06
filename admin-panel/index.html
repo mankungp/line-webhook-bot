@@ -756,9 +756,8 @@ function renderOrders(list) {
     if (o.status === 'confirmed') {
       html += '<button class="btn btn-primary btn-sm" onclick="markPaid(' + o.id + ')">จ่ายแล้ว</button> ';
     }
-    if (o.status !== 'cancelled') {
-      html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
-    }
+    // ปุ่มพิมพ์แสดงทุกสถานะ (รวม cancelled เผื่อดูประวัติ/พิมพ์ซ้ำ)
+    html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
     if (o.status !== 'cancelled' && o.status !== 'completed') {
       html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
     }
