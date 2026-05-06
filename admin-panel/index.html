@@ -327,7 +327,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
       <div class="stat-card"><div class="stat-number" id="memberStatTotal">0</div><div class="stat-label">ทั้งหมด</div></div>
       <div class="stat-card"><div class="stat-number" id="memberStatRegular">0</div><div class="stat-label">ทั่วไป</div></div>
       <div class="stat-card"><div class="stat-number" id="memberStatWholesale">0</div><div class="stat-label">ขายส่ง</div></div>
-      <div class="stat-card"><div class="stat-number" id="memberStatVip">0</div><div class="stat-label">VIP</div></div>
+      <div class="stat-card"><div class="stat-number" id="memberStatVip">0</div><div class="stat-label">ขายส่ง (ช่าง)</div></div>
     </div>
 
     <div class="card">
@@ -339,7 +339,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
           <option value="">ทุก tier</option>
           <option value="regular">ทั่วไป</option>
           <option value="wholesale">ขายส่ง</option>
-          <option value="vip">VIP</option>
+          <option value="technician">ขายส่ง (ช่าง)</option>
         </select>
       </div>
       <div style="overflow-x:auto;">
@@ -1542,7 +1542,7 @@ setInterval(loadBotCustomers, 30000);
         <select id="mTier" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
           <option value="regular">ทั่วไป</option>
           <option value="wholesale">ขายส่ง</option>
-          <option value="vip">VIP</option>
+          <option value="technician">ขายส่ง (ช่าง)</option>
         </select>
       </div>
       <div style="flex:1;">
@@ -1602,8 +1602,8 @@ function renderMembers(list) {
     body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px;">ไม่พบสมาชิก</td></tr>';
     return;
   }
-  var tierBadge = { regular: '👤 ทั่วไป', wholesale: '🏪 ขายส่ง', vip: '⭐ VIP' };
-  var tierColor = { regular: '#666', wholesale: '#0a8', vip: '#d35400' };
+  var tierBadge = { regular: '👤 ทั่วไป', wholesale: '🏪 ขายส่ง', technician: '🔧 ขายส่ง (ช่าง)', vip: '🔧 ขายส่ง (ช่าง)' };
+  var tierColor = { regular: '#666', wholesale: '#0a8', technician: '#0a8', vip: '#0a8' };
   var html = '';
   list.forEach(function(m) {
     var phones = (m.phones || []).join(', ') || '-';
@@ -1628,7 +1628,7 @@ function updateMemberStats(list) {
   list.forEach(function(m) {
     if (m.tier === 'regular') r++;
     else if (m.tier === 'wholesale') w++;
-    else if (m.tier === 'vip') v++;
+    else if (m.tier === 'technician' || m.tier === 'vip') v++;
   });
   document.getElementById('memberStatRegular').textContent = r;
   document.getElementById('memberStatWholesale').textContent = w;
