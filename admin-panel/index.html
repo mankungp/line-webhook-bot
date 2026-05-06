@@ -168,6 +168,9 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     <a onclick="showPage('customers')" data-page="customers">
       <span class="icon">👥</span> <span>ลูกค้า</span>
     </a>
+    <a onclick="showPage('members')" data-page="members">
+      <span class="icon">⭐</span> <span>สมาชิก</span>
+    </a>
   </nav>
 </div>
 
@@ -313,6 +316,52 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     </div>
   </div>
 
+  <!-- ============ MEMBERS PAGE ============ -->
+  <div id="page-members" class="page" style="display:none;">
+    <div class="page-header">
+      <h2>⭐ สมาชิก</h2>
+      <p>จัดการสมาชิกร้าน — มีหลายเบอร์/ที่อยู่ + tier ราคา</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-number" id="memberStatTotal">0</div><div class="stat-label">ทั้งหมด</div></div>
+      <div class="stat-card"><div class="stat-number" id="memberStatRegular">0</div><div class="stat-label">ทั่วไป</div></div>
+      <div class="stat-card"><div class="stat-number" id="memberStatWholesale">0</div><div class="stat-label">ขายส่ง</div></div>
+      <div class="stat-card"><div class="stat-number" id="memberStatVip">0</div><div class="stat-label">VIP</div></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openMemberModal()">+ เพิ่มสมาชิก</button>
+        <button class="btn btn-secondary" onclick="loadMembers()">รีเฟรช</button>
+        <input type="text" class="search-box" id="mSearch" placeholder="🔍 ค้นหา (ชื่อ/เบอร์/code)" oninput="loadMembers()" style="flex:1; min-width:180px;">
+        <select id="mTierFilter" onchange="loadMembers()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+          <option value="">ทุก tier</option>
+          <option value="regular">ทั่วไป</option>
+          <option value="wholesale">ขายส่ง</option>
+          <option value="vip">VIP</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="membersTable">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>ชื่อ</th>
+              <th>เบอร์</th>
+              <th>Tier</th>
+              <th class="num">ออเดอร์</th>
+              <th class="num">ยอดซื้อ</th>
+              <th>ล่าสุด</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="membersBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ CUSTOMERS PAGE ============ -->
   <div id="page-customers" class="page" style="display:none;">
     <div class="page-header">
@@ -434,6 +483,7 @@ function showPage(page) {
   if (page === 'products') loadProducts();
   if (page === 'orders') loadOrders();
   if (page === 'customers') loadCustomers();
+  if (page === 'members') loadMembers();
 }
 
 // ============ BOT CONTROL ============
@@ -959,6 +1009,7 @@ var productSearchTimer = null;
 
 function openOrderModal() {
   orderItems = [];
+  orderSelectedMember = null;
   document.getElementById('orderModal').classList.add('active');
   document.getElementById('oCustId').value = '';
   document.getElementById('oCustName').value = '';
@@ -1141,6 +1192,7 @@ async function submitOrder() {
   var body = {
     source: document.getElementById('oSource').value,
     customerId: document.getElementById('oCustId').value,
+    memberId: orderSelectedMember || null,
     customerName: name,
     customerPhone: document.getElementById('oCustPhone').value.trim(),
     customerAddress: document.getElementById('oCustAddress').value.trim(),
@@ -1338,11 +1390,11 @@ setInterval(loadBotCustomers, 30000);
     <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px; margin: 12px 0;">
       <h3 style="margin: 0 0 8px 0; font-size: 14px;">ข้อมูลลูกค้า</h3>
 
-      <div style="margin-bottom: 8px;">
-        <input type="text" id="oCustSearch" placeholder="🔍 ค้นหาลูกค้าเก่า (ชื่อ/เบอร์)..."
-               oninput="searchCustomers(this.value)" autocomplete="off"
+      <div style="margin-bottom: 8px; position:relative;">
+        <input type="text" id="oCustSearch" placeholder="⭐ ค้นหาสมาชิก (ชื่อ/เบอร์/code) — หรือกรอกชื่อยังไม่สมัครได้"
+               oninput="searchMembersForOrder(this.value)" autocomplete="off"
                style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
-        <div id="oCustResults" style="display:none; max-height:160px; overflow-y:auto; border:1px solid #ddd; border-radius:6px; margin-top:4px;"></div>
+        <div id="oCustResults" style="display:none; position:absolute; z-index:12; left:0; right:0; background:white; max-height:200px; overflow-y:auto; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
       </div>
 
       <input type="hidden" id="oCustId" value="">
@@ -1448,11 +1500,401 @@ setInterval(loadBotCustomers, 30000);
   </div>
 </div>
 
+<!-- Member Modal -->
+<div class="modal" id="memberModal">
+  <div class="modal-content" style="max-width: 600px; max-height: 95vh; overflow-y: auto;">
+    <button class="close-btn" onclick="closeMemberModal()">×</button>
+    <h2 id="memberModalTitle">+ เพิ่มสมาชิก</h2>
+    <input type="hidden" id="mId">
+
+    <div style="margin: 8px 0;">
+      <label style="font-size:12px; color:#666;">รหัสสมาชิก</label>
+      <input type="text" id="mCode" disabled style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd; background:#f5f5f5;">
+    </div>
+
+    <div style="margin: 8px 0;">
+      <label style="font-size:12px; color:#666;">ชื่อ *</label>
+      <input type="text" id="mName" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+    </div>
+
+    <!-- เบอร์โทร -->
+    <div style="margin: 12px 0;">
+      <label style="font-size:12px; color:#666; display:flex; justify-content:space-between;">
+        <span>เบอร์โทร</span>
+        <button type="button" onclick="addPhoneInput()" style="background:none;border:1px solid #ddd;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;">+ เพิ่ม</button>
+      </label>
+      <div id="mPhones"></div>
+    </div>
+
+    <!-- ที่อยู่ -->
+    <div style="margin: 12px 0;">
+      <label style="font-size:12px; color:#666; display:flex; justify-content:space-between;">
+        <span>ที่อยู่</span>
+        <button type="button" onclick="addAddressInput()" style="background:none;border:1px solid #ddd;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;">+ เพิ่ม</button>
+      </label>
+      <div id="mAddresses"></div>
+    </div>
+
+    <!-- Tier + Tax -->
+    <div style="display:flex; gap:8px; margin: 8px 0;">
+      <div style="flex:1;">
+        <label style="font-size:12px; color:#666;">Tier</label>
+        <select id="mTier" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+          <option value="regular">ทั่วไป</option>
+          <option value="wholesale">ขายส่ง</option>
+          <option value="vip">VIP</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+        <label style="font-size:12px; color:#666;">Tax ID (นิติบุคคล)</label>
+        <input type="text" id="mTaxId" maxlength="13" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+      </div>
+    </div>
+
+    <div style="margin: 8px 0;">
+      <label style="font-size:12px; color:#666;">LINE User ID (optional)</label>
+      <input type="text" id="mLineUserId" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+    </div>
+
+    <div style="margin: 8px 0;">
+      <label style="font-size:12px; color:#666;">หมายเหตุ</label>
+      <textarea id="mNotes" rows="2" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd; resize:vertical;"></textarea>
+    </div>
+
+    <!-- สถิติ (read-only) -->
+    <div id="mStats" style="margin: 12px 0; padding: 8px; background:#f9f9f9; border-radius:6px; font-size:13px; display:none;"></div>
+
+    <div id="mStatus" style="margin: 8px 0; font-size:13px;"></div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-danger" id="mDeleteBtn" style="display:none;" onclick="deleteMemberConfirm()">🗑️ ลบ</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="closeMemberModal()">ยกเลิก</button>
+      <button class="btn btn-primary" style="flex:2;" onclick="saveMember()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ MEMBERS ============
+var editingMemberId = null;
+
+async function loadMembers() {
+  var searchEl = document.getElementById('mSearch');
+  var tierEl = document.getElementById('mTierFilter');
+  var search = searchEl ? searchEl.value : '';
+  var tier = tierEl ? tierEl.value : '';
+  var url = '/api/members?limit=200';
+  if (search) url += '&search=' + encodeURIComponent(search);
+  if (tier) url += '&tier=' + encodeURIComponent(tier);
+  try {
+    var r = await fetch(url);
+    var data = await r.json();
+    var arr = Array.isArray(data) ? data : (data.members || []);
+    renderMembers(arr);
+    updateMemberStats(arr);
+  } catch (e) { console.error(e); }
+}
+
+function renderMembers(list) {
+  var body = document.getElementById('membersBody');
+  if (!body) return;
+  if (!list || list.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px;">ไม่พบสมาชิก</td></tr>';
+    return;
+  }
+  var tierBadge = { regular: '👤 ทั่วไป', wholesale: '🏪 ขายส่ง', vip: '⭐ VIP' };
+  var tierColor = { regular: '#666', wholesale: '#0a8', vip: '#d35400' };
+  var html = '';
+  list.forEach(function(m) {
+    var phones = (m.phones || []).join(', ') || '-';
+    var lastOrder = m.lastOrderAt ? new Date(m.lastOrderAt).toLocaleDateString('th-TH') : '-';
+    html += '<tr>';
+    html += '<td><strong>' + escapeHtml(m.memberCode || '-') + '</strong></td>';
+    html += '<td>' + escapeHtml(m.name || '') + '</td>';
+    html += '<td style="font-size:12px;">' + escapeHtml(phones) + '</td>';
+    html += '<td><span style="color:' + (tierColor[m.tier] || '#666') + ';font-weight:600;">' + (tierBadge[m.tier] || escapeHtml(m.tier || '')) + '</span></td>';
+    html += '<td class="num">' + (m.totalOrders || 0) + '</td>';
+    html += '<td class="num">' + numFormat(m.totalSpent || 0) + '</td>';
+    html += '<td style="font-size:12px;">' + lastOrder + '</td>';
+    html += '<td><button class="btn btn-secondary btn-sm" onclick="editMember(' + m.id + ')">แก้ไข</button></td>';
+    html += '</tr>';
+  });
+  body.innerHTML = html;
+}
+
+function updateMemberStats(list) {
+  document.getElementById('memberStatTotal').textContent = list.length;
+  var r = 0, w = 0, v = 0;
+  list.forEach(function(m) {
+    if (m.tier === 'regular') r++;
+    else if (m.tier === 'wholesale') w++;
+    else if (m.tier === 'vip') v++;
+  });
+  document.getElementById('memberStatRegular').textContent = r;
+  document.getElementById('memberStatWholesale').textContent = w;
+  document.getElementById('memberStatVip').textContent = v;
+}
+
+function openMemberModal() {
+  editingMemberId = null;
+  document.getElementById('memberModalTitle').textContent = '+ เพิ่มสมาชิก';
+  document.getElementById('mId').value = '';
+  document.getElementById('mCode').value = '(สร้างอัตโนมัติ)';
+  document.getElementById('mName').value = '';
+  document.getElementById('mTier').value = 'regular';
+  document.getElementById('mTaxId').value = '';
+  document.getElementById('mLineUserId').value = '';
+  document.getElementById('mNotes').value = '';
+  document.getElementById('mStats').style.display = 'none';
+  document.getElementById('mDeleteBtn').style.display = 'none';
+  document.getElementById('mStatus').textContent = '';
+  renderPhones([]);
+  renderAddresses([]);
+  document.getElementById('memberModal').classList.add('active');
+}
+
+async function editMember(id) {
+  try {
+    var r = await fetch('/api/members/' + id);
+    var m = await r.json();
+    if (m.error) { alert('❌ ' + m.error); return; }
+
+    editingMemberId = m.id;
+    document.getElementById('memberModalTitle').textContent = '✏️ แก้ไขสมาชิก';
+    document.getElementById('mId').value = m.id;
+    document.getElementById('mCode').value = m.memberCode || '';
+    document.getElementById('mName').value = m.name || '';
+    document.getElementById('mTier').value = m.tier || 'regular';
+    document.getElementById('mTaxId').value = m.taxId || '';
+    document.getElementById('mLineUserId').value = m.lineUserId || '';
+    document.getElementById('mNotes').value = m.notes || '';
+
+    var statsEl = document.getElementById('mStats');
+    statsEl.innerHTML = '📊 ออเดอร์: <strong>' + (m.totalOrders || 0) + '</strong> ครั้ง · ยอดซื้อ: <strong>' + numFormat(m.totalSpent || 0) + '</strong> บาท';
+    if (m.lastOrderAt) statsEl.innerHTML += '<br/>ล่าสุด: ' + new Date(m.lastOrderAt).toLocaleString('th-TH');
+    statsEl.style.display = 'block';
+
+    document.getElementById('mDeleteBtn').style.display = 'inline-block';
+    document.getElementById('mStatus').textContent = '';
+
+    renderPhones(m.phones || []);
+    renderAddresses(m.addresses || []);
+
+    document.getElementById('memberModal').classList.add('active');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+function closeMemberModal() {
+  document.getElementById('memberModal').classList.remove('active');
+  editingMemberId = null;
+}
+
+function renderPhones(phones) {
+  var box = document.getElementById('mPhones');
+  box.innerHTML = '';
+  if (!phones || phones.length === 0) phones = [''];
+  phones.forEach(function(ph) { addPhoneInput(ph); });
+}
+function addPhoneInput(value) {
+  var box = document.getElementById('mPhones');
+  var div = document.createElement('div');
+  div.style.cssText = 'display:flex; gap:6px; margin-bottom:4px;';
+  var safe = (typeof value === 'string' ? value : '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  div.innerHTML = '<input type="tel" class="m-phone" value="' + safe + '" placeholder="08x-xxx-xxxx" style="flex:1; padding:6px; border-radius:4px; border:1px solid #ddd;"><button type="button" onclick="this.parentElement.remove()" style="background:#fee;color:#d33;border:none;border-radius:4px;padding:0 10px;cursor:pointer;">×</button>';
+  box.appendChild(div);
+}
+
+function renderAddresses(addresses) {
+  var box = document.getElementById('mAddresses');
+  box.innerHTML = '';
+  if (!addresses || addresses.length === 0) addresses = [{ label: '', address: '', isDefault: true }];
+  addresses.forEach(function(a) { addAddressInput(a); });
+}
+function addAddressInput(addr) {
+  addr = addr || { label: '', address: '', isDefault: false };
+  var box = document.getElementById('mAddresses');
+  var div = document.createElement('div');
+  div.className = 'm-addr';
+  div.style.cssText = 'border:1px solid #eee; padding:8px; border-radius:6px; margin-bottom:6px;';
+  var labelEsc = (addr.label || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  var addrText = (addr.address || '').replace(/</g, '&lt;');
+  div.innerHTML = '<div style="display:flex; gap:6px; margin-bottom:4px; align-items:center;">'
+    + '<input type="text" class="m-addr-label" value="' + labelEsc + '" placeholder="ป้ายชื่อ (เช่น บ้าน/ที่ทำงาน)" style="flex:1; padding:6px; border-radius:4px; border:1px solid #ddd;">'
+    + '<label style="font-size:12px;"><input type="checkbox" class="m-addr-default"' + (addr.isDefault ? ' checked' : '') + '> หลัก</label>'
+    + '<button type="button" onclick="this.closest(\'.m-addr\').remove()" style="background:#fee;color:#d33;border:none;border-radius:4px;padding:0 10px;cursor:pointer;">×</button>'
+    + '</div>'
+    + '<textarea class="m-addr-text" rows="2" placeholder="ที่อยู่..." style="width:100%; padding:6px; border-radius:4px; border:1px solid #ddd; resize:vertical;">' + addrText + '</textarea>';
+  box.appendChild(div);
+}
+
+function collectMemberData() {
+  var phones = Array.prototype.slice.call(document.querySelectorAll('#mPhones .m-phone'))
+    .map(function(i){ return i.value.trim(); }).filter(Boolean);
+  var addresses = Array.prototype.slice.call(document.querySelectorAll('#mAddresses .m-addr')).map(function(div) {
+    return {
+      label: div.querySelector('.m-addr-label').value.trim(),
+      address: div.querySelector('.m-addr-text').value.trim(),
+      isDefault: div.querySelector('.m-addr-default').checked
+    };
+  }).filter(function(a){ return a.label || a.address; });
+
+  // ensure exactly one default
+  var defaults = addresses.filter(function(a){ return a.isDefault; });
+  if (defaults.length === 0 && addresses.length > 0) addresses[0].isDefault = true;
+  if (defaults.length > 1) {
+    var seen = false;
+    addresses.forEach(function(a){ if (a.isDefault) { if (seen) a.isDefault = false; seen = true; } });
+  }
+
+  return {
+    name: document.getElementById('mName').value.trim(),
+    phones: phones,
+    addresses: addresses,
+    tier: document.getElementById('mTier').value,
+    taxId: document.getElementById('mTaxId').value.trim(),
+    lineUserId: document.getElementById('mLineUserId').value.trim(),
+    notes: document.getElementById('mNotes').value.trim()
+  };
+}
+
+async function saveMember() {
+  var data = collectMemberData();
+  if (!data.name) {
+    document.getElementById('mStatus').innerHTML = '<span style="color:#d33;">⚠️ กรุณาใส่ชื่อ</span>';
+    return;
+  }
+  document.getElementById('mStatus').textContent = '⏳ กำลังบันทึก...';
+  try {
+    var url = '/api/members' + (editingMemberId ? '/' + editingMemberId : '');
+    var method = editingMemberId ? 'PUT' : 'POST';
+    var r = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    var result = await r.json();
+    if (result.error) {
+      document.getElementById('mStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(result.error) + '</span>';
+      return;
+    }
+    document.getElementById('mStatus').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว: ' + escapeHtml(result.memberCode || '') + '</span>';
+    setTimeout(function() { closeMemberModal(); loadMembers(); }, 600);
+  } catch (e) {
+    document.getElementById('mStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+async function deleteMemberConfirm() {
+  if (!editingMemberId) return;
+  if (!confirm('ลบสมาชิกนี้? (ออเดอร์เก่าจะยังอยู่แต่ไม่ผูกแล้ว)')) return;
+  try {
+    var r = await fetch('/api/members/' + editingMemberId, { method: 'DELETE' });
+    if (!r.ok) throw new Error('Delete failed');
+    closeMemberModal();
+    loadMembers();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+// ===== Member search shared (POS + Order) =====
+var posSelectedMember = null;
+var orderSelectedMember = null;
+var memberSearchTimer = null;
+
+function _renderMemberSearchResults(boxId, list, onSelectFnName) {
+  var box = document.getElementById(boxId);
+  if (!list || list.length === 0) { box.style.display = 'none'; return; }
+  var tierBadge = { regular: '👤', wholesale: '🏪', vip: '⭐' };
+  var html = '';
+  list.forEach(function(m) {
+    var phones = (m.phones || []).join(', ');
+    var defAddr = (m.addresses || []).find(function(a){ return a.isDefault; }) || (m.addresses || [])[0] || { address: '' };
+    var payload = JSON.stringify({
+      id: m.id,
+      code: m.memberCode || '',
+      name: m.name || '',
+      tier: m.tier || '',
+      phone: (m.phones || [])[0] || '',
+      phones: phones,
+      address: defAddr.address || ''
+    }).replace(/"/g, '&quot;');
+    html += '<div onclick="' + onSelectFnName + '(&quot;' + payload.replace(/&quot;/g, '\\&quot;') + '&quot;)" style="padding:8px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f5f5f5&quot;" onmouseout="this.style.background=&quot;&quot;">';
+    html += '<div><strong>' + (tierBadge[m.tier] || '') + ' ' + escapeHtml(m.name || '') + '</strong> <small style="color:#999;">' + escapeHtml(m.memberCode || '') + '</small></div>';
+    if (phones) html += '<div style="font-size:12px; color:#999;">' + escapeHtml(phones) + '</div>';
+    html += '</div>';
+  });
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+
+function searchMembersForPos(query) {
+  clearTimeout(memberSearchTimer);
+  var box = document.getElementById('posMemberResults');
+  if (!query || query.length < 1) { box.style.display = 'none'; return; }
+  memberSearchTimer = setTimeout(function() {
+    fetch('/api/members?search=' + encodeURIComponent(query) + '&limit=8').then(function(r){ return r.json(); }).then(function(data) {
+      var arr = Array.isArray(data) ? data : (data.members || []);
+      _renderMemberSearchResults('posMemberResults', arr, 'selectMemberForPos');
+    });
+  }, 200);
+}
+
+function selectMemberForPos(payloadStr) {
+  var data;
+  try { data = JSON.parse(payloadStr); } catch (e) { return; }
+  posSelectedMember = data.id;
+  document.getElementById('posMemberResults').style.display = 'none';
+  document.getElementById('posMemberSearch').value = '';
+  var sel = document.getElementById('posMemberSelected');
+  sel.innerHTML = '✅ <strong>' + escapeHtml(data.name) + '</strong> (' + escapeHtml(data.code) + ') — <a href="javascript:void(0)" onclick="clearPosMember()" style="color:#d33;">ลบ</a>';
+  sel.style.display = 'block';
+}
+
+function clearPosMember() {
+  posSelectedMember = null;
+  var sel = document.getElementById('posMemberSelected');
+  if (sel) sel.style.display = 'none';
+}
+
+function searchMembersForOrder(query) {
+  clearTimeout(memberSearchTimer);
+  var box = document.getElementById('oCustResults');
+  if (!box) return;
+  if (!query || query.length < 1) { box.style.display = 'none'; return; }
+  memberSearchTimer = setTimeout(function() {
+    fetch('/api/members?search=' + encodeURIComponent(query) + '&limit=8').then(function(r){ return r.json(); }).then(function(data) {
+      var arr = Array.isArray(data) ? data : (data.members || []);
+      _renderMemberSearchResults('oCustResults', arr, 'selectMemberForOrder');
+    });
+  }, 200);
+}
+
+function selectMemberForOrder(payloadStr) {
+  var data;
+  try { data = JSON.parse(payloadStr); } catch (e) { return; }
+  orderSelectedMember = data.id;
+  document.getElementById('oCustResults').style.display = 'none';
+  document.getElementById('oCustSearch').value = data.name + ' (' + data.code + ')';
+  document.getElementById('oCustId').value = ''; // member ไม่ใช่ LINE userId
+  document.getElementById('oCustName').value = data.name || '';
+  document.getElementById('oCustPhone').value = data.phone || '';
+  document.getElementById('oCustAddress').value = data.address || '';
+}
+</script>
+
 <!-- POS Quick-Bill Modal -->
 <div class="modal" id="posModal">
   <div class="modal-content" style="max-width: 600px; max-height: 95vh; overflow-y: auto; padding: 16px;">
     <button class="close-btn" onclick="closePosModal()">×</button>
     <h2 style="margin: 0 0 12px 0;">⚡ คีย์บิลด่วน (POS)</h2>
+
+    <!-- Search สมาชิก (optional) -->
+    <div style="margin-bottom: 12px; position:relative;">
+      <input type="text" id="posMemberSearch" placeholder="⭐ ค้นหาสมาชิก (ชื่อ/เบอร์/code) — เว้นว่างได้"
+             oninput="searchMembersForPos(this.value)" autocomplete="off"
+             style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #ddd; font-size: 14px;">
+      <div id="posMemberResults" style="display:none; position:absolute; z-index:11; left:0; right:0; background:white; max-height:200px; overflow-y:auto; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+      <div id="posMemberSelected" style="display:none; padding:8px; background:#e8f5e9; border-radius:6px; margin-top:4px; font-size:13px;"></div>
+    </div>
 
     <!-- Search สินค้า -->
     <div style="position:relative; margin-bottom: 12px;">
@@ -1545,6 +1987,9 @@ function openPosModal() {
   document.getElementById('posReceived').value = '';
   document.getElementById('posStatus').textContent = '';
   document.getElementById('posBillType').value = 'tax_invoice_abbr';
+  if (typeof clearPosMember === 'function') clearPosMember();
+  var msEl = document.getElementById('posMemberSearch');
+  if (msEl) msEl.value = '';
   setPayMethod('cash');
   renderPosCart();
   updatePosTotal();
@@ -1707,11 +2152,12 @@ async function submitPos() {
   statusEl.innerHTML = '⏳ กำลังบันทึก...';
 
   try {
-    // 1. POST /api/orders (POS = ลูกค้าทั่วไป)
+    // 1. POST /api/orders (POS = ลูกค้าทั่วไป หรือ สมาชิก)
     var orderBody = {
       source: 'pos',
       customerId: '',
-      customerName: 'ลูกค้าทั่วไป (POS)',
+      memberId: posSelectedMember || null,
+      customerName: posSelectedMember ? null : 'ลูกค้าทั่วไป (POS)',
       customerPhone: '',
       customerAddress: '',
       items: posCart.map(function(it){ return { productId: it.productId, name: it.name, quantity: it.quantity, price: it.price }; }),

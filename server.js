@@ -763,6 +763,77 @@ app.get('/api/customers', async function(req, res) {
   }
 });
 
+// ============ MEMBERS PROXY ============
+app.get('/api/members', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/members' + (qs ? '?' + qs : ''));
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/members/search', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/members/search' + (qs ? '?' + qs : ''));
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/members/:id', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id));
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/members/:id/orders', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id) + '/orders');
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/members', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/members/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/members/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id), {
+      method: 'DELETE'
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/members/:id/recalc-stats', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id) + '/recalc-stats', {
+      method: 'POST'
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ STATS PROXY ============
 app.get('/api/stats', async function(req, res) {
   try {
