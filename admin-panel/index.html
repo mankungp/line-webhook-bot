@@ -231,6 +231,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
     <div class="card">
       <div class="toolbar">
         <button class="btn btn-primary" onclick="openProductModal()">+ เพิ่มสินค้าใหม่</button>
+        <button class="btn btn-secondary" onclick="openCategoryModal()">🏷️ จัดการหมวดหมู่</button>
         <button class="btn btn-secondary" onclick="loadProducts()">รีเฟรช</button>
       </div>
       <div class="toolbar">
@@ -278,6 +279,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
 
     <div class="card">
       <div class="toolbar">
+        <button class="btn btn-primary" onclick="openOrderModal()">+ คีย์ออเดอร์</button>
         <button class="btn btn-secondary" onclick="loadOrders()">รีเฟรช</button>
         <select id="oStatusFilter" onchange="loadOrders()">
           <option value="">ทุกสถานะ</option>
@@ -949,6 +951,331 @@ document.addEventListener('click', function(e) {
   if (m && e.target === m) closeInvoiceModal();
 });
 
+// ============ ORDER MODAL ============
+var orderItems = [];
+var customerSearchTimer = null;
+var productSearchTimer = null;
+
+function openOrderModal() {
+  orderItems = [];
+  document.getElementById('orderModal').classList.add('active');
+  document.getElementById('oCustId').value = '';
+  document.getElementById('oCustName').value = '';
+  document.getElementById('oCustPhone').value = '';
+  document.getElementById('oCustAddress').value = '';
+  document.getElementById('oCustSearch').value = '';
+  document.getElementById('oCustResults').style.display = 'none';
+  document.getElementById('oProductSearch').value = '';
+  document.getElementById('oProductResults').style.display = 'none';
+  document.getElementById('oDiscount').value = '0';
+  document.getElementById('oShipping').value = '0';
+  document.getElementById('oSource').value = 'manual';
+  document.getElementById('oNotes').value = '';
+  document.getElementById('oStatus').textContent = '';
+  renderOrderItems();
+}
+
+function closeOrderModal() {
+  document.getElementById('orderModal').classList.remove('active');
+  orderItems = [];
+}
+
+function searchCustomers(query) {
+  clearTimeout(customerSearchTimer);
+  var box = document.getElementById('oCustResults');
+  if (!query || query.length < 2) { box.style.display = 'none'; return; }
+  customerSearchTimer = setTimeout(function() {
+    fetch('/api/customers').then(function(r){ return r.json(); }).then(function(arr) {
+      var q = query.toLowerCase();
+      var matched = (Array.isArray(arr) ? arr : []).filter(function(c) {
+        var name = (c.displayName || c.name || '').toLowerCase();
+        var phone = (c.phone || '');
+        return name.indexOf(q) >= 0 || phone.indexOf(query) >= 0;
+      }).slice(0, 8);
+
+      if (matched.length === 0) {
+        box.style.display = 'none';
+        return;
+      }
+
+      var html = '';
+      matched.forEach(function(c) {
+        var name = c.displayName || c.name || c.userId || 'ไม่ระบุ';
+        var phone = c.phone || '';
+        html += '<div onclick="selectCustomer(\'' + (c.userId || '').replace(/\'/g, "\\'") + '\', ' + JSON.stringify(JSON.stringify({name:name, phone:phone, address:c.address||''})).replace(/"/g, '&quot;') + ')" style="padding:8px 10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
+        html += '<div><strong>' + escapeHtml(name) + '</strong></div>';
+        if (phone) html += '<div style="font-size:12px; color:#999;">' + escapeHtml(phone) + '</div>';
+        html += '</div>';
+      });
+      box.innerHTML = html;
+      box.style.display = 'block';
+    });
+  }, 300);
+}
+
+function selectCustomer(userId, dataJson) {
+  var data = JSON.parse(dataJson);
+  document.getElementById('oCustId').value = userId;
+  document.getElementById('oCustName').value = data.name || '';
+  document.getElementById('oCustPhone').value = data.phone || '';
+  document.getElementById('oCustAddress').value = data.address || '';
+  document.getElementById('oCustSearch').value = data.name;
+  document.getElementById('oCustResults').style.display = 'none';
+}
+
+function searchProductsForOrder(query) {
+  clearTimeout(productSearchTimer);
+  var box = document.getElementById('oProductResults');
+  if (!query || query.length < 1) { box.style.display = 'none'; return; }
+  productSearchTimer = setTimeout(function() {
+    fetch('/api/products?status=active').then(function(r){ return r.json(); }).then(function(arr) {
+      var q = query.toLowerCase();
+      var matched = (Array.isArray(arr) ? arr : []).filter(function(p) {
+        var name = (p.name || '').toLowerCase();
+        var sku = (p.sku || '').toLowerCase();
+        return name.indexOf(q) >= 0 || sku.indexOf(q) >= 0;
+      }).slice(0, 8);
+
+      if (matched.length === 0) {
+        box.innerHTML = '<div style="padding:8px; color:#999;">ไม่พบสินค้า</div>';
+        box.style.display = 'block';
+        return;
+      }
+
+      var html = '';
+      matched.forEach(function(p) {
+        var stockColor = (p.stock > 0) ? '#0a0' : '#d33';
+        html += '<div onclick="addProductToOrder(' + p.id + ',' + (p.price || 0) + ',' + (p.stock || 0) + ',' + JSON.stringify(JSON.stringify(p.name || '')).replace(/"/g, '&quot;') + ')" style="padding:10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
+        html += '<div style="display:flex; justify-content:space-between;">';
+        html += '<div><strong>' + escapeHtml(p.name) + '</strong>';
+        if (p.sku) html += ' <small style="color:#999;">' + escapeHtml(p.sku) + '</small>';
+        html += '</div>';
+        html += '<div><strong>' + numFormat(p.price || 0) + '</strong> บาท</div>';
+        html += '</div>';
+        html += '<div style="font-size:12px; color:' + stockColor + ';">stock: ' + (p.stock || 0) + ' ' + (p.unit || '') + '</div>';
+        html += '</div>';
+      });
+      box.innerHTML = html;
+      box.style.display = 'block';
+    });
+  }, 200);
+}
+
+function addProductToOrder(productId, price, stock, nameJson) {
+  var name = JSON.parse(nameJson);
+  var existing = orderItems.find(function(it){ return it.productId === productId; });
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    orderItems.push({ productId: productId, name: name, quantity: 1, price: price, stock: stock });
+  }
+  document.getElementById('oProductSearch').value = '';
+  document.getElementById('oProductResults').style.display = 'none';
+  renderOrderItems();
+  updateOrderTotal();
+}
+
+function renderOrderItems() {
+  var tbody = document.getElementById('oItemsBody');
+  var noItems = document.getElementById('oNoItems');
+  if (orderItems.length === 0) {
+    tbody.innerHTML = '';
+    noItems.style.display = 'block';
+    return;
+  }
+  noItems.style.display = 'none';
+  var html = '';
+  orderItems.forEach(function(it, idx) {
+    html += '<tr>';
+    html += '<td style="padding:6px;">' + escapeHtml(it.name) + '</td>';
+    html += '<td style="padding:6px;text-align:right;"><input type="number" value="' + it.quantity + '" min="1" oninput="updateItemQty(' + idx + ',this.value)" style="width:50px;text-align:right;padding:4px;border:1px solid #ddd;border-radius:4px;"></td>';
+    html += '<td style="padding:6px;text-align:right;"><input type="number" value="' + it.price + '" oninput="updateItemPrice(' + idx + ',this.value)" style="width:70px;text-align:right;padding:4px;border:1px solid #ddd;border-radius:4px;"></td>';
+    html += '<td style="padding:6px;text-align:right;"><strong>' + numFormat(it.quantity * it.price) + '</strong></td>';
+    html += '<td><button onclick="removeItem(' + idx + ')" style="background:#fee; color:#d33; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">×</button></td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function updateItemQty(idx, qty) {
+  orderItems[idx].quantity = parseInt(qty) || 1;
+  renderOrderItems();
+  updateOrderTotal();
+}
+function updateItemPrice(idx, price) {
+  orderItems[idx].price = parseFloat(price) || 0;
+  renderOrderItems();
+  updateOrderTotal();
+}
+function removeItem(idx) {
+  orderItems.splice(idx, 1);
+  renderOrderItems();
+  updateOrderTotal();
+}
+
+function updateOrderTotal() {
+  var subtotal = orderItems.reduce(function(s, it) { return s + (it.quantity * it.price); }, 0);
+  var discount = parseFloat(document.getElementById('oDiscount').value) || 0;
+  var shipping = parseFloat(document.getElementById('oShipping').value) || 0;
+  var total = subtotal - discount + shipping;
+  document.getElementById('oTotal').textContent = numFormat(total) + ' บาท';
+}
+
+async function submitOrder() {
+  if (orderItems.length === 0) {
+    document.getElementById('oStatus').innerHTML = '<span style="color:#d33;">⚠️ กรุณาเลือกสินค้าอย่างน้อย 1 รายการ</span>';
+    return;
+  }
+  var name = document.getElementById('oCustName').value.trim();
+  if (!name) {
+    document.getElementById('oStatus').innerHTML = '<span style="color:#d33;">⚠️ กรุณาใส่ชื่อลูกค้า</span>';
+    return;
+  }
+
+  var subtotal = orderItems.reduce(function(s, it) { return s + (it.quantity * it.price); }, 0);
+  var discount = parseFloat(document.getElementById('oDiscount').value) || 0;
+  var shipping = parseFloat(document.getElementById('oShipping').value) || 0;
+
+  var body = {
+    source: document.getElementById('oSource').value,
+    customerId: document.getElementById('oCustId').value,
+    customerName: name,
+    customerPhone: document.getElementById('oCustPhone').value.trim(),
+    customerAddress: document.getElementById('oCustAddress').value.trim(),
+    items: orderItems.map(function(it){ return { productId: it.productId, name: it.name, quantity: it.quantity, price: it.price }; }),
+    subtotal: subtotal,
+    discount: discount,
+    shippingFee: shipping,
+    total: subtotal - discount + shipping,
+    notes: document.getElementById('oNotes').value.trim()
+  };
+
+  document.getElementById('oStatus').innerHTML = '⏳ กำลังบันทึก...';
+
+  try {
+    var r = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    var result = await r.json();
+
+    if (result.error) {
+      document.getElementById('oStatus').innerHTML = '<span style="color:#d33;">❌ ' + result.error + '</span>';
+      return;
+    }
+
+    document.getElementById('oStatus').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว: <code>' + (result.orderNo || '') + '</code></span>';
+    setTimeout(function() {
+      closeOrderModal();
+      if (typeof loadOrders === 'function') loadOrders();
+    }, 800);
+  } catch (e) {
+    document.getElementById('oStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
+}
+
+// ============ CATEGORY MODAL ============
+async function openCategoryModal() {
+  document.getElementById('categoryModal').classList.add('active');
+  document.getElementById('cName').value = '';
+  document.getElementById('cKey').value = '';
+  document.getElementById('cAddStatus').textContent = '';
+  await reloadCategoryList();
+}
+
+function closeCategoryModal() {
+  document.getElementById('categoryModal').classList.remove('active');
+}
+
+async function reloadCategoryList() {
+  var box = document.getElementById('cList');
+  box.innerHTML = '⏳ โหลด...';
+  try {
+    var r = await fetch('/api/categories');
+    var arr = await r.json();
+    if (!Array.isArray(arr) || arr.length === 0) {
+      box.innerHTML = '<div style="color:#999; padding:8px;">— ยังไม่มีหมวดหมู่ —</div>';
+      return;
+    }
+    var html = '';
+    arr.forEach(function(c) {
+      var id = c.id || c.key || c.name;
+      var name = c.name || c.key || id;
+      var key = c.key || c.id || '';
+      html += '<div style="display:flex; gap:6px; padding:6px; border-bottom:1px solid #f0f0f0; align-items:center;">';
+      html += '<input type="text" value="' + escapeHtml(name) + '" data-id="' + escapeHtml(String(id)) + '" data-field="name" style="flex:2; padding:4px; border:1px solid #ddd; border-radius:4px;">';
+      html += '<input type="text" value="' + escapeHtml(key) + '" data-id="' + escapeHtml(String(id)) + '" data-field="key" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:4px;">';
+      html += '<button class="btn btn-secondary btn-sm" onclick="saveCategory(\'' + String(id).replace(/\'/g, "\\'") + '\')">💾</button>';
+      html += '<button class="btn btn-danger btn-sm" onclick="deleteCategory(\'' + String(id).replace(/\'/g, "\\'") + '\')">🗑️</button>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div style="color:#d33;">❌ ' + e.message + '</div>';
+  }
+}
+
+async function addCategory() {
+  var name = document.getElementById('cName').value.trim();
+  var key = document.getElementById('cKey').value.trim();
+  if (!name) {
+    document.getElementById('cAddStatus').innerHTML = '<span style="color:#d33;">⚠️ ใส่ชื่อหมวด</span>';
+    return;
+  }
+  document.getElementById('cAddStatus').textContent = '⏳ กำลังบันทึก...';
+  try {
+    var r = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, key: key || undefined })
+    });
+    var result = await r.json();
+    if (result.error) {
+      document.getElementById('cAddStatus').innerHTML = '<span style="color:#d33;">❌ ' + result.error + '</span>';
+      return;
+    }
+    document.getElementById('cAddStatus').innerHTML = '<span style="color:#0a0;">✅ เพิ่มแล้ว</span>';
+    document.getElementById('cName').value = '';
+    document.getElementById('cKey').value = '';
+    await reloadCategoryList();
+    if (typeof loadCategories === 'function') loadCategories();
+  } catch (e) {
+    document.getElementById('cAddStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
+}
+
+async function saveCategory(id) {
+  var nameInput = document.querySelector('[data-id="' + id + '"][data-field="name"]');
+  var keyInput = document.querySelector('[data-id="' + id + '"][data-field="key"]');
+  if (!nameInput) return;
+  try {
+    var r = await fetch('/api/categories/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nameInput.value, key: keyInput ? keyInput.value : undefined })
+    });
+    if (!r.ok) throw new Error('Save failed');
+    nameInput.style.border = '1px solid #0a0';
+    setTimeout(function(){ nameInput.style.border = '1px solid #ddd'; }, 1000);
+    if (typeof loadCategories === 'function') loadCategories();
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+async function deleteCategory(id) {
+  if (!confirm('ลบหมวดหมู่นี้? (สินค้าในหมวดจะไม่ถูกลบ แต่จะ unset)')) return;
+  try {
+    var r = await fetch('/api/categories/' + encodeURIComponent(id), { method: 'DELETE' });
+    if (!r.ok) throw new Error('Delete failed');
+    await reloadCategoryList();
+    if (typeof loadCategories === 'function') loadCategories();
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
 // Initial load
 loadBotCustomers();
 setInterval(loadBotCustomers, 30000);
@@ -996,6 +1323,125 @@ setInterval(loadBotCustomers, 30000);
     </div>
     <div style="margin-top:12px;">
       <button class="btn btn-secondary" style="width:100%;" onclick="closeInvoiceModal()">ปิด</button>
+    </div>
+  </div>
+</div>
+<!-- Order Modal -->
+<div class="modal" id="orderModal">
+  <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+    <button class="close-btn" onclick="closeOrderModal()">×</button>
+    <h2>📦 คีย์ออเดอร์ใหม่</h2>
+
+    <!-- ข้อมูลลูกค้า -->
+    <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px; margin: 12px 0;">
+      <h3 style="margin: 0 0 8px 0; font-size: 14px;">ข้อมูลลูกค้า</h3>
+
+      <div style="margin-bottom: 8px;">
+        <input type="text" id="oCustSearch" placeholder="🔍 ค้นหาลูกค้าเก่า (ชื่อ/เบอร์)..."
+               oninput="searchCustomers(this.value)" autocomplete="off"
+               style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+        <div id="oCustResults" style="display:none; max-height:160px; overflow-y:auto; border:1px solid #ddd; border-radius:6px; margin-top:4px;"></div>
+      </div>
+
+      <input type="hidden" id="oCustId" value="">
+      <input type="text" id="oCustName" placeholder="ชื่อลูกค้า *" required style="width:100%; padding:8px; margin:4px 0; border-radius:6px; border:1px solid #ddd;">
+      <input type="text" id="oCustPhone" placeholder="เบอร์โทร" style="width:100%; padding:8px; margin:4px 0; border-radius:6px; border:1px solid #ddd;">
+      <textarea id="oCustAddress" placeholder="ที่อยู่จัดส่ง" rows="2" style="width:100%; padding:8px; margin:4px 0; border-radius:6px; border:1px solid #ddd; resize: vertical;"></textarea>
+    </div>
+
+    <!-- รายการสินค้า -->
+    <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px; margin: 12px 0;">
+      <h3 style="margin: 0 0 8px 0; font-size: 14px;">รายการสินค้า</h3>
+
+      <div style="position:relative; margin-bottom: 8px;">
+        <input type="text" id="oProductSearch" placeholder="🔍 ค้นหาสินค้า (ชื่อ/SKU)..."
+               oninput="searchProductsForOrder(this.value)" autocomplete="off"
+               style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+        <div id="oProductResults" style="display:none; position:absolute; z-index:10; left:0; right:0; background:white; max-height:240px; overflow-y:auto; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></div>
+      </div>
+
+      <table style="width:100%; font-size:14px;">
+        <thead>
+          <tr style="border-bottom: 1px solid #eee;">
+            <th style="text-align:left; padding:6px;">สินค้า</th>
+            <th style="text-align:right; padding:6px;width:60px;">จน.</th>
+            <th style="text-align:right; padding:6px;width:80px;">ราคา</th>
+            <th style="text-align:right; padding:6px;width:90px;">รวม</th>
+            <th style="width:30px;"></th>
+          </tr>
+        </thead>
+        <tbody id="oItemsBody"></tbody>
+      </table>
+      <div id="oNoItems" style="text-align:center; color:#999; padding:16px; font-size:13px;">— ยังไม่มีสินค้า —</div>
+    </div>
+
+    <!-- สรุป + เพิ่มเติม -->
+    <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px; margin: 12px 0;">
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <div style="flex:1;">
+          <label style="font-size:12px; color:#666;">ส่วนลด</label>
+          <input type="number" id="oDiscount" value="0" oninput="updateOrderTotal()" style="width:100%; padding:6px; border-radius:6px; border:1px solid #ddd;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:12px; color:#666;">ค่าส่ง</label>
+          <input type="number" id="oShipping" value="0" oninput="updateOrderTotal()" style="width:100%; padding:6px; border-radius:6px; border:1px solid #ddd;">
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; padding:8px 0; border-top:2px solid #eee; font-size:18px; font-weight:bold;">
+        <span>รวมทั้งสิ้น:</span>
+        <span id="oTotal">0.00 บาท</span>
+      </div>
+
+      <div style="margin-top:8px;">
+        <label style="font-size:12px; color:#666;">ที่มาของออเดอร์</label>
+        <select id="oSource" style="width:100%; padding:6px; border-radius:6px; border:1px solid #ddd;">
+          <option value="manual">หน้าร้าน</option>
+          <option value="line">LINE</option>
+          <option value="phone">โทรศัพท์</option>
+          <option value="facebook">Facebook</option>
+          <option value="other">อื่น ๆ</option>
+        </select>
+      </div>
+
+      <div style="margin-top:8px;">
+        <label style="font-size:12px; color:#666;">หมายเหตุ</label>
+        <textarea id="oNotes" rows="2" style="width:100%; padding:6px; border-radius:6px; border:1px solid #ddd; resize:vertical;"></textarea>
+      </div>
+    </div>
+
+    <div id="oStatus" style="margin: 8px 0; font-size:13px; color:#666;"></div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary" style="flex:1;" onclick="closeOrderModal()">ยกเลิก</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="submitOrder()">บันทึกออเดอร์</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal" id="categoryModal">
+  <div class="modal-content" style="max-width: 480px;">
+    <button class="close-btn" onclick="closeCategoryModal()">×</button>
+    <h2>🏷️ จัดการหมวดหมู่</h2>
+
+    <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px; margin: 12px 0;">
+      <h3 style="margin: 0 0 8px 0; font-size: 14px;">เพิ่มหมวดหมู่ใหม่</h3>
+      <div style="display:flex; gap:6px;">
+        <input type="text" id="cName" placeholder="ชื่อหมวดหมู่ (TH)" style="flex:2; padding:8px; border-radius:6px; border:1px solid #ddd;">
+        <input type="text" id="cKey" placeholder="key (en, optional)" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ddd;">
+        <button class="btn btn-primary btn-sm" onclick="addCategory()">เพิ่ม</button>
+      </div>
+      <div id="cAddStatus" style="font-size:12px; margin-top:4px;"></div>
+    </div>
+
+    <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px;">
+      <h3 style="margin: 0 0 8px 0; font-size: 14px;">หมวดหมู่ทั้งหมด</h3>
+      <div id="cList" style="max-height:300px; overflow-y:auto;"></div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button class="btn btn-secondary" style="width:100%;" onclick="closeCategoryModal()">ปิด</button>
     </div>
   </div>
 </div>
