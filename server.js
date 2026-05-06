@@ -668,6 +668,50 @@ app.post('/api/orders/:id/cancel', async function(req, res) {
   }
 });
 
+// ============ INVOICE PROXY ============
+
+app.get('/api/orders/:id/invoice', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice');
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/orders/:id/invoice/issue', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice/issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/orders/:id/invoice/data', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice/data');
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PDF binary stream
+app.get('/api/orders/:id/invoice/pdf', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var url = LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice/pdf' + (qs ? '?' + qs : '');
+    var r = await fetch(url);
+    if (!r.ok) {
+      var t = await r.text();
+      return res.status(r.status).send(t);
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', r.headers.get('content-disposition') || 'inline');
+    var buf = Buffer.from(await r.arrayBuffer());
+    res.send(buf);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ CUSTOMERS PROXY ============
 app.get('/api/customers', async function(req, res) {
   try {

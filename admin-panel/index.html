@@ -741,8 +741,9 @@ function renderOrders(list) {
     var itemCount = (o.items || []).length;
     var statusClass = 'order-status-' + (o.status || 'pending');
     var statusText = { pending: 'รอดำเนินการ', confirmed: 'ยืนยันแล้ว', paid: 'ชำระแล้ว', shipped: 'จัดส่งแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
+    var invoiceBadge = o.invoiceNo ? '<br/><small style="color:#0a0;">📋 ' + escapeHtml(o.invoiceNo) + '</small>' : '';
     html += '<tr>';
-    html += '<td><strong>' + escapeHtml(o.orderNo || '-') + '</strong></td>';
+    html += '<td><strong>' + escapeHtml(o.orderNo || '-') + '</strong>' + invoiceBadge + '</td>';
     html += '<td><div style="font-weight:500;">' + escapeHtml(o.customerName || '-') + '</div><div style="font-size:12px;color:#999;">' + escapeHtml(o.customerPhone || '') + '</div></td>';
     html += '<td>' + itemCount + ' รายการ</td>';
     html += '<td class="num"><strong>' + numFormat(o.total || 0) + '</strong> บาท</td>';
@@ -754,6 +755,9 @@ function renderOrders(list) {
     }
     if (o.status === 'confirmed') {
       html += '<button class="btn btn-primary btn-sm" onclick="markPaid(' + o.id + ')">จ่ายแล้ว</button> ';
+    }
+    if (o.status !== 'cancelled') {
+      html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
     }
     if (o.status !== 'cancelled' && o.status !== 'completed') {
       html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
@@ -852,9 +856,149 @@ function escapeHtml(text) {
   return d.innerHTML;
 }
 
+// ============ INVOICE MODAL ============
+var currentInvoiceOrderId = null;
+
+async function openInvoiceModal(orderId) {
+  currentInvoiceOrderId = orderId;
+  document.getElementById('invoiceModal').style.display = 'flex';
+  document.getElementById('invoiceStatus').textContent = '';
+  document.getElementById('invoiceStatus').style.color = '#666';
+
+  // Load order info
+  try {
+    var r = await fetch('/api/orders/' + orderId);
+    var order = await r.json();
+    var info = 'ออเดอร์: <strong>' + escapeHtml(order.orderNo || String(orderId)) + '</strong>';
+    info += ' • ลูกค้า: ' + escapeHtml(order.customerName || '-');
+    info += ' • ยอด: <strong>' + Number(order.total || 0).toLocaleString() + ' บาท</strong>';
+    if (order.invoiceNo) {
+      info += '<br/>📋 มีเลขใบกำกับแล้ว: <code>' + escapeHtml(order.invoiceNo) + '</code>';
+    }
+    document.getElementById('invoiceOrderInfo').innerHTML = info;
+
+    // ถ้ามีเลขแล้ว set type ให้ตรง
+    if (order.invoiceType) {
+      document.getElementById('invoiceType').value = order.invoiceType;
+    }
+  } catch (e) {
+    document.getElementById('invoiceOrderInfo').textContent = 'ไม่สามารถโหลดข้อมูลออเดอร์';
+  }
+}
+
+function closeInvoiceModal() {
+  document.getElementById('invoiceModal').style.display = 'none';
+  currentInvoiceOrderId = null;
+}
+
+function buildInvoiceUrl(orderId) {
+  var type = document.getElementById('invoiceType').value;
+  var qr = document.getElementById('invoiceQrMode').value;
+  var paper = document.getElementById('invoicePaperSize').value;
+  var params = ['type=' + encodeURIComponent(type), 'qr_mode=' + encodeURIComponent(qr)];
+  if (paper) params.push('paper_size=' + encodeURIComponent(paper));
+  return '/api/orders/' + orderId + '/invoice/pdf?' + params.join('&');
+}
+
+function previewInvoice() {
+  if (!currentInvoiceOrderId) return;
+  var url = buildInvoiceUrl(currentInvoiceOrderId);
+  window.open(url, '_blank');
+}
+
+async function issueAndDownload() {
+  if (!currentInvoiceOrderId) return;
+  var statusEl = document.getElementById('invoiceStatus');
+  var type = document.getElementById('invoiceType').value;
+
+  statusEl.style.color = '#666';
+  statusEl.textContent = '⏳ กำลังออกเลขใบกำกับภาษี...';
+
+  try {
+    // 1. Issue invoice number (idempotent)
+    var r = await fetch('/api/orders/' + currentInvoiceOrderId + '/invoice/issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: type })
+    });
+    var result = await r.json();
+
+    if (result.error) {
+      statusEl.style.color = '#d33';
+      statusEl.textContent = '❌ ' + result.error;
+      return;
+    }
+
+    statusEl.style.color = '#0a0';
+    statusEl.innerHTML = (result.existing ? '✅ ใช้เลขเดิม: ' : '✅ ออกเลขใหม่: ') + '<code>' + escapeHtml(result.invoiceNo || '') + '</code>';
+
+    // 2. Open PDF
+    var url = buildInvoiceUrl(currentInvoiceOrderId);
+    window.open(url, '_blank');
+
+    // 3. Refresh orders list (เพราะเลข invoice อัปเดต)
+    setTimeout(function(){ if (typeof loadOrders === 'function') loadOrders(); }, 500);
+  } catch (e) {
+    statusEl.style.color = '#d33';
+    statusEl.textContent = '❌ ' + e.message;
+  }
+}
+
+// Close modal on click outside
+document.addEventListener('click', function(e) {
+  var m = document.getElementById('invoiceModal');
+  if (m && e.target === m) closeInvoiceModal();
+});
+
 // Initial load
 loadBotCustomers();
 setInterval(loadBotCustomers, 30000);
 </script>
+
+<!-- Invoice Modal -->
+<div id="invoiceModal" class="modal" style="display:none;">
+  <div class="modal-content" style="max-width: 480px;">
+    <button class="close-btn" onclick="closeInvoiceModal()">×</button>
+    <h2>🖨️ พิมพ์บิล</h2>
+    <p id="invoiceOrderInfo" style="color:#666;"></p>
+
+    <div style="margin: 16px 0;">
+      <label style="display:block;font-weight:600;margin-bottom:6px;">ประเภทเอกสาร</label>
+      <select id="invoiceType" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px;">
+        <option value="tax_invoice">ใบกำกับภาษี (เต็มรูปแบบ — A4)</option>
+        <option value="tax_invoice_abbr">ใบกำกับภาษีอย่างย่อ (A5)</option>
+        <option value="receipt">ใบเสร็จรับเงิน (A4)</option>
+        <option value="delivery_note">ใบส่งของ (A4)</option>
+      </select>
+    </div>
+
+    <div style="margin: 16px 0;">
+      <label style="display:block;font-weight:600;margin-bottom:6px;">ขนาดกระดาษ</label>
+      <select id="invoicePaperSize" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px;">
+        <option value="">ใช้ค่าเริ่มต้น (ตามประเภท)</option>
+        <option value="A4">A4 (กระดาษเต็ม)</option>
+        <option value="A5">A5 (ครึ่งกระดาษ)</option>
+      </select>
+    </div>
+
+    <div style="margin: 16px 0;">
+      <label style="display:block;font-weight:600;margin-bottom:6px;">QR PromptPay</label>
+      <select id="invoiceQrMode" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px;">
+        <option value="dynamic">Dynamic (ใส่จำนวนเงินอัตโนมัติ) ⭐</option>
+        <option value="static">Static (ลูกค้ากรอกเงินเอง)</option>
+      </select>
+    </div>
+
+    <div id="invoiceStatus" style="margin: 12px 0; font-size:13px; color:#666;"></div>
+
+    <div style="display:flex; gap:8px; margin-top:20px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="previewInvoice()">👁️ ดูตัวอย่าง</button>
+      <button class="btn btn-success" style="flex:1;" onclick="issueAndDownload()">🖨️ ออกบิล</button>
+    </div>
+    <div style="margin-top:12px;">
+      <button class="btn btn-secondary" style="width:100%;" onclick="closeInvoiceModal()">ปิด</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
