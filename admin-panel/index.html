@@ -93,6 +93,21 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
 .close-btn { float: right; background: none; border: none; font-size: 24px; cursor: pointer; line-height: 1; }
 .close-btn:hover { opacity: 0.7; }
 
+/* Tabs */
+.tabs-bar { display:flex; border-bottom:2px solid #eee; margin-bottom:16px; flex-wrap:wrap; }
+.tab-btn { padding:8px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#666; border-bottom:3px solid transparent; }
+.tab-btn.active { color:#0a8; border-bottom-color:#0a8; font-weight:600; }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; }
+.channel-row { display:grid; grid-template-columns: 1.4fr 1fr auto auto; gap:8px; align-items:center; padding:8px; border:1px solid #eee; border-radius:6px; margin-bottom:6px; font-size:13px; }
+.channel-row label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+.channel-row input[type=number] { padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px; }
+.channel-id { font-size:11px; color:#999; font-family:monospace; }
+.variants-table { width:100%; font-size:13px; border-collapse:collapse; }
+.variants-table th, .variants-table td { padding:6px; border-bottom:1px solid #eee; text-align:left; }
+.variants-table input { width:100%; padding:5px 6px; border:1px solid #ddd; border-radius:4px; font-size:12px; }
+.profit-display { padding:10px 12px; background:#f0f9f4; border-left:3px solid #0a8; border-radius:4px; font-size:14px; color:#0a8; font-weight:500; margin-top:8px; }
+
 /* Customer Avatar */
 .avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
 
@@ -239,6 +254,7 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
       <div class="toolbar">
         <button class="btn btn-primary" onclick="openProductModal()">+ เพิ่มสินค้าใหม่</button>
         <button class="btn btn-secondary" onclick="openCategoryModal()">🏷️ จัดการหมวดหมู่</button>
+        <button class="btn btn-secondary" onclick="openDuplicatesModal()">🔍 ตรวจสินค้าซ้ำ</button>
         <button class="btn btn-secondary" onclick="loadProducts()">รีเฟรช</button>
       </div>
       <div class="toolbar">
@@ -500,82 +516,151 @@ select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-siz
 
 <!-- Product Modal -->
 <div class="modal" id="productModal">
-  <div class="modal-content">
+  <div class="modal-content" style="max-width:720px;">
     <button class="close-btn" onclick="closeProductModal()">×</button>
     <h2 id="pModalTitle">เพิ่มสินค้าใหม่</h2>
+
+    <div class="tabs-bar">
+      <button type="button" class="tab-btn active" data-tab="general" onclick="switchProductTab('general')">ข้อมูลทั่วไป</button>
+      <button type="button" class="tab-btn" data-tab="stock" onclick="switchProductTab('stock')">สต็อก/ราคา</button>
+      <button type="button" class="tab-btn" data-tab="channels" onclick="switchProductTab('channels')">ขายช่องทาง</button>
+      <button type="button" class="tab-btn" data-tab="variants" onclick="switchProductTab('variants')">Variants</button>
+    </div>
+
     <form id="pForm" onsubmit="saveProduct(event)">
       <input type="hidden" id="pId">
-      <div class="form-group">
-        <label>ชื่อสินค้า *</label>
-        <input type="text" id="pName" required>
-      </div>
-      <div class="form-row">
+
+      <!-- TAB 1: ข้อมูลทั่วไป -->
+      <div class="tab-pane active" data-pane="general">
         <div class="form-group">
-          <label>SKU / รหัสสินค้า</label>
-          <input type="text" id="pSku">
+          <label>ชื่อสินค้า *</label>
+          <input type="text" id="pName" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>SKU / รหัสสินค้า</label>
+            <input type="text" id="pSku">
+          </div>
+          <div class="form-group">
+            <label>หมวดหมู่ *</label>
+            <select id="pCategory" required>
+              <option value="agricultural">เครื่องเกษตร</option>
+              <option value="motorcycle">อะไหล่มอเตอร์ไซค์</option>
+              <option value="lawnmower">เครื่องตัดหญ้า</option>
+              <option value="pump">เครื่องสูบน้ำ</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Barcode</label>
+            <input type="text" id="pBarcode" placeholder="เช่น 8851234567890">
+          </div>
+          <div class="form-group">
+            <label>ผู้จำหน่าย (Supplier)</label>
+            <input type="text" id="pSupplier" placeholder="ชื่อผู้จำหน่าย">
+          </div>
         </div>
         <div class="form-group">
-          <label>หมวดหมู่ *</label>
-          <select id="pCategory" required>
-            <option value="agricultural">เครื่องเกษตร</option>
-            <option value="motorcycle">อะไหล่มอเตอร์ไซค์</option>
-            <option value="lawnmower">เครื่องตัดหญ้า</option>
-            <option value="pump">เครื่องสูบน้ำ</option>
-            <option value="other">อื่นๆ</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>รายละเอียด</label>
-        <textarea id="pDesc" style="height:70px;resize:vertical;"></textarea>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>ราคาปลีก (บาท) *</label>
-          <input type="number" id="pPrice" required min="0" step="0.01">
+          <label>รายละเอียด</label>
+          <textarea id="pDesc" style="height:70px;resize:vertical;"></textarea>
         </div>
         <div class="form-group">
-          <label>ราคาส่ง (บาท)</label>
-          <input type="number" id="pPriceWs" min="0" step="0.01">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>สต็อก *</label>
-          <input type="number" id="pStock" required min="0">
+          <label>รูปสินค้า</label>
+          <input type="file" id="pImage" accept="image/*">
+          <img id="pImagePreview" style="display:none;width:200px;margin-top:10px;border-radius:8px;">
         </div>
         <div class="form-group">
-          <label>หน่วย</label>
-          <input type="text" id="pUnit" value="ชิ้น">
+          <label>Tags (คั่นด้วย ,)</label>
+          <input type="text" id="pTags" placeholder="เช่น ตัดหญ้า, ไฟฟ้า">
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>น้ำหนัก</label>
-          <input type="number" id="pWeight" min="0" step="0.01">
+
+      <!-- TAB 2: สต็อก/ราคา -->
+      <div class="tab-pane" data-pane="stock">
+        <div class="form-row">
+          <div class="form-group">
+            <label>ราคาปลีก (บาท) *</label>
+            <input type="number" id="pPrice" required min="0" step="0.01" oninput="updateProfitDisplay()">
+          </div>
+          <div class="form-group">
+            <label>ราคาส่ง (บาท)</label>
+            <input type="number" id="pPriceWs" min="0" step="0.01">
+          </div>
         </div>
-        <div class="form-group">
-          <label>หน่วยน้ำหนัก</label>
-          <select id="pWeightUnit">
-            <option value="กก.">กิโลกรัม</option>
-            <option value="กรัม">กรัม</option>
-          </select>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ต้นทุน / Cost (บาท)</label>
+            <input type="number" id="pCost" min="0" step="0.01" oninput="updateProfitDisplay()">
+          </div>
+          <div class="form-group">
+            <label>สต็อก *</label>
+            <input type="number" id="pStock" required min="0">
+          </div>
+        </div>
+        <div id="profitDisplay" class="profit-display" style="display:none;">รอคำนวณ...</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>หน่วย</label>
+            <input type="text" id="pUnit" value="ชิ้น">
+          </div>
+          <div class="form-group">
+            <label>เตือนสต็อกต่ำ (LowStockThreshold)</label>
+            <input type="number" id="pLowStock" min="0" placeholder="เช่น 5">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>น้ำหนัก</label>
+            <input type="number" id="pWeight" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>หน่วยน้ำหนัก</label>
+            <select id="pWeightUnit">
+              <option value="กก.">กิโลกรัม</option>
+              <option value="กรัม">กรัม</option>
+            </select>
+          </div>
         </div>
       </div>
-      <div class="form-group">
-        <label>รูปสินค้า</label>
-        <input type="file" id="pImage" accept="image/*">
-        <img id="pImagePreview" style="display:none;width:200px;margin-top:10px;border-radius:8px;">
+
+      <!-- TAB 3: ขายช่องทาง -->
+      <div class="tab-pane" data-pane="channels">
+        <div style="font-size:13px;color:#666;margin-bottom:10px;">
+          เปิด/ปิดขายตามช่องทาง — ปล่อยราคาว่างไว้ = ใช้ราคา default
+        </div>
+        <div id="channelsList"></div>
       </div>
-      <div class="form-group">
-        <label>Tags (คั่นด้วย ,)</label>
-        <input type="text" id="pTags" placeholder="เช่น ตัดหญ้า, ไฟฟ้า">
+
+      <!-- TAB 4: Variants -->
+      <div class="tab-pane" data-pane="variants">
+        <div style="font-size:13px;color:#666;margin-bottom:10px;">
+          Variants — ถ้าราคา/ต้นทุนปล่อยว่างไว้ จะใช้ของ parent
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="variants-table">
+            <thead><tr><th>ชื่อ</th><th>SKU</th><th>Barcode</th><th>ราคา</th><th>ต้นทุน</th><th>Stock</th><th></th></tr></thead>
+            <tbody id="variantsBody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addVariant()" style="margin-top:10px;">+ เพิ่ม variant</button>
       </div>
+
       <div style="display:flex;gap:10px;margin-top:20px;">
         <button type="submit" class="btn btn-primary">บันทึก</button>
         <button type="button" class="btn btn-secondary" onclick="closeProductModal()">ยกเลิก</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Duplicates Modal -->
+<div class="modal" id="duplicatesModal">
+  <div class="modal-content" style="max-width:720px; max-height:90vh; overflow-y:auto;">
+    <button class="close-btn" onclick="closeDuplicatesModal()">×</button>
+    <h2>🔍 สินค้าที่อาจซ้ำ</h2>
+    <div id="dupResults"></div>
   </div>
 </div>
 
@@ -790,12 +875,125 @@ function updateProductStats(list) {
   document.getElementById('pstat-moto').textContent = moto;
 }
 
+// ----- Channels & Variants config -----
+var CHANNEL_DEFS = [
+  { key: 'shopee_main',  label: '🛒 Shopee Main',  idField: 'shopee_item_id' },
+  { key: 'shopee_sub1',  label: '🛒 Shopee Sub1',  idField: 'shopee_item_id' },
+  { key: 'shopee_sub2',  label: '🛒 Shopee Sub2',  idField: 'shopee_item_id' },
+  { key: 'lazada',       label: '🛍️ Lazada',      idField: 'lazada_sku_id'  },
+  { key: 'tiktok',       label: '🎵 TikTok Shop',  idField: 'tiktok_product_id' }
+];
+
+function switchProductTab(tabName) {
+  document.querySelectorAll('#productModal .tab-btn[data-tab]').forEach(function(b){ b.classList.toggle('active', b.dataset.tab === tabName); });
+  document.querySelectorAll('#productModal .tab-pane[data-pane]').forEach(function(p){ p.classList.toggle('active', p.dataset.pane === tabName); });
+}
+
+function renderChannelsList(channels) {
+  channels = channels || {};
+  var box = document.getElementById('channelsList');
+  var html = '';
+  CHANNEL_DEFS.forEach(function(c) {
+    var ch = channels[c.key] || {};
+    var enabled = ch.enabled ? 'checked' : '';
+    var price = (ch.price !== undefined && ch.price !== null && ch.price !== '') ? ch.price : '';
+    var status = ch.status || 'draft';
+    var statusColor = status === 'live' ? 'on' : (status === 'error' ? 'off' : 'pending');
+    var platformId = ch[c.idField] || '';
+    html += '<div class="channel-row" data-channel-key="' + c.key + '">';
+    html += '<label><input type="checkbox" data-channel="' + c.key + '" ' + enabled + '> ' + escapeHtml(c.label) + '</label>';
+    html += '<input type="number" min="0" step="0.01" placeholder="ราคา (ใช้ default)" data-channel-price="' + c.key + '" value="' + price + '">';
+    html += '<span class="status-badge ' + statusColor + '">' + escapeHtml(status) + '</span>';
+    html += '<span class="channel-id" title="' + escapeHtml(c.idField) + '">' + (platformId ? escapeHtml(String(platformId)) : '—') + '</span>';
+    // hidden field to keep platform id read-only round-trip
+    html += '<input type="hidden" data-channel-platformid="' + c.key + '" value="' + escapeHtml(String(platformId)) + '">';
+    html += '</div>';
+  });
+  box.innerHTML = html;
+}
+
+function collectChannels() {
+  var out = {};
+  CHANNEL_DEFS.forEach(function(c) {
+    var enabled = !!document.querySelector('#channelsList input[data-channel="' + c.key + '"]:checked');
+    var priceStr = (document.querySelector('#channelsList input[data-channel-price="' + c.key + '"]') || {}).value;
+    var price = (priceStr === '' || priceStr === undefined || priceStr === null) ? null : (parseFloat(priceStr) || 0);
+    var pid = (document.querySelector('#channelsList input[data-channel-platformid="' + c.key + '"]') || {}).value || '';
+    var entry = { enabled: enabled, price: price };
+    if (pid) entry[c.idField] = pid;
+    out[c.key] = entry;
+  });
+  return out;
+}
+
+function renderVariants(variants) {
+  variants = Array.isArray(variants) ? variants : [];
+  var tbody = document.getElementById('variantsBody');
+  tbody.innerHTML = '';
+  variants.forEach(function(v) { addVariant(v); });
+}
+
+function addVariant(v) {
+  v = v || {};
+  var tbody = document.getElementById('variantsBody');
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><input type="text" data-vfield="name" value="' + escapeHtml(v.name || '') + '"></td>' +
+    '<td><input type="text" data-vfield="sku" value="' + escapeHtml(v.sku || '') + '"></td>' +
+    '<td><input type="text" data-vfield="barcode" value="' + escapeHtml(v.barcode || '') + '"></td>' +
+    '<td><input type="number" min="0" step="0.01" data-vfield="price" value="' + (v.price !== undefined && v.price !== null ? v.price : '') + '"></td>' +
+    '<td><input type="number" min="0" step="0.01" data-vfield="cost" value="' + (v.cost !== undefined && v.cost !== null ? v.cost : '') + '"></td>' +
+    '<td><input type="number" min="0" data-vfield="stock" value="' + (v.stock !== undefined && v.stock !== null ? v.stock : 0) + '"></td>' +
+    '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">✖</button></td>';
+  if (v.id) tr.dataset.vid = v.id;
+  tbody.appendChild(tr);
+}
+
+function collectVariants() {
+  var rows = document.querySelectorAll('#variantsBody tr');
+  var out = [];
+  rows.forEach(function(tr) {
+    var get = function(f) { var el = tr.querySelector('input[data-vfield="' + f + '"]'); return el ? el.value : ''; };
+    var name = get('name').trim();
+    var sku  = get('sku').trim();
+    if (!name && !sku) return; // skip empty row
+    var priceVal = get('price');
+    var costVal  = get('cost');
+    var entry = {
+      name: name,
+      sku: sku,
+      barcode: get('barcode').trim(),
+      price: (priceVal === '' ? null : (parseFloat(priceVal) || 0)),
+      cost:  (costVal  === '' ? null : (parseFloat(costVal)  || 0)),
+      stock: parseInt(get('stock')) || 0
+    };
+    if (tr.dataset.vid) entry.id = parseInt(tr.dataset.vid);
+    out.push(entry);
+  });
+  return out;
+}
+
+function updateProfitDisplay() {
+  var price = parseFloat(document.getElementById('pPrice').value) || 0;
+  var cost  = parseFloat(document.getElementById('pCost').value)  || 0;
+  var box = document.getElementById('profitDisplay');
+  if (price <= 0 || cost <= 0) { box.style.display = 'none'; return; }
+  var profit = price - cost;
+  var margin = price > 0 ? (profit / price * 100) : 0;
+  box.style.display = 'block';
+  box.innerHTML = '💰 กำไร: <strong>' + numFormat(profit) + '</strong> บาท (' + margin.toFixed(1) + '%)';
+}
+
 function openProductModal() {
   document.getElementById('productModal').classList.add('active');
   document.getElementById('pForm').reset();
   document.getElementById('pId').value = '';
   document.getElementById('pImagePreview').style.display = 'none';
   document.getElementById('pModalTitle').textContent = 'เพิ่มสินค้าใหม่';
+  switchProductTab('general');
+  renderChannelsList({});
+  renderVariants([]);
+  document.getElementById('profitDisplay').style.display = 'none';
 }
 
 function editProduct(id) {
@@ -808,10 +1006,14 @@ function editProduct(id) {
   document.getElementById('pSku').value = p.sku || '';
   document.getElementById('pCategory').value = p.category || 'other';
   document.getElementById('pDesc').value = p.description || '';
+  document.getElementById('pBarcode').value = p.barcode || '';
+  document.getElementById('pSupplier').value = p.supplier || '';
   document.getElementById('pPrice').value = p.price || 0;
   document.getElementById('pPriceWs').value = p.priceWholesale || 0;
+  document.getElementById('pCost').value = (p.cost !== undefined && p.cost !== null) ? p.cost : '';
   document.getElementById('pStock').value = p.stock || 0;
   document.getElementById('pUnit').value = p.unit || 'ชิ้น';
+  document.getElementById('pLowStock').value = (p.lowStockThreshold !== undefined && p.lowStockThreshold !== null) ? p.lowStockThreshold : '';
   document.getElementById('pWeight').value = p.weight || '';
   document.getElementById('pWeightUnit').value = p.weightUnit || 'กก.';
   document.getElementById('pTags').value = (p.tags || []).join(', ');
@@ -822,6 +1024,10 @@ function editProduct(id) {
   } else {
     document.getElementById('pImagePreview').style.display = 'none';
   }
+  switchProductTab('general');
+  renderChannelsList(p.channels || {});
+  renderVariants(p.variants || []);
+  updateProfitDisplay();
 }
 
 function closeProductModal() {
@@ -832,19 +1038,27 @@ async function saveProduct(e) {
   e.preventDefault();
   var id = document.getElementById('pId').value;
   var tagsVal = document.getElementById('pTags').value;
-  var tags = tagsVal ? tagsVal.split(',').map(function(t) { return t.trim(); }) : [];
+  var tags = tagsVal ? tagsVal.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+  var costVal = document.getElementById('pCost').value;
+  var lowStockVal = document.getElementById('pLowStock').value;
   var data = {
     name: document.getElementById('pName').value,
     sku: document.getElementById('pSku').value,
     category: document.getElementById('pCategory').value,
     description: document.getElementById('pDesc').value,
+    barcode: document.getElementById('pBarcode').value,
+    supplier: document.getElementById('pSupplier').value,
     price: parseFloat(document.getElementById('pPrice').value) || 0,
     priceWholesale: parseFloat(document.getElementById('pPriceWs').value) || 0,
+    cost: (costVal === '' ? null : (parseFloat(costVal) || 0)),
     stock: parseInt(document.getElementById('pStock').value) || 0,
     unit: document.getElementById('pUnit').value,
+    lowStockThreshold: (lowStockVal === '' ? null : (parseInt(lowStockVal) || 0)),
     weight: parseFloat(document.getElementById('pWeight').value) || 0,
     weightUnit: document.getElementById('pWeightUnit').value,
-    tags: tags
+    tags: tags,
+    channels: collectChannels(),
+    variants: collectVariants()
   };
   var method = id ? 'PUT' : 'POST';
   var url = '/api/products' + (id ? '/' + id : '');
@@ -856,16 +1070,92 @@ async function saveProduct(e) {
       body: JSON.stringify(data)
     });
     var result = await res.json();
+    if (result && result.error) { alert('❌ ' + result.error); return; }
     var imgInput = document.getElementById('pImage');
-    if (imgInput.files && imgInput.files[0]) {
+    var savedId = result && (result.id || (result.product && result.product.id));
+    if (imgInput.files && imgInput.files[0] && savedId) {
       var formData = new FormData();
       formData.append('image', imgInput.files[0]);
-      await fetch('/api/products/' + result.id + '/image', { method: 'POST', body: formData });
+      await fetch('/api/products/' + savedId + '/image', { method: 'POST', body: formData });
     }
     closeProductModal();
     loadProducts();
   } catch (err) {
     alert('เกิดข้อผิดพลาด: ' + err.message);
+  }
+}
+
+// ===== Duplicates =====
+function closeDuplicatesModal() {
+  document.getElementById('duplicatesModal').classList.remove('active');
+}
+
+async function openDuplicatesModal() {
+  document.getElementById('duplicatesModal').classList.add('active');
+  var box = document.getElementById('dupResults');
+  box.innerHTML = '<div style="padding:20px;text-align:center;">⏳ กำลังตรวจ...</div>';
+  try {
+    var r = await fetch('/api/products/find-duplicates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    var d = await r.json();
+    if (d && d.error) {
+      box.innerHTML = '<div style="padding:20px;text-align:center;color:#c62828;">❌ ' + escapeHtml(d.error) + '</div>';
+      return;
+    }
+    if (!d.groups || d.groups.length === 0) {
+      box.innerHTML = '<div style="padding:20px; text-align:center; color:#0a0;">✅ ไม่พบสินค้าซ้ำ</div>';
+      return;
+    }
+    var html = '';
+    d.groups.forEach(function(g, gi) {
+      var reasonLabel = g.reason === 'sku' ? 'SKU เดียวกัน' : (g.reason === 'barcode' ? 'Barcode เดียวกัน' : 'ชื่อคล้าย');
+      // pick default keep = item with max stock
+      var maxIdx = 0;
+      g.items.forEach(function(it, ii){ if ((it.stock||0) > (g.items[maxIdx].stock||0)) maxIdx = ii; });
+      html += '<div style="border:1px solid #eee; padding:12px; border-radius:8px; margin-bottom:12px;">';
+      html += '<div style="font-weight:600; margin-bottom:8px;">เหตุผล: ' + reasonLabel + '</div>';
+      html += '<table style="width:100%; font-size:13px;"><thead><tr><th style="text-align:left;">เก็บ</th><th style="text-align:left;">SKU</th><th style="text-align:left;">ชื่อ</th><th style="text-align:right;">Stock</th></tr></thead><tbody>';
+      g.items.forEach(function(it, ii) {
+        html += '<tr><td><input type="radio" name="keep_' + gi + '" value="' + it.id + '"' + (ii === maxIdx ? ' checked' : '') + '></td>';
+        html += '<td>' + escapeHtml(it.sku || '') + '</td>';
+        html += '<td>' + escapeHtml(it.name || '') + '</td>';
+        html += '<td style="text-align:right;">' + (it.stock || 0) + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      var idsCsv = g.items.map(function(i){ return i.id; }).join(',');
+      html += '<button class="btn btn-primary btn-sm" onclick="mergeGroup(' + gi + ',[' + idsCsv + '])" style="margin-top:8px;">🔀 รวมเป็นตัวเดียว</button>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:#c62828;">❌ ' + escapeHtml(e.message || String(e)) + '</div>';
+  }
+}
+
+async function mergeGroup(gi, ids) {
+  var keepEl = document.querySelector('input[name="keep_' + gi + '"]:checked');
+  if (!keepEl) { alert('กรุณาเลือกสินค้าตัวหลัก'); return; }
+  var keepId = parseInt(keepEl.value);
+  var mergeIds = ids.filter(function(id){ return id !== keepId; });
+  if (mergeIds.length === 0) { alert('ไม่มีรายการให้รวม'); return; }
+  if (!confirm('รวม ' + mergeIds.length + ' รายการเข้ากับสินค้า ID ' + keepId + '?\n(stock จะรวมกัน, สินค้าที่ถูกรวมจะถูกลบ, orders เก่าจะ remap ให้)')) return;
+  try {
+    var r = await fetch('/api/products/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keepId: keepId, mergeIds: mergeIds })
+    });
+    var result = await r.json();
+    if (result && result.error) { alert('❌ ' + result.error); return; }
+    var newStock = (result && result.kept && result.kept.stock !== undefined) ? result.kept.stock : '?';
+    alert('✅ รวมแล้ว — stock ใหม่: ' + newStock);
+    openDuplicatesModal(); // refresh
+    if (typeof loadProducts === 'function') loadProducts();
+  } catch (e) {
+    alert('❌ ' + (e.message || String(e)));
   }
 }
 
