@@ -1029,7 +1029,8 @@ function searchProductsForOrder(query) {
   var box = document.getElementById('oProductResults');
   if (!query || query.length < 1) { box.style.display = 'none'; return; }
   productSearchTimer = setTimeout(function() {
-    fetch('/api/products?status=active').then(function(r){ return r.json(); }).then(function(arr) {
+    fetch('/api/products?status=active&limit=200').then(function(r){ return r.json(); }).then(function(data) {
+      var arr = Array.isArray(data) ? data : (data && data.products) ? data.products : [];
       var q = query.toLowerCase();
       var matched = (Array.isArray(arr) ? arr : []).filter(function(p) {
         var name = (p.name || '').toLowerCase();
@@ -1578,7 +1579,8 @@ function searchProductsForPos(query) {
   var box = document.getElementById('posProductResults');
   if (!query || query.length < 1) { box.style.display = 'none'; return; }
   posSearchTimer = setTimeout(function() {
-    fetch('/api/products?status=active').then(function(r){ return r.json(); }).then(function(arr) {
+    fetch('/api/products?status=active&limit=200').then(function(r){ return r.json(); }).then(function(data) {
+      var arr = Array.isArray(data) ? data : (data && data.products) ? data.products : [];
       var q = query.toLowerCase();
       var matched = (Array.isArray(arr) ? arr : []).filter(function(p) {
         var name = (p.name || '').toLowerCase();
