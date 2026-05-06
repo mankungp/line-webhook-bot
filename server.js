@@ -49,6 +49,108 @@ app.get('/health', function(req, res) {
   res.json({ status: 'ok', service: 'LINE Bot', timestamp: new Date().toISOString() });
 });
 
+// ============ AUTH PROXY (Phase 8) ============
+
+app.get('/auth/login', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var url = LOCAL_API_BASE + '/auth/login' + (qs ? '?' + qs : '');
+    var r = await fetch(url, { redirect: 'manual' });
+    var loc = r.headers.get('location');
+    if (loc) return res.redirect(loc);
+    res.status(r.status).send(await r.text());
+  } catch (err) {
+    console.error('[auth-proxy] login error:', err);
+    res.status(500).send('Auth proxy error: ' + err.message);
+  }
+});
+
+app.get('/auth/line/callback', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var url = LOCAL_API_BASE + '/auth/line/callback' + (qs ? '?' + qs : '');
+    var r = await fetch(url, { redirect: 'manual' });
+
+    var setCookie = r.headers.get('set-cookie');
+    if (setCookie) res.setHeader('Set-Cookie', setCookie);
+
+    var loc = r.headers.get('location');
+    if (loc) return res.redirect(loc);
+
+    res.status(r.status).send(await r.text());
+  } catch (err) {
+    console.error('[auth-proxy] callback error:', err);
+    res.status(500).send('Auth proxy error: ' + err.message);
+  }
+});
+
+app.get('/auth/me', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/auth/me', {
+      headers: { 'cookie': req.headers.cookie || '' }
+    });
+    var ct = r.headers.get('content-type') || 'application/json';
+    res.status(r.status).set('Content-Type', ct).send(await r.text());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/auth/logout', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/auth/logout', {
+      method: 'POST',
+      headers: { 'cookie': req.headers.cookie || '' }
+    });
+    var setCookie = r.headers.get('set-cookie');
+    if (setCookie) res.setHeader('Set-Cookie', setCookie);
+    var ct = r.headers.get('content-type') || 'application/json';
+    res.status(r.status).set('Content-Type', ct).send(await r.text());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+['/auth/pending','/auth/blocked'].forEach(function(p) {
+  app.get(p, async function(req, res) {
+    try {
+      var r = await fetch(LOCAL_API_BASE + p);
+      res.setHeader('Content-Type', r.headers.get('content-type') || 'text/html; charset=utf-8');
+      res.status(r.status).send(await r.text());
+    } catch (err) { res.status(500).send(err.message); }
+  });
+});
+
+// Forward request body + cookie to local-api
+function forwardWithCookie(method) {
+  return async function(req, res) {
+    try {
+      var qs = req.url.split('?')[1] || '';
+      var url = LOCAL_API_BASE + req.path + (qs ? '?' + qs : '');
+      var opts = {
+        method: method,
+        headers: {
+          'cookie': req.headers.cookie || '',
+          'content-type': 'application/json'
+        }
+      };
+      if (method !== 'GET' && method !== 'DELETE') {
+        opts.body = JSON.stringify(req.body || {});
+      }
+      var r = await fetch(url, opts);
+      var ct = r.headers.get('content-type') || 'application/json';
+      res.status(r.status).set('Content-Type', ct).send(await r.text());
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+}
+
+app.get('/api/users', forwardWithCookie('GET'));
+app.put('/api/users/:lineUserId', forwardWithCookie('PUT'));
+app.delete('/api/users/:lineUserId', forwardWithCookie('DELETE'));
+
+
 // LINE signature verification
 function verifyLineSignature(req, res, next) {
   var signature = req.get('x-line-signature');
