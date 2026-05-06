@@ -519,6 +519,45 @@ app.post('/api/admin/toggle-customer', async function(req, res) {
   }
 });
 
+// ============ CATEGORIES PROXY ============
+app.get('/api/categories', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/categories');
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/categories', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/categories/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/categories/' + encodeURIComponent(req.params.id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/categories/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/categories/' + encodeURIComponent(req.params.id), {
+      method: 'DELETE'
+    });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ PRODUCTS PROXY ============
 app.get('/api/products', async function(req, res) {
   try {
