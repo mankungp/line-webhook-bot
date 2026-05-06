@@ -2,31 +2,84 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a8">
   <title>เข้าสู่ระบบ - เกิดการเกษตร</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --primary: #0a8;
+      --primary-hover: #097;
+      --bg-card: #ffffff;
+      --text-primary: #1a1f24;
+      --text-secondary: #5a6168;
+      --text-muted: #9098a0;
+      --border: #e8eaed;
+    }
+    [data-theme="dark"] {
+      --bg-card: #1a1f24;
+      --text-primary: #e6e8eb;
+      --text-secondary: #b0b6bd;
+      --text-muted: #707880;
+      --border: #2a3038;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
     body {
-      font-family: -apple-system, 'Sarabun', sans-serif;
-      background: linear-gradient(135deg, #0a8 0%, #0c9 50%, #4ad 100%);
+      font-family: 'Sarabun', -apple-system, system-ui, sans-serif;
+      background: linear-gradient(-45deg, #0a8, #0c9, #4ad, #0a8);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      -webkit-font-smoothing: antialiased;
+      color: var(--text-primary);
+    }
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
     .login-card {
-      background: white;
+      background: var(--bg-card);
       border-radius: 24px;
       padding: 48px 32px;
       max-width: 420px;
       width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
       text-align: center;
+      animation: cardIn 0.5s ease-out;
     }
-    .logo-emoji { font-size: 56px; margin-bottom: 16px; }
-    h1 { color: #0a8; font-size: 28px; margin-bottom: 8px; }
-    .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .logo-emoji {
+      font-size: 72px;
+      margin-bottom: 12px;
+      display: inline-block;
+      animation: bounce 2s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    h1 {
+      color: var(--primary);
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
     .line-btn {
       width: 100%;
       background: #06C755;
@@ -41,7 +94,7 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      transition: all 0.2s;
+      transition: transform 0.15s, box-shadow 0.15s;
       box-shadow: 0 4px 16px rgba(6,199,85,0.3);
       font-family: inherit;
     }
@@ -56,11 +109,12 @@
     .info {
       margin-top: 32px;
       padding-top: 24px;
-      border-top: 1px solid #eee;
+      border-top: 1px solid var(--border);
       font-size: 12px;
-      color: #999;
+      color: var(--text-muted);
       line-height: 1.6;
     }
+    .info strong { color: var(--text-secondary); }
     .error-banner {
       background: #fff3e0;
       color: #e65100;
@@ -70,9 +124,24 @@
       font-size: 13px;
       text-align: left;
       display: none;
+      border: 1px solid #ffcc80;
+    }
+    [data-theme="dark"] .error-banner {
+      background: rgba(230,81,0,0.15);
+      color: #ffb74d;
+      border-color: rgba(230,81,0,0.3);
     }
     .error-banner.show { display: block; }
   </style>
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('theme');
+        if (!saved) saved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div class="login-card">
@@ -90,7 +159,7 @@
     <div class="info">
       <strong>🔒 ปลอดภัย</strong> · ใช้ LINE ID เดิม ไม่ต้องสมัครใหม่<br/>
       ใช้ได้เฉพาะพนักงานที่ได้รับสิทธิ์<br/>
-      <small style="color:#bbb;">© 2026 หจก.เกิดการเกษตร</small>
+      <small style="opacity:0.7;">© 2026 หจก.เกิดการเกษตร</small>
     </div>
   </div>
 
