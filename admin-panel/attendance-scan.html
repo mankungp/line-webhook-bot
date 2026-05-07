@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0a8855" />
+<title>ลงเวลาทำงาน</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(160deg, #e8f7ef 0%, #f5fff9 100%);
+    color: #1a2e22;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .header {
+    text-align: center;
+    padding: 12px 0 20px;
+  }
+  .header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #0a8855;
+  }
+  .header .sub {
+    font-size: 13px;
+    color: #5a7a6b;
+    margin-top: 4px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(10, 136, 85, 0.08);
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 56px;
+    border: none;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .1s, box-shadow .15s;
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: #0a8855;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(10, 136, 85, 0.25);
+  }
+  .btn-secondary {
+    background: #fff;
+    color: #0a8855;
+    border: 2px solid #0a8855;
+  }
+  .btn-danger {
+    background: #d8633a;
+    color: #fff;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: #5a7a6b;
+    border: 1px solid #c7d8cf;
+  }
+  .btn-line {
+    background: #06c755;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(6, 199, 85, 0.3);
+  }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn + .btn { margin-top: 10px; }
+  input[type="text"], input[type="password"], input[type="tel"], select {
+    width: 100%;
+    min-height: 50px;
+    padding: 12px 14px;
+    font-size: 17px;
+    border: 1px solid #c7d8cf;
+    border-radius: 10px;
+    background: #fafefb;
+    font-family: inherit;
+    margin-bottom: 12px;
+  }
+  input:focus, select:focus { outline: none; border-color: #0a8855; box-shadow: 0 0 0 3px rgba(10,136,85,.15); }
+  label { display: block; font-size: 14px; color: #3a5547; margin-bottom: 6px; font-weight: 500; }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid #d8ead9;
+    border-top-color: #0a8855;
+    border-radius: 50%;
+    animation: spin .9s linear infinite;
+    margin: 20px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .center { text-align: center; }
+  .muted { color: #5a7a6b; font-size: 14px; }
+  .big-emoji { font-size: 56px; margin-bottom: 8px; }
+  .alert {
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
+  .alert-error { background: #fce8e0; color: #a23315; border: 1px solid #f0c4b0; }
+  .alert-warn { background: #fff5dc; color: #7a5410; border: 1px solid #f0d99a; }
+  .alert-info { background: #e0f0ff; color: #155488; border: 1px solid #b8d8f5; }
+  .name {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0a8855;
+    text-align: center;
+    margin: 8px 0;
+  }
+  .video-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .video-wrap video, .video-wrap img, .video-wrap canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .row { display: flex; gap: 10px; }
+  .row .btn { margin-top: 0; }
+  .hidden { display: none !important; }
+  .footer { text-align: center; font-size: 12px; color: #8aa599; padding: 16px 0; }
+  .clock {
+    font-size: 32px;
+    font-weight: 700;
+    color: #0a8855;
+    text-align: center;
+    margin: 4px 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .success-icon { font-size: 72px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>👋 ลงเวลาทำงาน</h1>
+    <div class="sub">QR Attendance System</div>
+  </div>
+
+  <div id="content" class="card">
+    <!-- rendered by JS -->
+    <div class="center">
+      <div class="spinner"></div>
+      <div class="muted">กำลังโหลด...</div>
+    </div>
+  </div>
+
+  <div class="footer">© <span id="year"></span> Attendance</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- State ----------
+  const state = {
+    token: null,
+    tokenValid: false,
+    user: null,           // {lineUserId, name, ...} from /auth/me
+    empCode: null,        // selected emp code (re-link/set-pin flow)
+    selectedType: null,   // 'in' | 'out'
+    employees: [],
+    selfieDataUrl: null,
+    stream: null,
+    timer: null,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const root = $('content');
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // ---------- Helpers ----------
+  function setHTML(html) {
+    stopCamera();
+    root.innerHTML = html;
+  }
+
+  async function api(path, opts = {}) {
+    const r = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      ...opts,
+    });
+    let body = null;
+    try { body = await r.json(); } catch (_) {}
+    return { status: r.status, ok: r.ok, body };
+  }
+
+  function getToken() {
+    const u = new URL(location.href);
+    return u.searchParams.get('token');
+  }
+
+  function fmtTime(d = new Date()) {
+    return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  // ---------- Camera ----------
+  async function startCamera(videoEl) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      state.stream = stream;
+      videoEl.srcObject = stream;
+      await videoEl.play();
+    } catch (err) {
+      console.error('camera error', err);
+      throw err;
+    }
+  }
+
+  function stopCamera() {
+    if (state.stream) {
+      try { state.stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      state.stream = null;
+    }
+  }
+
+  function snapToDataUrl(videoEl) {
+    const maxSide = 800;
+    let w = videoEl.videoWidth || 720;
+    let h = videoEl.videoHeight || 720;
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.75);
+  }
+
+  // ---------- Steps ----------
+  function showLoading(msg = 'กำลังโหลด...') {
+    setHTML(`
+      <div class="center">
+        <div class="spinner"></div>
+        <div class="muted">${escapeHtml(msg)}</div>
+      </div>
+    `);
+  }
+
+  function showTokenExpired(reason) {
+    setHTML(`
+      <div class="center">
+        <div class="big-emoji">⏰</div>
+        <h2 style="margin:6px 0">QR หมดอายุ</h2>
+        <p class="muted">${escapeHtml(reason || 'กรุณาให้ระบบสร้าง QR ใหม่ แล้วสแกนอีกครั้ง')}</p>
+      </div>
+    `);
+  }
+
+  function showNotLoggedIn() {
+    setHTML(`
+      <div class="center">
+        <div class="big-emoji">🔐</div>
+        <h2 style="margin:6px 0">เข้าสู่ระบบก่อนลงเวลา</h2>
+        <p class="muted">กดปุ่มด้านล่างเพื่อยืนยันตัวตนผ่าน LINE</p>
+      </div>
+      <button class="btn btn-line" id="btnLogin">
+        <span>เข้าสู่ระบบด้วย LINE</span>
+      </button>
+    `);
+    $('btnLogin').addEventListener('click', () => {
+      const next = encodeURIComponent('/attendance/scan?token=' + encodeURIComponent(state.token));
+      location.href = '/auth/login?next=' + next;
+    });
+  }
+
+  function renderEmpOptions() {
+    return state.employees
+      .map(e => `<option value="${escapeHtml(e.emp_code)}">${escapeHtml(e.name)} (${escapeHtml(e.emp_code)})</option>`)
+      .join('');
+  }
+
+  async function loadActiveEmployees() {
+    const r = await api('/api/attendance/active-employees');
+    if (r.ok && r.body) {
+      state.employees = r.body.employees || r.body.data || r.body || [];
+      if (!Array.isArray(state.employees)) state.employees = [];
+    } else {
+      state.employees = [];
+    }
+  }
+
+  async function showNeedRelink(errMsg) {
+    showLoading('กำลังโหลดรายชื่อพนักงาน...');
+    await loadActiveEmployees();
+
+    setHTML(`
+      ${errMsg ? `<div class="alert alert-warn">${escapeHtml(errMsg)}</div>` : ''}
+      <h3 style="margin-top:0">เชื่อมโยงบัญชี LINE กับพนักงาน</h3>
+      <p class="muted" style="margin-top:-4px">เลือกชื่อของคุณและกรอก PIN เพื่อเชื่อมบัญชี</p>
+      <label>ชื่อพนักงาน</label>
+      <select id="selEmp">
+        <option value="">-- เลือกพนักงาน --</option>
+        ${renderEmpOptions()}
+      </select>
+      <label>PIN (4-6 หลัก)</label>
+      <input type="tel" id="inpPin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" />
+      <div class="row" style="margin-top:6px">
+        <button class="btn btn-ghost" id="btnSetPinMode" type="button" style="flex:1">ยังไม่มี PIN</button>
+        <button class="btn btn-primary" id="btnRelink" style="flex:1.4">เชื่อมบัญชี</button>
+      </div>
+    `);
+
+    $('btnRelink').addEventListener('click', async () => {
+      const emp = $('selEmp').value;
+      const pin = $('inpPin').value.trim();
+      if (!emp) return alert('กรุณาเลือกพนักงาน');
+      if (!pin || pin.length < 4) return alert('PIN ต้อง 4-6 หลัก');
+      state.empCode = emp;
+      // จะเข้าสู่ Ready โดยส่ง pin + selected_emp_code ตอน checkin จริง
+      // เก็บ pin ไว้ใช้ตอน checkin ครั้งแรก
+      state._pendingPin = pin;
+      showReady();
+    });
+
+    $('btnSetPinMode').addEventListener('click', () => showNeedSetPin());
+  }
+
+  async function showNeedSetPin() {
+    if (!state.employees.length) {
+      showLoading('กำลังโหลดรายชื่อพนักงาน...');
+      await loadActiveEmployees();
+    }
+    setHTML(`
+      <h3 style="margin-top:0">ตั้ง PIN ครั้งแรก</h3>
+      <p class="muted" style="margin-top:-4px">เลือกชื่อและตั้ง PIN ใหม่ (4-6 หลัก)</p>
+      <label>ชื่อพนักงาน</label>
+      <select id="selEmp">
+        <option value="">-- เลือกพนักงาน --</option>
+        ${renderEmpOptions()}
+      </select>
+      <label>PIN ใหม่</label>
+      <input type="tel" id="inpPin1" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" />
+      <label>ยืนยัน PIN ใหม่</label>
+      <input type="tel" id="inpPin2" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" />
+      <button class="btn btn-primary" id="btnSetPin">ตั้ง PIN</button>
+      <button class="btn btn-ghost" id="btnBack" type="button">ย้อนกลับ</button>
+    `);
+
+    $('btnBack').addEventListener('click', () => showNeedRelink());
+    $('btnSetPin').addEventListener('click', async () => {
+      const emp = $('selEmp').value;
+      const p1 = $('inpPin1').value.trim();
+      const p2 = $('inpPin2').value.trim();
+      if (!emp) return alert('กรุณาเลือกพนักงาน');
+      if (!p1 || p1.length < 4) return alert('PIN ต้อง 4-6 หลัก');
+      if (p1 !== p2) return alert('PIN ไม่ตรงกัน');
+
+      $('btnSetPin').disabled = true;
+      const r = await api('/api/attendance/set-pin', {
+        method: 'POST',
+        body: JSON.stringify({
+          token: state.token,
+          line_user_id: state.user && state.user.lineUserId,
+          selected_emp_code: emp,
+          new_pin: p1,
+        }),
+      });
+      if (r.ok) {
+        state.empCode = emp;
+        state._pendingPin = p1;
+        showReady();
+      } else {
+        const reason = (r.body && (r.body.reason || r.body.error)) || `HTTP ${r.status}`;
+        $('btnSetPin').disabled = false;
+        alert('ตั้ง PIN ไม่สำเร็จ: ' + reason);
+      }
+    });
+  }
+
+  function showReady() {
+    const displayName = (state.user && (state.user.displayName || state.user.name)) || 'พนักงาน';
+    setHTML(`
+      <div class="center">
+        <div class="muted">สวัสดี</div>
+        <div class="name">${escapeHtml(displayName)}</div>
+        <div class="clock" id="clk">${fmtTime()}</div>
+        <div class="muted" style="margin-bottom:14px">${new Date().toLocaleDateString('th-TH', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+      </div>
+      <button class="btn btn-primary" id="btnIn">✅ เข้างาน</button>
+      <button class="btn btn-danger" id="btnOut">🚪 ออกงาน</button>
+    `);
+    if (state.timer) clearInterval(state.timer);
+    state.timer = setInterval(() => {
+      const el = $('clk');
+      if (el) el.textContent = fmtTime();
+    }, 1000);
+
+    $('btnIn').addEventListener('click', () => { state.selectedType = 'in'; showCamera(); });
+    $('btnOut').addEventListener('click', () => { state.selectedType = 'out'; showCamera(); });
+  }
+
+  async function showCamera() {
+    setHTML(`
+      <h3 style="margin-top:0">${state.selectedType === 'in' ? '✅ เข้างาน' : '🚪 ออกงาน'} — ถ่ายเซลฟี่</h3>
+      <div class="video-wrap"><video id="vid" playsinline muted autoplay></video></div>
+      <button class="btn btn-primary" id="btnSnap">📸 ถ่ายรูป</button>
+      <button class="btn btn-ghost" id="btnCancel" type="button">ยกเลิก</button>
+    `);
+    try {
+      await startCamera($('vid'));
+    } catch (err) {
+      showError('ไม่สามารถเปิดกล้องได้: ' + (err.message || err.name || 'unknown'), () => showReady());
+      return;
+    }
+    $('btnSnap').addEventListener('click', () => {
+      const dataUrl = snapToDataUrl($('vid'));
+      state.selfieDataUrl = dataUrl;
+      showPreview();
+    });
+    $('btnCancel').addEventListener('click', () => showReady());
+  }
+
+  function showPreview() {
+    setHTML(`
+      <h3 style="margin-top:0">ตรวจสอบรูป</h3>
+      <div class="video-wrap"><img id="prev" alt="selfie" /></div>
+      <button class="btn btn-primary" id="btnConfirm">✓ ยืนยันลงเวลา</button>
+      <button class="btn btn-ghost" id="btnRetake" type="button">🔄 ถ่ายใหม่</button>
+    `);
+    $('prev').src = state.selfieDataUrl;
+    $('btnConfirm').addEventListener('click', () => submitCheckin());
+    $('btnRetake').addEventListener('click', () => showCamera());
+  }
+
+  async function submitCheckin() {
+    showLoading('กำลังส่งข้อมูล...');
+    const payload = {
+      token: state.token,
+      type: state.selectedType,
+      line_user_id: state.user && state.user.lineUserId,
+      selfie_base64: state.selfieDataUrl,
+    };
+    if (state.empCode) payload.selected_emp_code = state.empCode;
+    if (state._pendingPin) payload.pin = state._pendingPin;
+
+    const r = await api('/api/attendance/checkin', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (r.ok) {
+      // clear sensitive
+      state._pendingPin = null;
+      state.selfieDataUrl = null;
+      const name = (r.body && (r.body.name || r.body.emp_name)) || (state.user && (state.user.displayName || state.user.name)) || '';
+      const t = (r.body && r.body.time) || fmtTime();
+      const typeLabel = state.selectedType === 'in' ? 'เข้างาน' : 'ออกงาน';
+      setHTML(`
+        <div class="center">
+          <div class="success-icon">✅</div>
+          <h2 style="margin:6px 0">ลงเวลา${typeLabel}สำเร็จ</h2>
+          <div class="clock">${escapeHtml(t)}</div>
+          <div class="name">${escapeHtml(name)}</div>
+          <p class="muted">ขอบคุณครับ ขอให้เป็นวันที่ดี 🌿</p>
+        </div>
+        <button class="btn btn-ghost" id="btnClose" type="button">ปิดหน้านี้</button>
+      `);
+      $('btnClose').addEventListener('click', () => { try { window.close(); } catch(_){} });
+      return;
+    }
+
+    // Errors
+    const reason = (r.body && (r.body.reason || r.body.error)) || '';
+    if (r.status === 403 && reason === 'not_linked') {
+      // need re-link
+      await showNeedRelink('ยังไม่ได้เชื่อมบัญชี LINE กับพนักงาน กรุณาเลือกชื่อและกรอก PIN');
+      return;
+    }
+    if (reason === 'no_pin' || reason === 'pin_not_set') {
+      await showNeedSetPin();
+      return;
+    }
+    if (reason === 'token_expired' || reason === 'token_invalid') {
+      showTokenExpired(reason === 'token_expired' ? 'QR หมดอายุ กรุณาสแกนใหม่' : 'Token ไม่ถูกต้อง');
+      return;
+    }
+
+    const msg = (r.body && r.body.message) || reason || `HTTP ${r.status}`;
+    showError('ลงเวลาไม่สำเร็จ: ' + msg, () => showReady());
+  }
+
+  function showError(msg, onRetry) {
+    setHTML(`
+      <div class="center">
+        <div class="big-emoji">⚠️</div>
+        <h2 style="margin:6px 0">เกิดข้อผิดพลาด</h2>
+        <div class="alert alert-error">${escapeHtml(msg)}</div>
+      </div>
+      <button class="btn btn-primary" id="btnRetry">ลองอีกครั้ง</button>
+    `);
+    $('btnRetry').addEventListener('click', () => onRetry && onRetry());
+  }
+
+  // ---------- Init ----------
+  async function init() {
+    state.token = getToken();
+    if (!state.token) {
+      showError('ไม่พบ token ใน URL — กรุณาสแกน QR ใหม่');
+      return;
+    }
+
+    // 1) verify token
+    showLoading('กำลังตรวจสอบ QR...');
+    const v = await api('/api/attendance/verify-token', {
+      method: 'POST',
+      body: JSON.stringify({ token: state.token }),
+    });
+    if (!v.ok || !v.body || !v.body.valid) {
+      const reason = (v.body && v.body.reason) || 'token ไม่ถูกต้อง';
+      showTokenExpired(reason);
+      return;
+    }
+    state.tokenValid = true;
+
+    // 2) check identity
+    const me = await api('/auth/me');
+    if (me.status === 401 || !me.ok) {
+      showNotLoggedIn();
+      return;
+    }
+    state.user = (me.body && (me.body.user || me.body)) || null;
+    if (!state.user) {
+      showNotLoggedIn();
+      return;
+    }
+
+    // 3) check link by `emp_linked` field if present, else go straight to Ready
+    //    actual mismatch will surface at checkin (not_linked)
+    const linked = state.user.emp_linked === true || !!state.user.emp_code;
+    if (!linked && state.user.emp_linked === false) {
+      await showNeedRelink();
+      return;
+    }
+    showReady();
+  }
+
+  window.addEventListener('beforeunload', stopCamera);
+  init().catch(err => {
+    console.error(err);
+    showError('เกิดข้อผิดพลาด: ' + (err.message || err), () => init());
+  });
+})();
+</script>
+</body>
+</html>

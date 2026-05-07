@@ -176,6 +176,20 @@ app.post('/api/tech-jobs', forwardWithCookie('POST'));
 app.put('/api/tech-jobs/:id', forwardWithCookie('PUT'));
 app.delete('/api/tech-jobs/:id', forwardWithCookie('DELETE'));
 
+// Attendance (QR check-in)
+app.get('/api/attendance/qr-token', forwardWithCookie('GET'));
+app.get('/api/attendance/today', forwardWithCookie('GET'));
+app.post('/api/attendance/manual', forwardWithCookie('POST'));
+app.post('/api/attendance/verify-token', forwardWithCookie('POST'));
+app.post('/api/attendance/checkin', forwardWithCookie('POST'));
+app.post('/api/attendance/set-pin', forwardWithCookie('POST'));
+app.get('/api/attendance/active-employees', forwardWithCookie('GET'));
+
+// Mobile attendance scan page (public — token required in query)
+app.get('/attendance/scan', (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'admin-panel', 'attendance-scan.html'));
+});
+
 // ============ MARKETPLACE PROXIES ============
 app.get('/api/marketplace/status', forwardWithCookie('GET'));
 app.get('/api/marketplace/lazada/config', forwardWithCookie('GET'));

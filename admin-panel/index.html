@@ -752,6 +752,9 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read">
       <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
     </a>
+    <a onclick="showPage('qr-att')" data-page="qr-att" data-perm="hr:read">
+      <span class="icon">📱</span> <span>QR ลงเวลา</span>
+    </a>
     <a onclick="showPage('users')" data-page="users" data-owner-only>
       <span class="icon">👥</span> <span>ผู้ใช้ระบบ</span>
     </a>
@@ -1436,6 +1439,94 @@ input:focus, textarea:focus, select:focus {
     </div>
   </div>
 
+<div id="page-qr-att" class="page" style="display:none;" data-perm="hr:read">
+  <div class="page-header">
+    <h2>📱 QR ลงเวลา</h2>
+    <p>แสดง QR Code สำหรับพนักงานสแกนลงเวลา · เปลี่ยนทุก 30 วินาที</p>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+    <!-- LEFT: QR Display -->
+    <div class="card" id="qrCard" style="text-align:center;">
+      <div style="margin-bottom:12px;">
+        <button class="btn btn-primary btn-sm" onclick="enterQrFullscreen()">🔳 เต็มจอ</button>
+        <button class="btn btn-secondary btn-sm" onclick="refreshQrToken()">🔄 รีเฟรช</button>
+      </div>
+      <div id="qrcodeBox" style="display:flex; justify-content:center; padding:20px; background:#fff; border-radius:8px;">
+        <div id="qrcodeImg"></div>
+      </div>
+      <div style="margin-top:14px;">
+        <div style="font-size:32px; font-weight:bold; color:var(--text-primary);" id="qrTime">--:--:--</div>
+        <div style="font-size:14px; color:#666; margin-top:6px;">
+          เปลี่ยนใน <span id="qrCountdown" style="font-weight:bold; color:#0a8;">--</span> วินาที
+        </div>
+        <div style="font-size:11px; color:#999; margin-top:8px;" id="qrUrl"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Today's logs -->
+    <div class="card">
+      <h3 style="margin-top:0;">📋 ลงเวลาวันนี้</h3>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button class="btn btn-primary btn-sm" onclick="openManualAttModal()">👨‍💼 ลงเวลาให้พนักงาน</button>
+        <button class="btn btn-secondary btn-sm" onclick="loadTodayAttendance()">🔄 รีเฟรช</button>
+      </div>
+      <div id="qrSummary" style="display:flex; gap:10px; margin-bottom:10px; font-size:13px;"></div>
+      <div style="max-height:500px; overflow-y:auto;">
+        <table class="data-table" style="font-size:13px;">
+          <thead><tr><th>เวลา</th><th>ชื่อ</th><th>ประเภท</th><th>แหล่ง</th></tr></thead>
+          <tbody id="qrTodayBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Attendance Modal -->
+<div class="modal" id="manualAttModal">
+  <div class="modal-content" style="max-width:420px;">
+    <button class="close-btn" onclick="closeManualAttModal()">×</button>
+    <h2>👨‍💼 ลงเวลาให้พนักงาน</h2>
+    <div style="font-size:12px; color:#856404; background:#fff3cd; padding:8px; border-radius:6px; margin-bottom:12px;">
+      ⚠️ ใช้กรณีพนักงานลงเวลาเองไม่ได้ (มือถือเสีย/ลืม)
+    </div>
+    <div><label>พนักงาน *</label>
+      <select id="maEmpSelect" style="width:100%; padding:8px;"></select>
+    </div>
+    <div style="margin-top:10px;"><label>ประเภท *</label>
+      <select id="maType" style="width:100%; padding:8px;">
+        <option value="check_in">เข้างาน</option>
+        <option value="check_out">ออกงาน</option>
+      </select>
+    </div>
+    <div style="margin-top:10px;"><label>เวลา</label>
+      <input type="datetime-local" id="maTs" style="width:100%;">
+    </div>
+    <div style="margin-top:10px;"><label>เหตุผล *</label>
+      <input type="text" id="maReason" placeholder="เช่น มือถือเสีย, ลืมสแกน" style="width:100%;">
+    </div>
+    <div id="maStatus" style="margin-top:10px;"></div>
+    <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeManualAttModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveManualAtt()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR Fullscreen overlay -->
+<div id="qrFullscreen" style="display:none; position:fixed; inset:0; background:#fff; z-index:99999; flex-direction:column; align-items:center; justify-content:center;">
+  <div style="position:absolute; top:20px; right:20px;">
+    <button class="btn btn-secondary" onclick="exitQrFullscreen()">✕ ออก (Esc)</button>
+  </div>
+  <h1 style="font-size:36px; margin-bottom:20px; color:#0a8;">📱 ลงเวลาเข้า-ออกงาน</h1>
+  <div id="qrFullImg" style="padding:30px; background:#fff;"></div>
+  <div style="font-size:60px; font-weight:bold; margin-top:30px;" id="qrFullTime">--:--:--</div>
+  <div style="font-size:24px; color:#666; margin-top:10px;">เปลี่ยนใน <span id="qrFullCountdown" style="font-weight:bold; color:#0a8;">--</span> วินาที</div>
+  <div style="margin-top:20px; padding:12px 20px; background:#f0f9f5; border-radius:8px; font-size:18px;">
+    📷 สแกนด้วยกล้องมือถือ → เปิดใน LINE
+  </div>
+</div>
+
   <!-- ============ USERS PAGE (owner only) ============ -->
   <div id="page-users" class="page" style="display:none;" data-owner-only>
     <div class="page-header">
@@ -1777,6 +1868,7 @@ function showPage(page) {
   if (page === 'cameras') loadCameras();
   if (page === 'hr') loadHr();
   if (page === 'marketplace') loadMarketplace();
+  if (page === 'qr-att') loadQrAttendance();
   if (page === 'users') loadAdminUsers();
   if (page === 'reports') {
     if (!document.getElementById('rFrom').value) setReportPeriod('today');
@@ -5370,6 +5462,198 @@ async function syncMarketplace(provider) {
     loadMarketplace();
   } catch (e) { alert('❌ ' + e.message); }
   finally { btn.disabled = false; btn.textContent = '🔄 Sync orders'; }
+}
+
+// ============ QR ATTENDANCE ============
+var qrTimer = null;
+var qrCountdownTimer = null;
+var qrCurrentToken = null;
+var qrExpiresAt = null;
+var qrInFullscreen = false;
+var qrCodeInstance = null;
+var qrCodeFullInstance = null;
+
+function getQrUrl(token) {
+  return location.origin + '/attendance/scan?token=' + encodeURIComponent(token);
+}
+
+async function loadQrAttendance() {
+  if (typeof QRCode === 'undefined') {
+    await new Promise(function(resolve) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+  }
+  await loadEmployees();
+  populateMaEmpSelect();
+  refreshQrToken();
+  loadTodayAttendance();
+  startQrTimers();
+}
+
+function populateMaEmpSelect() {
+  var sel = document.getElementById('maEmpSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
+  (allEmployees || []).filter(function(e){ return e.active !== false; }).forEach(function(e) {
+    var o = document.createElement('option');
+    o.value = e.emp_code;
+    o.textContent = e.emp_code + ' - ' + (e.nickname || e.name);
+    sel.appendChild(o);
+  });
+  var now = new Date();
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  document.getElementById('maTs').value = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate()) + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+}
+
+async function refreshQrToken() {
+  try {
+    var r = await fetch('/api/attendance/qr-token');
+    var d = await r.json();
+    if (d.error) { console.error(d); return; }
+    qrCurrentToken = d.token;
+    qrExpiresAt = new Date(d.expires_at).getTime();
+    var url = getQrUrl(d.token);
+    renderQr('qrcodeImg', url, 240);
+    if (qrInFullscreen) renderQr('qrFullImg', url, 360);
+    var u = document.getElementById('qrUrl');
+    if (u) u.textContent = url;
+  } catch (e) { console.error('refreshQrToken:', e); }
+}
+
+function renderQr(elId, text, size) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = '';
+  new QRCode(el, { text: text, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+}
+
+function startQrTimers() {
+  stopQrTimers();
+  qrCountdownTimer = setInterval(updateQrCountdown, 1000);
+  updateQrCountdown();
+}
+
+function stopQrTimers() {
+  if (qrCountdownTimer) { clearInterval(qrCountdownTimer); qrCountdownTimer = null; }
+}
+
+function updateQrCountdown() {
+  if (!qrExpiresAt) return;
+  var now = Date.now();
+  var remain = Math.max(0, Math.floor((qrExpiresAt - now) / 1000));
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  var d = new Date();
+  var timeStr = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  var t1 = document.getElementById('qrTime'); if (t1) t1.textContent = timeStr;
+  var c1 = document.getElementById('qrCountdown'); if (c1) c1.textContent = remain;
+  var t2 = document.getElementById('qrFullTime'); if (t2) t2.textContent = timeStr;
+  var c2 = document.getElementById('qrFullCountdown'); if (c2) c2.textContent = remain;
+  if (remain <= 0) refreshQrToken();
+}
+
+function enterQrFullscreen() {
+  qrInFullscreen = true;
+  var el = document.getElementById('qrFullscreen');
+  el.style.display = 'flex';
+  if (qrCurrentToken) renderQr('qrFullImg', getQrUrl(qrCurrentToken), 360);
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(function(){});
+  }
+}
+
+function exitQrFullscreen() {
+  qrInFullscreen = false;
+  document.getElementById('qrFullscreen').style.display = 'none';
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && qrInFullscreen) exitQrFullscreen();
+});
+
+async function loadTodayAttendance() {
+  try {
+    var r = await fetch('/api/attendance/today');
+    var d = await r.json();
+    if (d.error) { console.error(d); return; }
+    var sum = d.summary || {};
+    var sumEl = document.getElementById('qrSummary');
+    if (sumEl) sumEl.innerHTML =
+      '<span style="background:#e8f5e9; color:#2e7d32; padding:4px 10px; border-radius:6px;">เข้างาน: <b>' + (sum.check_in||0) + '</b></span>' +
+      '<span style="background:#fff3e0; color:#e65100; padding:4px 10px; border-radius:6px;">ออกงาน: <b>' + (sum.check_out||0) + '</b></span>' +
+      '<span style="background:#fce4ec; color:#880e4f; padding:4px 10px; border-radius:6px;">Manual: <b>' + (sum.manual||0) + '</b></span>';
+    var html = '';
+    if (!d.logs || d.logs.length === 0) {
+      html = '<tr><td colspan="4" style="text-align:center; color:#999; padding:16px;">ยังไม่มีลงเวลาวันนี้</td></tr>';
+    } else {
+      d.logs.forEach(function(l) {
+        var t = new Date(l.recordTime);
+        var pad = function(n){ return String(n).padStart(2,'0'); };
+        var ts = pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds());
+        var name = l.emp_name || l.emp_nickname || l.emp_code || ('ZK:' + (l.userId || '-'));
+        var typeLabel = l.type === 'check_in' ? '<span style="color:#2e7d32;">✅ เข้างาน</span>' :
+                        l.type === 'check_out' ? '<span style="color:#e65100;">🚪 ออกงาน</span>' :
+                        escapeHtml(l.type || '');
+        var srcLabel = l.source === 'qr_mobile' ? '📱 QR' :
+                       l.source === 'manual_by_manager' ? '👨‍💼 Manual' :
+                       l.source === 'zk_device' ? '🖐️ เครื่อง' :
+                       escapeHtml(l.source || '');
+        html += '<tr>';
+        html += '<td>' + ts + '</td>';
+        html += '<td>' + escapeHtml(name) + '</td>';
+        html += '<td>' + typeLabel + '</td>';
+        html += '<td>' + srcLabel + '</td>';
+        html += '</tr>';
+      });
+    }
+    var body = document.getElementById('qrTodayBody');
+    if (body) body.innerHTML = html;
+  } catch (e) { console.error('loadTodayAttendance:', e); }
+}
+
+function openManualAttModal() {
+  populateMaEmpSelect();
+  document.getElementById('maReason').value = '';
+  document.getElementById('maStatus').textContent = '';
+  document.getElementById('manualAttModal').classList.add('active');
+}
+function closeManualAttModal() { document.getElementById('manualAttModal').classList.remove('active'); }
+
+async function saveManualAtt() {
+  var data = {
+    emp_code: document.getElementById('maEmpSelect').value,
+    type: document.getElementById('maType').value,
+    ts: new Date(document.getElementById('maTs').value).toISOString(),
+    reason: document.getElementById('maReason').value.trim()
+  };
+  if (!data.emp_code || !data.reason) {
+    document.getElementById('maStatus').innerHTML = '<span style="color:#d33;">❌ กรอกพนักงาน + เหตุผล</span>';
+    return;
+  }
+  try {
+    var r = await fetch('/api/attendance/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    var result = await r.json();
+    if (!r.ok || result.error) throw new Error(result.error || 'failed');
+    document.getElementById('maStatus').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว</span>';
+    setTimeout(function(){ closeManualAttModal(); loadTodayAttendance(); }, 600);
+  } catch (e) {
+    document.getElementById('maStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+var _origShowPage_qrAtt = window.showPage;
+if (typeof _origShowPage_qrAtt === 'function') {
+  window.showPage = function(page) {
+    if (page !== 'qr-att') stopQrTimers();
+    return _origShowPage_qrAtt.apply(this, arguments);
+  };
 }
 </script>
 
