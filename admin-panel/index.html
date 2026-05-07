@@ -746,6 +746,9 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('hr')" data-page="hr" data-perm="hr:read">
       <span class="icon">🧑‍💼</span> <span>พนักงาน</span>
     </a>
+    <a onclick="showPage('payroll')" data-page="payroll" data-perm="hr:read">
+      <span class="icon">💰</span> <span>เงินเดือน</span>
+    </a>
     <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read">
       <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
     </a>
@@ -1336,6 +1339,73 @@ input:focus, textarea:focus, select:focus {
     </div>
   </div>
 
+  <!-- ============ PAYROLL PAGE (เงินเดือน) ============ -->
+  <div id="page-payroll" class="page" style="display:none;" data-perm="hr:read">
+    <div class="page-header">
+      <h2>💰 เงินเดือน</h2>
+      <p>คำนวณ & ออกสลิปเงินเดือน · รอบรายสัปดาห์ / รายเดือน</p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+        <div>
+          <label style="display:block; font-size:12px; color:#666;">เริ่มรอบ</label>
+          <input type="date" id="payPeriodStart" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; color:#666;">สิ้นรอบ</label>
+          <input type="date" id="payPeriodEnd" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="setPayrollPreset('first-half')">ครึ่งเดือนแรก</button>
+          <button class="btn btn-secondary btn-sm" onclick="setPayrollPreset('second-half')">ครึ่งเดือนหลัง</button>
+          <button class="btn btn-secondary btn-sm" onclick="setPayrollPreset('whole-month')">ทั้งเดือนนี้</button>
+        </div>
+        <div style="flex:1;"></div>
+        <button class="btn btn-primary" onclick="loadPayrollPreview()">🔍 คำนวณ Preview</button>
+        <button class="btn btn-secondary btn-sm" onclick="loadPayrollList()">📜 สลิปที่ commit แล้ว</button>
+      </div>
+      <div id="payrollMsg" style="margin-top:8px; font-size:13px;"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h3 style="margin:0;">ผลลัพธ์</h3>
+        <div>
+          <span id="payrollSummary" style="font-size:13px; color:#444;"></span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table" id="payrollTable" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Code</th><th>ชื่อ</th><th class="num">วันทำงาน</th>
+              <th class="num">ฐาน</th><th class="num">คอมช่าง</th>
+              <th class="num">หัก</th><th class="num">สุทธิ</th>
+              <th>สถานะ</th><th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="payrollTableBody"><tr><td colspan="9" style="text-align:center; color:#888;">เลือกรอบแล้วกด Preview</td></tr></tbody>
+        </table>
+      </div>
+      <div id="payrollFooter" style="margin-top:12px; display:none; gap:8px; justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="sendAllPayslipsLine()">📲 ส่ง LINE ทุกคน</button>
+        <button class="btn btn-primary" onclick="commitPayroll()" data-perm="hr:write">💾 บันทึก commit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: payslip detail -->
+  <div id="payslipModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 id="payslipModalTitle">รายละเอียดสลิป</h3>
+        <button class="close-btn" onclick="closePayslipModal()">×</button>
+      </div>
+      <div class="modal-body" id="payslipModalBody"></div>
+    </div>
+  </div>
+
   <!-- ============ MARKETPLACE PAGE ============ -->
   <div id="page-marketplace" class="page" style="display:none;" data-perm="marketplace:read">
     <div class="page-header">
@@ -1851,6 +1921,7 @@ function showPage(page) {
   if (page === 'members') loadMembers();
   if (page === 'cameras') loadCameras();
   if (page === 'hr') loadHr();
+  if (page === 'payroll') initPayrollPage();
   if (page === 'marketplace') loadMarketplace();
   if (page === 'qr-att') loadQrAttendance();
   if (page === 'users') loadAdminUsers();
@@ -5647,6 +5718,225 @@ if (typeof _origShowPage_qrAtt === 'function') {
     return _origShowPage_qrAtt.apply(this, arguments);
   };
 }
+
+// ============ PAYROLL (Phase 3) ============
+var _payrollSlips = [];
+var _payrollCommitted = false; // ถ้า list มาจาก committed records → disable commit
+
+function initPayrollPage() {
+  // default: ครึ่งเดือนแรกของเดือนปัจจุบัน
+  var s = document.getElementById('payPeriodStart');
+  var e = document.getElementById('payPeriodEnd');
+  if (!s.value && !e.value) setPayrollPreset('first-half');
+}
+
+function setPayrollPreset(kind) {
+  var now = new Date();
+  var y = now.getFullYear(), m = now.getMonth();
+  function fmt(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  var s, e;
+  if (kind === 'first-half') { s = new Date(y,m,1); e = new Date(y,m,15); }
+  else if (kind === 'second-half') { s = new Date(y,m,16); e = new Date(y,m+1,0); }
+  else { s = new Date(y,m,1); e = new Date(y,m+1,0); }
+  document.getElementById('payPeriodStart').value = fmt(s);
+  document.getElementById('payPeriodEnd').value = fmt(e);
+}
+
+function _payrollMsg(text, kind) {
+  var el = document.getElementById('payrollMsg');
+  if (!el) return;
+  var color = kind === 'err' ? '#c0392b' : kind === 'ok' ? '#0a7a2e' : '#666';
+  el.style.color = color;
+  el.textContent = text || '';
+}
+
+function _payrollPeriod() {
+  var ps = document.getElementById('payPeriodStart').value;
+  var pe = document.getElementById('payPeriodEnd').value;
+  if (!ps || !pe) { _payrollMsg('กรุณาระบุช่วงรอบ','err'); return null; }
+  if (ps > pe) { _payrollMsg('ช่วงไม่ถูกต้อง','err'); return null; }
+  return { period_start: ps, period_end: pe };
+}
+
+function _fmt(n) {
+  return Number(n||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function loadPayrollPreview() {
+  var p = _payrollPeriod(); if (!p) return;
+  _payrollMsg('กำลังคำนวณ…');
+  try {
+    var r = await fetch('/api/payroll/preview-all?period_start=' + p.period_start + '&period_end=' + p.period_end);
+    var data = await r.json();
+    if (!r.ok) { _payrollMsg('ผิดพลาด: ' + (data.error || r.status),'err'); return; }
+    _payrollSlips = data.payslips || [];
+    _payrollCommitted = false;
+    renderPayrollTable(_payrollSlips, false);
+    _payrollMsg('คำนวณ preview — ' + _payrollSlips.length + ' คน (ยังไม่ commit)','ok');
+  } catch (e) {
+    _payrollMsg('Error: ' + e.message,'err');
+  }
+}
+
+async function loadPayrollList() {
+  var p = _payrollPeriod(); if (!p) return;
+  _payrollMsg('โหลดสลิปที่ commit…');
+  try {
+    var r = await fetch('/api/payroll/list?period_start=' + p.period_start + '&period_end=' + p.period_end);
+    var data = await r.json();
+    if (!r.ok) { _payrollMsg('ผิดพลาด: ' + (data.error || r.status),'err'); return; }
+    _payrollSlips = data.payslips || [];
+    _payrollCommitted = _payrollSlips.length > 0;
+    renderPayrollTable(_payrollSlips, _payrollCommitted);
+    _payrollMsg('สลิปที่ commit แล้ว — ' + _payrollSlips.length + ' รายการ','ok');
+  } catch (e) {
+    _payrollMsg('Error: ' + e.message,'err');
+  }
+}
+
+function renderPayrollTable(slips, committed) {
+  var tb = document.getElementById('payrollTableBody');
+  var footer = document.getElementById('payrollFooter');
+  if (!slips || slips.length === 0) {
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#888;">ไม่มีข้อมูล</td></tr>';
+    footer.style.display = 'none';
+    document.getElementById('payrollSummary').textContent = '';
+    return;
+  }
+  var totalGross=0, totalDeduct=0, totalNet=0;
+  tb.innerHTML = slips.map(function(s) {
+    totalGross += Number(s.gross||0);
+    totalDeduct += Number(s.total_deduction||0);
+    totalNet += Number(s.final_pay||0);
+    var statusBadge;
+    if (s.status === 'paid') statusBadge = '<span style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:10px; font-size:11px;">✓ จ่ายแล้ว</span>';
+    else if (s.status === 'pending_payment') statusBadge = '<span style="background:#fff3cd; color:#856404; padding:2px 8px; border-radius:10px; font-size:11px;">รอจ่าย</span>';
+    else statusBadge = '<span style="color:#888; font-size:11px;">preview</span>';
+    var actions = '<button class="btn btn-sm" onclick="showPayslip(\'' + (s.id || s.emp_code) + '\')" style="padding:3px 8px;">👁</button>';
+    if (committed && s.id) {
+      actions += ' <button class="btn btn-sm" onclick="openPayslipPdf(\'' + s.id + '\')" style="padding:3px 8px;">PDF</button>';
+      actions += ' <button class="btn btn-sm" onclick="sendPayslipLine(\'' + s.id + '\')" style="padding:3px 8px;">📲</button>';
+      if (s.status !== 'paid') actions += ' <button class="btn btn-sm btn-primary" onclick="markPayslipPaid(\'' + s.id + '\')" style="padding:3px 8px;">✓</button>';
+    }
+    return '<tr>' +
+      '<td>' + s.emp_code + '</td>' +
+      '<td>' + (s.name || '-') + '</td>' +
+      '<td class="num">' + s.days_worked + '/' + s.days_in_period + '</td>' +
+      '<td class="num">' + _fmt(s.base_earning) + '</td>' +
+      '<td class="num">' + _fmt(s.tech_commission) + '</td>' +
+      '<td class="num" style="color:#c0392b;">' + _fmt(s.total_deduction) + '</td>' +
+      '<td class="num" style="font-weight:bold;">' + _fmt(s.final_pay) +
+        (s.new_carryover < 0 ? ' <small style="color:#a00;">(ติดลบ)</small>' : '') + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td>' + actions + '</td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('payrollSummary').textContent =
+    'รวมรายได้ ' + _fmt(totalGross) + ' · หัก ' + _fmt(totalDeduct) +
+    ' · สุทธิ ' + _fmt(totalNet) + ' ฿';
+  footer.style.display = 'flex';
+}
+
+function showPayslip(idOrCode) {
+  var s = _payrollSlips.find(function(x) { return x.id === idOrCode || x.emp_code === idOrCode; });
+  if (!s) return;
+  var body = document.getElementById('payslipModalBody');
+  var html = '';
+  html += '<p><b>' + (s.name||'-') + '</b> (' + s.emp_code + ')</p>';
+  html += '<p style="color:#666; font-size:13px;">รอบ: ' + s.period_start + ' ถึง ' + s.period_end + '</p>';
+  html += '<table class="table" style="width:100%; font-size:13px;"><tbody>';
+  html += '<tr><td>เงินเดือน/รายวัน</td><td class="num">' + _fmt(s.base_earning) + '</td></tr>';
+  if (s.tech_commission > 0) html += '<tr><td>คอมช่าง (' + (s.tech_jobs_included||[]).length + ' งาน)</td><td class="num">+' + _fmt(s.tech_commission) + '</td></tr>';
+  html += '<tr style="font-weight:bold; border-top:1px solid #ddd;"><td>รวมรายได้</td><td class="num">' + _fmt(s.gross) + '</td></tr>';
+  if (s.time_deduction > 0) html += '<tr><td>หักเวลา (สาย ' + s.late_minutes + '/ออกก่อน ' + s.early_minutes + '/พักเกิน ' + s.excess_break_minutes + '/ขาด ' + s.absent_deduct_minutes + ' นาที)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.time_deduction) + '</td></tr>';
+  if (s.social_security > 0) html += '<tr><td>ประกันสังคม 5%</td><td class="num" style="color:#c0392b;">-' + _fmt(s.social_security) + '</td></tr>';
+  if (s.advance_deduction > 0) html += '<tr><td>เบิกล่วงหน้า (' + (s.advances_included||[]).length + ' รายการ)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.advance_deduction) + '</td></tr>';
+  if (s.carryover_deduction > 0) html += '<tr><td>ยอดค้างงวดก่อน</td><td class="num" style="color:#c0392b;">-' + _fmt(s.carryover_deduction) + '</td></tr>';
+  html += '<tr style="font-weight:bold; border-top:1px solid #ddd;"><td>รวมหัก</td><td class="num">' + _fmt(s.total_deduction) + '</td></tr>';
+  html += '<tr style="font-weight:bold; font-size:15px; border-top:2px solid #000;"><td>เงินสุทธิ</td><td class="num">' + _fmt(s.final_pay) + '</td></tr>';
+  html += '</tbody></table>';
+  if (s.new_carryover < 0) html += '<p style="color:#a00; font-size:12px;">⚠ ติดลบ ' + _fmt(Math.abs(s.new_carryover)) + ' ฿ — ยกไปงวดถัดไป</p>';
+  html += '<p style="font-size:12px; color:#888;">วันทำงาน ' + s.days_worked + '/' + s.days_in_period + ' วัน' + (s.days_absent>0?' · ขาด/ลา ' + s.days_absent + ' วัน':'') + '</p>';
+  body.innerHTML = html;
+  document.getElementById('payslipModal').style.display = 'flex';
+}
+
+function closePayslipModal() {
+  document.getElementById('payslipModal').style.display = 'none';
+}
+
+function openPayslipPdf(id) {
+  window.open('/api/payroll/' + encodeURIComponent(id) + '/pdf', '_blank');
+}
+
+async function commitPayroll() {
+  if (_payrollCommitted) { _payrollMsg('รอบนี้ commit แล้ว','err'); return; }
+  if (!_payrollSlips || _payrollSlips.length === 0) { _payrollMsg('ยังไม่มีข้อมูล preview','err'); return; }
+  var p = _payrollPeriod(); if (!p) return;
+  if (!confirm('ยืนยัน commit รอบ ' + p.period_start + ' ถึง ' + p.period_end + ' (' + _payrollSlips.length + ' คน) ?\n\n⚠ หลัง commit — เบิกล่วงหน้า/งานช่าง จะถูก mark ปิดรอบ')) return;
+  _payrollMsg('กำลัง commit…');
+  try {
+    var r = await fetch('/api/payroll/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ period_start: p.period_start, period_end: p.period_end, payslips: _payrollSlips })
+    });
+    var data = await r.json();
+    if (!r.ok) { _payrollMsg('ผิดพลาด: ' + (data.error || r.status),'err'); return; }
+    _payrollSlips = data.payslips || [];
+    _payrollCommitted = true;
+    renderPayrollTable(_payrollSlips, true);
+    _payrollMsg('✓ บันทึกสำเร็จ — batch ' + data.batch_id,'ok');
+  } catch (e) {
+    _payrollMsg('Error: ' + e.message,'err');
+  }
+}
+
+async function markPayslipPaid(id) {
+  var method = prompt('จ่ายผ่านช่องไหน? (cash / transfer / promptpay)', 'cash');
+  if (!method) return;
+  try {
+    var r = await fetch('/api/payroll/' + encodeURIComponent(id) + '/mark-paid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paid_method: method })
+    });
+    var data = await r.json();
+    if (!r.ok) { alert('ผิดพลาด: ' + (data.error || r.status)); return; }
+    var idx = _payrollSlips.findIndex(function(s) { return s.id === id; });
+    if (idx >= 0) _payrollSlips[idx] = data.payslip;
+    renderPayrollTable(_payrollSlips, true);
+    _payrollMsg('✓ mark จ่ายแล้ว ' + data.payslip.emp_code,'ok');
+  } catch (e) { alert(e.message); }
+}
+
+async function sendPayslipLine(id) {
+  if (!confirm('ส่งสลิปทาง LINE ให้พนักงาน?')) return;
+  try {
+    var r = await fetch('/api/payroll/' + encodeURIComponent(id) + '/send-line', { method: 'POST' });
+    var data = await r.json();
+    if (!r.ok) { alert('ผิดพลาด: ' + (data.error || r.status)); return; }
+    _payrollMsg(data.mock ? '⚠ mock (ยังไม่ได้ตั้ง LINE token)' : '✓ ส่ง LINE สำเร็จ','ok');
+  } catch (e) { alert(e.message); }
+}
+
+async function sendAllPayslipsLine() {
+  if (!_payrollCommitted) { _payrollMsg('ต้อง commit ก่อนจึงส่ง LINE','err'); return; }
+  if (!confirm('ส่งสลิปผ่าน LINE ให้ทุกคน (' + _payrollSlips.length + ' คน)?')) return;
+  var ok=0, fail=0;
+  for (var i=0; i<_payrollSlips.length; i++) {
+    var s = _payrollSlips[i];
+    if (!s.id) continue;
+    try {
+      var r = await fetch('/api/payroll/' + encodeURIComponent(s.id) + '/send-line', { method: 'POST' });
+      if (r.ok) ok++; else fail++;
+    } catch (e) { fail++; }
+  }
+  _payrollMsg('✓ ส่งสำเร็จ ' + ok + ' · ผิดพลาด ' + fail,'ok');
+}
+
 </script>
 
 <!-- User Edit Modal (owner only) -->
