@@ -176,6 +176,31 @@ app.post('/api/tech-jobs', forwardWithCookie('POST'));
 app.put('/api/tech-jobs/:id', forwardWithCookie('PUT'));
 app.delete('/api/tech-jobs/:id', forwardWithCookie('DELETE'));
 
+// ============ PAYROLL PROXIES (Phase 3) ============
+app.get('/api/payroll/preview', forwardWithCookie('GET'));
+app.get('/api/payroll/preview-all', forwardWithCookie('GET'));
+app.post('/api/payroll/commit', forwardWithCookie('POST'));
+app.get('/api/payroll/list', forwardWithCookie('GET'));
+app.post('/api/payroll/:id/mark-paid', forwardWithCookie('POST'));
+app.post('/api/payroll/:id/send-line', forwardWithCookie('POST'));
+// PDF — binary stream (ต้อง forward cookie + arrayBuffer)
+app.get('/api/payroll/:id/pdf', async function(req, res) {
+  try {
+    var url = LOCAL_API_BASE + '/api/payroll/' + req.params.id + '/pdf';
+    var r = await fetch(url, {
+      method: 'GET',
+      headers: { 'cookie': req.headers.cookie || '' }
+    });
+    if (!r.ok) {
+      var t = await r.text();
+      return res.status(r.status).send(t);
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', r.headers.get('content-disposition') || 'inline');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Attendance (QR check-in)
 app.get('/api/attendance/qr-token', forwardWithCookie('GET'));
 app.get('/api/attendance/today', forwardWithCookie('GET'));

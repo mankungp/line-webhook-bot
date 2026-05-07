@@ -734,9 +734,6 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('orders')" data-page="orders" data-perm="orders:read">
       <span class="icon">🧾</span> <span>ออร์เดอร์</span>
     </a>
-    <a onclick="showPage('customers')" data-page="customers" data-perm="members:read">
-      <span class="icon">👥</span> <span>ลูกค้า</span>
-    </a>
     <a onclick="showPage('members')" data-page="members" data-perm="members:read">
       <span class="icon">⭐</span> <span>สมาชิก</span>
     </a>
@@ -1121,24 +1118,6 @@ input:focus, textarea:focus, select:focus {
   </div>
 
   <!-- ============ CUSTOMERS PAGE ============ -->
-  <div id="page-customers" class="page" style="display:none;">
-    <div class="page-header">
-      <h2>👥 ลูกค้า</h2>
-      <p>ข้อมูลลูกค้าที่สนทนากับ Bot</p>
-    </div>
-
-    <div class="card">
-      <div class="toolbar">
-        <button class="btn btn-secondary" onclick="loadCustomers()">รีเฟรช</button>
-        <input type="text" class="search-box" id="cSearchBox" placeholder="ค้นหาลูกค้า..." onkeyup="loadCustomers()">
-      </div>
-      <div style="margin-bottom:12px;font-size:14px;color:#666;font-weight:600;">รายชื่อลูกค้า</div>
-      <div id="customerList" style="max-height:600px;overflow-y:auto;">
-        <div class="empty-state">กำลังโหลด...</div>
-      </div>
-    </div>
-  </div>
-
   <!-- ============ CAMERAS PAGE ============ -->
   <div id="page-cameras" class="page" style="display:none;">
     <div class="page-header">
@@ -1869,7 +1848,6 @@ function showPage(page) {
   if (page === 'bot') loadBotCustomers();
   if (page === 'products') loadProducts();
   if (page === 'orders') loadOrders();
-  if (page === 'customers') loadCustomers();
   if (page === 'members') loadMembers();
   if (page === 'cameras') loadCameras();
   if (page === 'hr') loadHr();
@@ -2472,43 +2450,6 @@ async function cancelOrder(id) {
 }
 
 // ============ CUSTOMERS ============
-async function loadCustomers() {
-  var search = encodeURIComponent(document.getElementById('cSearchBox').value);
-  var url = '/api/customers';
-  if (search) url += '?search=' + search;
-
-  try {
-    var res = await fetch(url);
-    var list = await res.json();
-    renderCustomers(list);
-  } catch (e) {
-    document.getElementById('customerList').innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อ API ได้</div>';
-  }
-}
-
-function renderCustomers(list) {
-  var el = document.getElementById('customerList');
-  if (!list || list.length === 0) {
-    el.innerHTML = '<div class="empty-state">ยังไม่มีลูกค้า</div>';
-    return;
-  }
-  var html = '';
-  list.forEach(function(c) {
-    var date = c.lastSeen ? new Date(c.lastSeen) : null;
-    var dateStr = date ? (date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })) : '-';
-    html += '<div class="customer-item">';
-    html += '<div><div class="avatar">👤</div>';
-    html += '<div>';
-    html += '<div class="customer-name">' + escapeHtml(c.displayName || c.name || 'ลูกค้า') + '</div>';
-    if (c.phone) html += '<div style="font-size:12px;color:#666;">📞 ' + escapeHtml(c.phone) + '</div>';
-    html += '<div class="customer-id">' + c.userId.substring(0, 40) + '...</div>';
-    html += '<div class="customer-meta">เข้าล่าสุด: ' + dateStr + '</div>';
-    html += '</div></div>';
-    html += '</div>';
-  });
-  el.innerHTML = html;
-}
-
 // ============ HELPERS ============
 function getCatName(cat) {
   var names = { agricultural: 'เครื่องเกษตร', motorcycle: 'อะไหล่มอเตอร์ไซค์', lawnmower: 'เครื่องตัดหญ้า', pump: 'เครื่องสูบน้ำ', other: 'อื่นๆ' };
