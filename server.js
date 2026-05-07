@@ -158,6 +158,24 @@ app.get('/api/users', forwardWithCookie('GET'));
 app.put('/api/users/:lineUserId', forwardWithCookie('PUT'));
 app.delete('/api/users/:lineUserId', forwardWithCookie('DELETE'));
 
+// ============ HR / EMPLOYEES / ATTENDANCE PROXIES ============
+app.get('/api/employees', forwardWithCookie('GET'));
+app.post('/api/employees', forwardWithCookie('POST'));
+app.put('/api/employees/:code', forwardWithCookie('PUT'));
+app.delete('/api/employees/:code', forwardWithCookie('DELETE'));
+app.get('/api/hr/zk/ping', forwardWithCookie('GET'));
+app.get('/api/hr/zk/users', forwardWithCookie('GET'));
+app.post('/api/hr/zk/sync', forwardWithCookie('POST'));
+app.get('/api/hr/zk/status', forwardWithCookie('GET'));
+app.get('/api/attendance', forwardWithCookie('GET'));
+app.get('/api/advances', forwardWithCookie('GET'));
+app.post('/api/advances', forwardWithCookie('POST'));
+app.delete('/api/advances/:id', forwardWithCookie('DELETE'));
+app.get('/api/tech-jobs', forwardWithCookie('GET'));
+app.post('/api/tech-jobs', forwardWithCookie('POST'));
+app.put('/api/tech-jobs/:id', forwardWithCookie('PUT'));
+app.delete('/api/tech-jobs/:id', forwardWithCookie('DELETE'));
+
 
 // LINE signature verification
 function verifyLineSignature(req, res, next) {

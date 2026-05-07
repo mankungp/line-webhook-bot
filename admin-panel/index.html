@@ -746,6 +746,9 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('cameras')" data-page="cameras" data-perm="cameras:read">
       <span class="icon">📷</span> <span>กล้อง</span>
     </a>
+    <a onclick="showPage('hr')" data-page="hr" data-perm="hr:read">
+      <span class="icon">🧑‍💼</span> <span>พนักงาน</span>
+    </a>
     <a onclick="showPage('users')" data-page="users" data-owner-only>
       <span class="icon">👥</span> <span>ผู้ใช้ระบบ</span>
     </a>
@@ -1142,6 +1145,207 @@ input:focus, textarea:focus, select:focus {
     </div>
   </div>
 
+  <!-- ============ HR PAGE (พนักงาน) ============ -->
+  <div id="page-hr" class="page" style="display:none;" data-perm="hr:read">
+    <div class="page-header">
+      <h2>🧑‍💼 พนักงาน</h2>
+      <p>จัดการพนักงาน · ลงเวลา · เบิกล่วงหน้า · งานช่างซ่อม</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-bar" style="margin-bottom:12px;">
+      <button type="button" class="tab-btn active" data-hrtab="employees" onclick="switchHrTab('employees')">👤 พนักงาน</button>
+      <button type="button" class="tab-btn" data-hrtab="attendance" onclick="switchHrTab('attendance')">⏰ ลงเวลา</button>
+      <button type="button" class="tab-btn" data-hrtab="advances" onclick="switchHrTab('advances')">💵 เบิกล่วงหน้า</button>
+      <button type="button" class="tab-btn" data-hrtab="jobs" onclick="switchHrTab('jobs')">🔧 งานช่างซ่อม</button>
+    </div>
+
+    <!-- Tab: Employees -->
+    <div id="hrtab-employees" class="hr-tab">
+      <div class="card">
+        <div class="toolbar">
+          <button class="btn btn-primary btn-sm" onclick="openEmpModal()">➕ เพิ่มพนักงาน</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadEmployees()">🔄 รีเฟรช</button>
+          <input type="text" id="empSearch" placeholder="🔍 ค้นหาชื่อ/รหัส" oninput="renderEmployeesList()" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ddd;">
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="empTable">
+            <thead><tr>
+              <th>รหัส</th><th>ชื่อ</th><th>ประเภท</th><th class="num">เงินเดือน/รายวัน</th><th>ปกส.</th><th>คอม</th><th>ZK ID</th><th></th>
+            </tr></thead>
+            <tbody id="empBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Attendance -->
+    <div id="hrtab-attendance" class="hr-tab" style="display:none;">
+      <div class="card" style="margin-bottom:12px;">
+        <div class="toolbar">
+          <button class="btn btn-primary btn-sm" onclick="syncAttendance()">⚡ Sync จากเครื่อง</button>
+          <button class="btn btn-secondary btn-sm" onclick="pingZk()">📡 Test เครื่อง</button>
+          <span id="zkStatus" style="font-size:13px; color:#666;"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <input type="date" id="attFrom" onchange="loadAttendance()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+          <input type="date" id="attTo" onchange="loadAttendance()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+          <select id="attEmp" onchange="loadAttendance()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+            <option value="">ทุกคน</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadAttendance()">ค้นหา</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr>
+              <th>วัน-เวลา</th><th>พนักงาน</th><th>ประเภท</th><th>ยืนยัน</th>
+            </tr></thead>
+            <tbody id="attBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Advances -->
+    <div id="hrtab-advances" class="hr-tab" style="display:none;">
+      <div class="card">
+        <div class="toolbar">
+          <button class="btn btn-primary btn-sm" onclick="openAdvanceModal()">➕ เพิ่มรายการเบิก</button>
+          <select id="advEmp" onchange="loadAdvances()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+            <option value="">ทุกคน</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadAdvances()">🔄 รีเฟรช</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr>
+              <th>วันที่</th><th>พนักงาน</th><th class="num">จำนวน</th><th>บันทึก</th><th>สถานะ</th><th></th>
+            </tr></thead>
+            <tbody id="advBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Jobs -->
+    <div id="hrtab-jobs" class="hr-tab" style="display:none;">
+      <div class="card">
+        <div class="toolbar">
+          <button class="btn btn-primary btn-sm" onclick="openJobModal()">➕ เพิ่มงานช่าง</button>
+          <select id="jobEmp" onchange="loadTechJobs()" style="padding:8px; border-radius:6px; border:1px solid #ddd;">
+            <option value="">ทุกช่าง</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadTechJobs()">🔄 รีเฟรช</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr>
+              <th>วันที่</th><th>ช่าง</th><th>รายละเอียด</th><th>ลูกค้า</th><th class="num">ราคา</th><th class="num">% คอม</th><th class="num">คอม</th><th></th>
+            </tr></thead>
+            <tbody id="jobBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Employee Edit Modal -->
+  <div class="modal" id="empModal">
+    <div class="modal-content" style="max-width:560px;">
+      <button class="close-btn" onclick="closeEmpModal()">×</button>
+      <h2 id="empModalTitle">เพิ่มพนักงาน</h2>
+      <input type="hidden" id="empCodeOrig">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div><label>รหัส (auto)</label><input type="text" id="empCode" placeholder="E001"></div>
+        <div><label>ZK User ID</label><input type="text" id="empZkId" placeholder="ไอดีบนเครื่อง"></div>
+        <div><label>ชื่อ-นามสกุล *</label><input type="text" id="empName" required></div>
+        <div><label>ชื่อเล่น</label><input type="text" id="empNick"></div>
+        <div><label>เบอร์โทร</label><input type="text" id="empPhone"></div>
+        <div><label>LINE userId</label><input type="text" id="empLineId" placeholder="ส่งสลิป LINE"></div>
+        <div><label>ประเภท *</label>
+          <select id="empPayType">
+            <option value="monthly">รายเดือน</option>
+            <option value="biweekly">รายครึ่งเดือน</option>
+            <option value="daily">รายวัน</option>
+            <option value="technician">ช่างซ่อม</option>
+          </select>
+        </div>
+        <div><label>รอบจ่าย (วันที่)</label><input type="number" id="empPayDay" placeholder="เช่น 31"></div>
+        <div><label>เงินเดือน</label><input type="number" id="empBaseSalary" step="0.01" value="0"></div>
+        <div><label>รายวัน</label><input type="number" id="empDailyRate" step="0.01" value="0"></div>
+        <div><label>คอมขาย (%)</label><input type="number" id="empComm" step="0.1" value="0"></div>
+        <div><label>คอมช่าง (%)</label><input type="number" id="empTechComm" step="0.1" value="0"></div>
+        <div><label>เข้างาน</label><input type="time" id="empWorkStart" value="08:00"></div>
+        <div><label>ออกงาน</label><input type="time" id="empWorkEnd" value="17:00"></div>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap;">
+        <label><input type="checkbox" id="empSocSec"> มีประกันสังคม</label>
+        <label><input type="checkbox" id="empPaidLeave"> วันหยุดมีเงิน</label>
+        <label><input type="checkbox" id="empHasComm"> รับคอม</label>
+        <label><input type="checkbox" id="empActive" checked> พนักงานปัจจุบัน</label>
+      </div>
+      <div style="margin-top:10px;"><label>หมายเหตุ</label><textarea id="empNote" rows="2" style="width:100%;"></textarea></div>
+      <div id="empStatus" style="margin-top:10px;"></div>
+      <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeEmpModal()">ยกเลิก</button>
+        <button class="btn btn-danger" id="empDeleteBtn" onclick="deleteEmployee()" style="display:none;">🗑️ ลบ</button>
+        <button class="btn btn-primary" onclick="saveEmployee()">💾 บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advance Modal -->
+  <div class="modal" id="advanceModal">
+    <div class="modal-content" style="max-width:420px;">
+      <button class="close-btn" onclick="closeAdvanceModal()">×</button>
+      <h2>เบิกล่วงหน้า</h2>
+      <div><label>พนักงาน *</label>
+        <select id="advEmpSelect" style="width:100%; padding:8px;"></select>
+      </div>
+      <div style="margin-top:10px;"><label>วันที่</label><input type="date" id="advDate" style="width:100%;"></div>
+      <div style="margin-top:10px;"><label>จำนวนเงิน *</label><input type="number" id="advAmount" step="0.01" style="width:100%;"></div>
+      <div style="margin-top:10px;"><label>หมายเหตุ</label><input type="text" id="advNote" style="width:100%;"></div>
+      <div id="advStatus" style="margin-top:10px;"></div>
+      <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeAdvanceModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveAdvance()">💾 บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tech Job Modal -->
+  <div class="modal" id="jobModal">
+    <div class="modal-content" style="max-width:480px;">
+      <button class="close-btn" onclick="closeJobModal()">×</button>
+      <h2>งานช่างซ่อม</h2>
+      <input type="hidden" id="jobId">
+      <div><label>ช่าง *</label>
+        <select id="jobEmpSelect" style="width:100%; padding:8px;"></select>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+        <div><label>วันที่</label><input type="date" id="jobDate"></div>
+        <div><label>สถานะ</label>
+          <select id="jobStatus"><option value="done">เสร็จแล้ว</option><option value="pending">รอจ่าย</option></select>
+        </div>
+      </div>
+      <div style="margin-top:10px;"><label>รายละเอียดงาน</label><textarea id="jobDesc" rows="2" style="width:100%;"></textarea></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+        <div><label>ลูกค้า</label><input type="text" id="jobCustomer"></div>
+        <div><label>เบอร์ลูกค้า</label><input type="text" id="jobPhone"></div>
+        <div><label>ราคางาน *</label><input type="number" id="jobAmount" step="0.01"></div>
+        <div><label>% คอม</label><input type="number" id="jobCommRate" step="0.1" value="0"></div>
+      </div>
+      <div id="jobStatusMsg" style="margin-top:10px;"></div>
+      <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeJobModal()">ยกเลิก</button>
+        <button class="btn btn-danger" id="jobDeleteBtn" onclick="deleteJob()" style="display:none;">🗑️ ลบ</button>
+        <button class="btn btn-primary" onclick="saveJob()">💾 บันทึก</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ USERS PAGE (owner only) ============ -->
   <div id="page-users" class="page" style="display:none;" data-owner-only>
     <div class="page-header">
@@ -1481,6 +1685,7 @@ function showPage(page) {
   if (page === 'customers') loadCustomers();
   if (page === 'members') loadMembers();
   if (page === 'cameras') loadCameras();
+  if (page === 'hr') loadHr();
   if (page === 'users') loadAdminUsers();
   if (page === 'reports') {
     if (!document.getElementById('rFrom').value) setReportPeriod('today');
@@ -4583,6 +4788,400 @@ async function loadSalesLeaderboard() {
     var body = document.getElementById('rSalesLeaderboard');
     if (body) body.innerHTML = html;
   } catch (e) { console.error('leaderboard:', e); }
+}
+
+// ============ HR / EMPLOYEES ============
+var allEmployees = [];
+var editingEmpCode = null;
+var editingJobId = null;
+
+function switchHrTab(name) {
+  document.querySelectorAll('#page-hr .tab-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.hrtab === name); });
+  document.querySelectorAll('.hr-tab').forEach(function(t){ t.style.display = 'none'; });
+  document.getElementById('hrtab-' + name).style.display = 'block';
+  if (name === 'attendance') { var f = document.getElementById('attFrom'); if (!f.value) { var d = new Date(); var t = d.toISOString().slice(0,10); f.value = t; document.getElementById('attTo').value = t; } loadAttendance(); pingZk(); }
+  if (name === 'advances') loadAdvances();
+  if (name === 'jobs') loadTechJobs();
+}
+
+async function loadHr() {
+  // load employees first (ใช้ร่วมหลาย dropdown)
+  await loadEmployees();
+  // populate dropdowns
+  var sels = ['attEmp','advEmp','jobEmp','advEmpSelect','jobEmpSelect'];
+  sels.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var keep = el.value;
+    var first = el.firstElementChild ? el.firstElementChild.outerHTML : '';
+    el.innerHTML = first;
+    allEmployees.forEach(function(e) {
+      if (!e.active) return;
+      var opt = document.createElement('option');
+      opt.value = e.emp_code;
+      opt.textContent = e.emp_code + ' - ' + (e.nickname || e.name);
+      el.appendChild(opt);
+    });
+    el.value = keep;
+  });
+}
+
+async function loadEmployees() {
+  try {
+    var r = await fetch('/api/employees');
+    var d = await r.json();
+    allEmployees = d.employees || [];
+    renderEmployeesList();
+  } catch (e) { console.error('loadEmployees:', e); }
+}
+
+function renderEmployeesList() {
+  var search = (document.getElementById('empSearch') || {value:''}).value.toLowerCase();
+  var filtered = allEmployees.filter(function(e) {
+    if (!search) return true;
+    var hay = ((e.name||'') + ' ' + (e.nickname||'') + ' ' + (e.emp_code||'')).toLowerCase();
+    return hay.indexOf(search) >= 0;
+  });
+  var typeLabel = { monthly:'รายเดือน', biweekly:'รายครึ่งเดือน', daily:'รายวัน', technician:'ช่างซ่อม' };
+  var html = '';
+  if (filtered.length === 0) {
+    html = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px;">ยังไม่มีพนักงาน</td></tr>';
+  } else {
+    filtered.forEach(function(e) {
+      var pay = e.pay_type === 'daily' ? (e.daily_rate ? '฿' + e.daily_rate.toLocaleString() : '-') : (e.base_salary ? '฿' + e.base_salary.toLocaleString() : '-');
+      var comm = e.has_commission ? (e.commission_rate || 0) + '%' : '-';
+      if (e.pay_type === 'technician') comm = (e.technician_commission_rate || 0) + '%';
+      html += '<tr style="' + (e.active ? '' : 'opacity:0.45;') + '">';
+      html += '<td><code>' + escapeHtml(e.emp_code) + '</code></td>';
+      html += '<td><strong>' + escapeHtml(e.name) + '</strong>' + (e.nickname ? '<br/><small style="color:#999;">(' + escapeHtml(e.nickname) + ')</small>' : '') + '</td>';
+      html += '<td>' + (typeLabel[e.pay_type] || e.pay_type) + '</td>';
+      html += '<td class="num">' + pay + '</td>';
+      html += '<td>' + (e.has_social_security ? '✅' : '—') + '</td>';
+      html += '<td>' + comm + '</td>';
+      html += '<td>' + (e.zk_user_id ? '<code>' + escapeHtml(String(e.zk_user_id)) + '</code>' : '<span style="color:#d80;">ไม่ได้ผูก</span>') + '</td>';
+      html += '<td><button class="btn btn-secondary btn-sm" onclick="editEmployee(\'' + escapeHtml(e.emp_code) + '\')">แก้ไข</button></td>';
+      html += '</tr>';
+    });
+  }
+  document.getElementById('empBody').innerHTML = html;
+}
+
+function openEmpModal() {
+  editingEmpCode = null;
+  document.getElementById('empModalTitle').textContent = 'เพิ่มพนักงาน';
+  document.getElementById('empCodeOrig').value = '';
+  ['empCode','empZkId','empName','empNick','empPhone','empLineId','empPayDay','empNote'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('empPayType').value = 'monthly';
+  document.getElementById('empBaseSalary').value = 0;
+  document.getElementById('empDailyRate').value = 0;
+  document.getElementById('empComm').value = 0;
+  document.getElementById('empTechComm').value = 0;
+  document.getElementById('empWorkStart').value = '08:00';
+  document.getElementById('empWorkEnd').value = '17:00';
+  ['empSocSec','empPaidLeave','empHasComm'].forEach(function(id){ document.getElementById(id).checked = false; });
+  document.getElementById('empActive').checked = true;
+  document.getElementById('empDeleteBtn').style.display = 'none';
+  document.getElementById('empStatus').textContent = '';
+  document.getElementById('empModal').classList.add('active');
+}
+
+function editEmployee(code) {
+  var e = allEmployees.find(function(x){ return x.emp_code === code; });
+  if (!e) return;
+  editingEmpCode = code;
+  document.getElementById('empModalTitle').textContent = 'แก้ไขพนักงาน';
+  document.getElementById('empCodeOrig').value = code;
+  document.getElementById('empCode').value = e.emp_code;
+  document.getElementById('empZkId').value = e.zk_user_id || '';
+  document.getElementById('empName').value = e.name || '';
+  document.getElementById('empNick').value = e.nickname || '';
+  document.getElementById('empPhone').value = e.phone || '';
+  document.getElementById('empLineId').value = e.line_user_id || '';
+  document.getElementById('empPayType').value = e.pay_type || 'monthly';
+  document.getElementById('empPayDay').value = e.pay_cycle_day || '';
+  document.getElementById('empBaseSalary').value = e.base_salary || 0;
+  document.getElementById('empDailyRate').value = e.daily_rate || 0;
+  document.getElementById('empComm').value = e.commission_rate || 0;
+  document.getElementById('empTechComm').value = e.technician_commission_rate || 0;
+  document.getElementById('empWorkStart').value = e.work_start || '08:00';
+  document.getElementById('empWorkEnd').value = e.work_end || '17:00';
+  document.getElementById('empSocSec').checked = !!e.has_social_security;
+  document.getElementById('empPaidLeave').checked = !!e.has_paid_leave;
+  document.getElementById('empHasComm').checked = !!e.has_commission;
+  document.getElementById('empActive').checked = e.active !== false;
+  document.getElementById('empNote').value = e.note || '';
+  document.getElementById('empDeleteBtn').style.display = 'inline-block';
+  document.getElementById('empStatus').textContent = '';
+  document.getElementById('empModal').classList.add('active');
+}
+
+function closeEmpModal() {
+  document.getElementById('empModal').classList.remove('active');
+  editingEmpCode = null;
+}
+
+async function saveEmployee() {
+  var data = {
+    emp_code: document.getElementById('empCode').value.trim() || undefined,
+    zk_user_id: document.getElementById('empZkId').value.trim(),
+    name: document.getElementById('empName').value.trim(),
+    nickname: document.getElementById('empNick').value.trim(),
+    phone: document.getElementById('empPhone').value.trim(),
+    line_user_id: document.getElementById('empLineId').value.trim(),
+    pay_type: document.getElementById('empPayType').value,
+    pay_cycle_day: parseInt(document.getElementById('empPayDay').value) || null,
+    base_salary: parseFloat(document.getElementById('empBaseSalary').value) || 0,
+    daily_rate: parseFloat(document.getElementById('empDailyRate').value) || 0,
+    commission_rate: parseFloat(document.getElementById('empComm').value) || 0,
+    technician_commission_rate: parseFloat(document.getElementById('empTechComm').value) || 0,
+    work_start: document.getElementById('empWorkStart').value,
+    work_end: document.getElementById('empWorkEnd').value,
+    has_social_security: document.getElementById('empSocSec').checked,
+    has_paid_leave: document.getElementById('empPaidLeave').checked,
+    has_commission: document.getElementById('empHasComm').checked,
+    active: document.getElementById('empActive').checked,
+    note: document.getElementById('empNote').value.trim()
+  };
+  if (!data.name) { document.getElementById('empStatus').innerHTML = '<span style="color:#d33;">❌ ต้องใส่ชื่อ</span>'; return; }
+  document.getElementById('empStatus').textContent = '⏳ กำลังบันทึก...';
+  try {
+    var url = editingEmpCode ? '/api/employees/' + encodeURIComponent(editingEmpCode) : '/api/employees';
+    var method = editingEmpCode ? 'PUT' : 'POST';
+    var r = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    var result = await r.json();
+    if (!r.ok || result.error) {
+      document.getElementById('empStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(result.error || 'error') + '</span>';
+      return;
+    }
+    document.getElementById('empStatus').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว</span>';
+    setTimeout(function(){ closeEmpModal(); loadHr(); }, 500);
+  } catch (e) { document.getElementById('empStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>'; }
+}
+
+async function deleteEmployee() {
+  if (!editingEmpCode) return;
+  if (!confirm('ลบพนักงาน ' + editingEmpCode + ' ?\n(รายการลงเวลา/เบิก/งานช่าง ยังอยู่ — ไม่ link ชื่อ)')) return;
+  try {
+    var r = await fetch('/api/employees/' + encodeURIComponent(editingEmpCode), { method: 'DELETE' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    closeEmpModal();
+    loadHr();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+// ============ ATTENDANCE ============
+async function pingZk() {
+  var el = document.getElementById('zkStatus');
+  if (el) el.textContent = '⏳ ตรวจ...';
+  try {
+    var r = await fetch('/api/hr/zk/ping');
+    var d = await r.json();
+    if (d.ok) {
+      el.innerHTML = '<span style="color:#0a0;">🟢 เครื่อง ' + escapeHtml(d.host) + ':' + d.port + ' ออนไลน์</span>';
+    } else {
+      el.innerHTML = '<span style="color:#d33;">🔴 ' + escapeHtml(d.error || 'offline') + '</span>';
+    }
+  } catch (e) { el.innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>'; }
+}
+
+async function syncAttendance() {
+  var el = document.getElementById('zkStatus');
+  if (el) el.textContent = '⏳ กำลัง sync...';
+  try {
+    var r = await fetch('/api/hr/zk/sync', { method: 'POST' });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'sync failed');
+    el.innerHTML = '<span style="color:#0a0;">✅ Sync แล้ว — เครื่องมี ' + d.deviceTotal + ' รายการ, เพิ่มใหม่ ' + d.added + '</span>';
+    loadAttendance();
+  } catch (e) { el.innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>'; }
+}
+
+async function loadAttendance() {
+  var f = (document.getElementById('attFrom')||{}).value;
+  var t = (document.getElementById('attTo')||{}).value;
+  var emp = (document.getElementById('attEmp')||{}).value;
+  var qs = [];
+  if (f) qs.push('from=' + f);
+  if (t) qs.push('to=' + t);
+  if (emp) qs.push('empCode=' + emp);
+  try {
+    var r = await fetch('/api/attendance' + (qs.length ? '?' + qs.join('&') : ''));
+    var d = await r.json();
+    var html = '';
+    if (!d.logs || d.logs.length === 0) {
+      html = '<tr><td colspan="4" style="text-align:center;color:#999;padding:16px;">ไม่มีข้อมูล</td></tr>';
+    } else {
+      d.logs.forEach(function(l) {
+        var dt = new Date(l.recordTime);
+        var ds = dt.toLocaleString('th-TH', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        var name = l.emp_code ? (l.emp_code + ' ' + (l.emp_nickname || l.emp_name)) : '<span style="color:#d80;">ZK:' + escapeHtml(String(l.userId)) + ' (ไม่ได้ผูก)</span>';
+        html += '<tr>';
+        html += '<td>' + ds + '</td>';
+        html += '<td>' + name + '</td>';
+        html += '<td>' + escapeHtml(l.inOutMode || '') + '</td>';
+        html += '<td>' + escapeHtml(l.verifyMode || '') + '</td>';
+        html += '</tr>';
+      });
+    }
+    document.getElementById('attBody').innerHTML = html;
+  } catch (e) { console.error('loadAttendance:', e); }
+}
+
+// ============ ADVANCES ============
+async function loadAdvances() {
+  var emp = (document.getElementById('advEmp')||{}).value;
+  try {
+    var r = await fetch('/api/advances' + (emp ? '?empCode=' + emp : ''));
+    var d = await r.json();
+    var html = '';
+    if (!d.advances || d.advances.length === 0) {
+      html = '<tr><td colspan="6" style="text-align:center;color:#999;padding:16px;">ไม่มีรายการเบิก</td></tr>';
+    } else {
+      d.advances.forEach(function(a) {
+        var emp = allEmployees.find(function(e){ return e.emp_code === a.emp_code; });
+        html += '<tr>';
+        html += '<td>' + escapeHtml(a.date) + '</td>';
+        html += '<td>' + escapeHtml(a.emp_code) + ' ' + escapeHtml(emp ? (emp.nickname || emp.name) : '?') + '</td>';
+        html += '<td class="num">฿' + a.amount.toLocaleString() + '</td>';
+        html += '<td>' + escapeHtml(a.note || '') + '</td>';
+        html += '<td>' + (a.is_cleared ? '<span style="color:#0a0;">✅ หักแล้ว</span>' : '<span style="color:#d80;">⏳ รอหัก</span>') + '</td>';
+        html += '<td>' + (a.is_cleared ? '' : '<button class="btn btn-danger btn-sm" onclick="deleteAdvance(\'' + a.id + '\')">🗑️</button>') + '</td>';
+        html += '</tr>';
+      });
+    }
+    document.getElementById('advBody').innerHTML = html;
+  } catch (e) { console.error('loadAdvances:', e); }
+}
+
+function openAdvanceModal() {
+  document.getElementById('advDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('advAmount').value = '';
+  document.getElementById('advNote').value = '';
+  document.getElementById('advStatus').textContent = '';
+  document.getElementById('advanceModal').classList.add('active');
+}
+function closeAdvanceModal() { document.getElementById('advanceModal').classList.remove('active'); }
+async function saveAdvance() {
+  var data = {
+    emp_code: document.getElementById('advEmpSelect').value,
+    date: document.getElementById('advDate').value,
+    amount: parseFloat(document.getElementById('advAmount').value),
+    note: document.getElementById('advNote').value.trim()
+  };
+  if (!data.emp_code || !data.amount) { document.getElementById('advStatus').innerHTML = '<span style="color:#d33;">❌ ต้องใส่พนักงาน+จำนวน</span>'; return; }
+  try {
+    var r = await fetch('/api/advances', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    var result = await r.json();
+    if (!r.ok || result.error) throw new Error(result.error || 'failed');
+    document.getElementById('advStatus').innerHTML = '<span style="color:#0a0;">✅</span>';
+    setTimeout(function(){ closeAdvanceModal(); loadAdvances(); }, 400);
+  } catch (e) { document.getElementById('advStatus').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>'; }
+}
+async function deleteAdvance(id) {
+  if (!confirm('ลบรายการเบิกนี้?')) return;
+  try {
+    var r = await fetch('/api/advances/' + id, { method:'DELETE' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    loadAdvances();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+// ============ TECH JOBS ============
+async function loadTechJobs() {
+  var emp = (document.getElementById('jobEmp')||{}).value;
+  try {
+    var r = await fetch('/api/tech-jobs' + (emp ? '?empCode=' + emp : ''));
+    var d = await r.json();
+    var html = '';
+    if (!d.jobs || d.jobs.length === 0) {
+      html = '<tr><td colspan="8" style="text-align:center;color:#999;padding:16px;">ยังไม่มีงาน</td></tr>';
+    } else {
+      d.jobs.forEach(function(j) {
+        var emp = allEmployees.find(function(e){ return e.emp_code === j.emp_code; });
+        html += '<tr>';
+        html += '<td>' + escapeHtml(j.date) + '</td>';
+        html += '<td>' + escapeHtml(j.emp_code) + ' ' + escapeHtml(emp ? (emp.nickname || emp.name) : '?') + '</td>';
+        html += '<td>' + escapeHtml(j.description || '') + '</td>';
+        html += '<td>' + escapeHtml(j.customer_name || '') + (j.customer_phone ? '<br/><small>' + escapeHtml(j.customer_phone) + '</small>' : '') + '</td>';
+        html += '<td class="num">฿' + j.amount.toLocaleString() + '</td>';
+        html += '<td class="num">' + (j.commission_rate||0) + '%</td>';
+        html += '<td class="num"><strong>฿' + (j.commission_amount||0).toLocaleString() + '</strong></td>';
+        html += '<td><button class="btn btn-secondary btn-sm" onclick="editJob(\'' + j.id + '\')">แก้ไข</button></td>';
+        html += '</tr>';
+      });
+    }
+    document.getElementById('jobBody').innerHTML = html;
+  } catch (e) { console.error('loadTechJobs:', e); }
+}
+
+var _allJobsCache = [];
+async function _fetchJobsCache() {
+  var r = await fetch('/api/tech-jobs');
+  var d = await r.json();
+  _allJobsCache = d.jobs || [];
+}
+
+async function openJobModal() {
+  editingJobId = null;
+  document.getElementById('jobId').value = '';
+  document.getElementById('jobDate').value = new Date().toISOString().slice(0,10);
+  ['jobDesc','jobCustomer','jobPhone','jobAmount'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('jobCommRate').value = 0;
+  document.getElementById('jobStatus').value = 'done';
+  document.getElementById('jobDeleteBtn').style.display = 'none';
+  document.getElementById('jobStatusMsg').textContent = '';
+  document.getElementById('jobModal').classList.add('active');
+}
+async function editJob(id) {
+  await _fetchJobsCache();
+  var j = _allJobsCache.find(function(x){ return x.id === id; });
+  if (!j) return;
+  editingJobId = id;
+  document.getElementById('jobId').value = id;
+  document.getElementById('jobEmpSelect').value = j.emp_code;
+  document.getElementById('jobDate').value = j.date;
+  document.getElementById('jobDesc').value = j.description || '';
+  document.getElementById('jobCustomer').value = j.customer_name || '';
+  document.getElementById('jobPhone').value = j.customer_phone || '';
+  document.getElementById('jobAmount').value = j.amount;
+  document.getElementById('jobCommRate').value = j.commission_rate || 0;
+  document.getElementById('jobStatus').value = j.status || 'done';
+  document.getElementById('jobDeleteBtn').style.display = 'inline-block';
+  document.getElementById('jobStatusMsg').textContent = '';
+  document.getElementById('jobModal').classList.add('active');
+}
+function closeJobModal() { document.getElementById('jobModal').classList.remove('active'); editingJobId=null; }
+async function saveJob() {
+  var data = {
+    emp_code: document.getElementById('jobEmpSelect').value,
+    date: document.getElementById('jobDate').value,
+    description: document.getElementById('jobDesc').value.trim(),
+    customer_name: document.getElementById('jobCustomer').value.trim(),
+    customer_phone: document.getElementById('jobPhone').value.trim(),
+    amount: parseFloat(document.getElementById('jobAmount').value),
+    commission_rate: parseFloat(document.getElementById('jobCommRate').value) || 0,
+    status: document.getElementById('jobStatus').value
+  };
+  if (!data.emp_code || !data.amount) { document.getElementById('jobStatusMsg').innerHTML = '<span style="color:#d33;">❌ ต้องใส่ช่าง+ราคา</span>'; return; }
+  try {
+    var url = editingJobId ? '/api/tech-jobs/' + editingJobId : '/api/tech-jobs';
+    var method = editingJobId ? 'PUT' : 'POST';
+    var r = await fetch(url, { method:method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    var result = await r.json();
+    if (!r.ok || result.error) throw new Error(result.error || 'failed');
+    document.getElementById('jobStatusMsg').innerHTML = '<span style="color:#0a0;">✅</span>';
+    setTimeout(function(){ closeJobModal(); loadTechJobs(); }, 400);
+  } catch (e) { document.getElementById('jobStatusMsg').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>'; }
+}
+async function deleteJob() {
+  if (!editingJobId) return;
+  if (!confirm('ลบงานนี้?')) return;
+  try {
+    var r = await fetch('/api/tech-jobs/' + editingJobId, { method:'DELETE' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    closeJobModal();
+    loadTechJobs();
+  } catch (e) { alert('❌ ' + e.message); }
 }
 </script>
 
