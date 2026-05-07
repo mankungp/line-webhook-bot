@@ -773,6 +773,9 @@ input:focus, textarea:focus, select:focus {
         <span class="status-badge" id="globalStatusBadge">...</span>
       </div>
       <button class="btn btn-primary" id="globalToggleBtn" onclick="toggleGlobal()" style="width:100%;margin-top:12px;">กดปิด/เปิด</button>
+      <div id="globalHint" style="display:none;margin-top:10px;padding:8px 12px;background:#fff3cd;border:1px solid #ffe69c;border-radius:6px;color:#856404;font-size:12px;">
+        ⚠️ Bot หลักปิดอยู่ — ปุ่มรายคนถูก disable ต้องเปิด Global Bot ก่อนจึงจะตั้งรายคนได้
+      </div>
     </div>
 
     <div class="card">
@@ -1503,17 +1506,20 @@ function updateBotUI(data) {
   var on = data.globalMode;
   var badge = document.getElementById('globalStatusBadge');
   var btn = document.getElementById('globalToggleBtn');
+  var hint = document.getElementById('globalHint');
 
   if (on) {
     badge.textContent = 'ปิดอยู่';
     badge.className = 'status-badge off';
     btn.textContent = 'เปิด Bot';
     btn.style.background = '#4fc3f7';
+    if (hint) hint.style.display = 'block';
   } else {
     badge.textContent = 'เปิดอยู่';
     badge.className = 'status-badge on';
     btn.textContent = 'ปิด Bot';
     btn.style.background = '#ef5350';
+    if (hint) hint.style.display = 'none';
   }
 
   var customers = data.allCustomers || {};
@@ -1530,6 +1536,9 @@ function updateBotUI(data) {
     return;
   }
 
+  // ถ้า Global Bot OFF → disable ปุ่มรายคน (กดไปไม่มีผล เพราะบอทปิดรวมอยู่แล้ว)
+  var globalDisabled = !on;
+
   var html = '';
   entries.forEach(function(entry) {
     var userId = entry[0];
@@ -1540,9 +1549,12 @@ function updateBotUI(data) {
     var name = info.displayName || 'ลูกค้า';
     var avatarUrl = info.pictureUrl;
 
-    html += '<div class="customer-item" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;">';
+    html += '<div class="customer-item" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;' + (globalDisabled ? 'opacity:0.55;' : '') + '">';
     // isOff = true แปลว่า "ลูกค้านี้ถูกปิดบอท" → ปุ่มต้องแสดง "เปิด" และกดแล้วส่ง turnOn=true
-    html += '<button type="button" class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-uid="' + userId.replace(/"/g, '&quot;') + '" data-turn-on="' + isOff + '" style="min-width:75px;height:48px;border:none;border-radius:8px;color:white;font-weight:bold;font-size:14px;cursor:pointer;">' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
+    var btnTitle = globalDisabled ? 'ปิด Bot หลักอยู่ — เปิด Global Bot ก่อนจึงจะตั้งรายคนได้' : (isOff ? 'เปิดบอทลูกค้านี้' : 'ปิดบอทลูกค้านี้');
+    var btnCursor = globalDisabled ? 'not-allowed' : 'pointer';
+    var btnDisabled = globalDisabled ? ' disabled' : '';
+    html += '<button type="button" class="customer-toggle ' + (isOff ? 'on' : 'off') + '" data-uid="' + userId.replace(/"/g, '&quot;') + '" data-turn-on="' + isOff + '" title="' + btnTitle + '" style="min-width:75px;height:48px;border:none;border-radius:8px;color:white;font-weight:bold;font-size:14px;cursor:' + btnCursor + ';"' + btnDisabled + '>' + (isOff ? 'เปิด' : 'ปิด') + '</button>';
     if (avatarUrl) {
       html += '<img src="' + escapeHtml(avatarUrl) + '" class="avatar" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">';
     } else {
@@ -1592,6 +1604,8 @@ document.addEventListener('click', function(e) {
   var btn = e.target.closest('.customer-toggle');
   if (!btn) return;
   e.preventDefault();
+  // ถ้า button disabled (Global Bot OFF) → ไม่ทำอะไร
+  if (btn.disabled) return;
   if (btn.dataset.busy === '1') return;
   btn.dataset.busy = '1';
   var userId = btn.getAttribute('data-uid');
