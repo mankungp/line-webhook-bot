@@ -1269,7 +1269,12 @@ input:focus, textarea:focus, select:focus {
         <div><label>ชื่อ-นามสกุล *</label><input type="text" id="empName" required></div>
         <div><label>ชื่อเล่น</label><input type="text" id="empNick"></div>
         <div><label>เบอร์โทร</label><input type="text" id="empPhone"></div>
-        <div><label>LINE userId</label><input type="text" id="empLineId" placeholder="ส่งสลิป LINE"></div>
+        <div><label>ผูก LINE (จากผู้ใช้ระบบ)</label>
+          <select id="empLineId" style="width:100%; padding:8px;">
+            <option value="">— ไม่ผูก —</option>
+          </select>
+          <div style="font-size:11px;color:#999;margin-top:4px;">เลือกจากผู้ใช้ระบบที่ login ด้วย LINE แล้ว</div>
+        </div>
         <div><label>ประเภท *</label>
           <select id="empPayType">
             <option value="monthly">รายเดือน</option>
@@ -1542,6 +1547,7 @@ input:focus, textarea:focus, select:focus {
           <option value="owner">Owner</option>
           <option value="manager">Manager</option>
           <option value="staff">Staff</option>
+          <option value="packing">Packing (แพ็คของ)</option>
           <option value="technician">Technician</option>
           <option value="customer">Customer (รออนุมัติ)</option>
           <option value="blocked">Blocked</option>
@@ -4704,6 +4710,7 @@ function renderUserInfo() {
     owner:     '<span style="background:#d35400;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">⭐ OWNER</span>',
     manager:   '<span style="background:#2980b9;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">👔 MANAGER</span>',
     staff:     '<span style="background:#0a8;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">👤 STAFF</span>',
+    packing:   '<span style="background:#16a085;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">📦 PACKING</span>',
     technician:'<span style="background:#9b59b6;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">🔧 TECHNICIAN</span>'
   })[currentUser.role] || ('<span style="background:#999;color:white;padding:2px 8px;border-radius:4px;font-size:11px;">' + (currentUser.role || '?') + '</span>');
 
@@ -4837,8 +4844,8 @@ function renderAdminUsersList() {
     return true;
   });
 
-  var roleLabel = { owner:'⭐ Owner', manager:'👔 Manager', staff:'👤 Staff', technician:'🔧 Tech', customer:'👋 Customer', blocked:'🚫 Blocked' };
-  var roleColor = { owner:'#d35400', manager:'#2980b9', staff:'#0a8', technician:'#9b59b6', customer:'#999', blocked:'#d33' };
+  var roleLabel = { owner:'⭐ Owner', manager:'👔 Manager', staff:'👤 Staff', packing:'📦 Packing', technician:'🔧 Tech', customer:'👋 Customer', blocked:'🚫 Blocked' };
+  var roleColor = { owner:'#d35400', manager:'#2980b9', staff:'#0a8', packing:'#16a085', technician:'#9b59b6', customer:'#999', blocked:'#d33' };
   var html = '';
   if (filtered.length === 0) {
     html = '<tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">ไม่พบผู้ใช้</td></tr>';
@@ -4990,6 +4997,7 @@ function switchHrTab(name) {
 async function loadHr() {
   // load employees first (ใช้ร่วมหลาย dropdown)
   await loadEmployees();
+  await loadHrUsersDropdown();
   // populate dropdowns
   var sels = ['attEmp','advEmp','jobEmp','advEmpSelect','jobEmpSelect'];
   sels.forEach(function(id) {
@@ -5007,6 +5015,48 @@ async function loadHr() {
     });
     el.value = keep;
   });
+}
+
+var hrSystemUsers = [];
+async function loadHrUsersDropdown() {
+  try {
+    var r = await fetch('/api/users');
+    var d = await r.json();
+    hrSystemUsers = d.users || [];
+  } catch (e) { hrSystemUsers = []; }
+}
+
+function populateEmpLineDropdown(currentLineId) {
+  var sel = document.getElementById('empLineId');
+  if (!sel) return;
+  var alreadyLinked = {};
+  (allEmployees || []).forEach(function(emp) {
+    if (emp.emp_code !== editingEmpCode && emp.line_user_id) {
+      alreadyLinked[emp.line_user_id] = emp.name || emp.nickname || emp.emp_code;
+    }
+  });
+  var html = '<option value="">— ไม่ผูก —</option>';
+  (hrSystemUsers || []).forEach(function(u) {
+    if (!u.lineUserId) return;
+    var label = (u.name || u.displayName || u.nickname || u.lineUserId.substring(0, 12));
+    var roleSpan = u.role ? ' [' + u.role + ']' : '';
+    var disabled = '';
+    var dupNote = '';
+    if (alreadyLinked[u.lineUserId]) {
+      disabled = ' disabled';
+      dupNote = ' (ผูกกับ ' + alreadyLinked[u.lineUserId] + ' แล้ว)';
+    }
+    var selected = (u.lineUserId === currentLineId) ? ' selected' : '';
+    html += '<option value="' + escapeHtml(u.lineUserId) + '"' + selected + disabled + '>' + escapeHtml(label) + roleSpan + dupNote + '</option>';
+  });
+  sel.innerHTML = html;
+  if (currentLineId && sel.value !== currentLineId) {
+    var unknownOpt = document.createElement('option');
+    unknownOpt.value = currentLineId;
+    unknownOpt.textContent = '⚠️ ' + currentLineId.substring(0, 16) + '... (ไม่พบในผู้ใช้ระบบ)';
+    unknownOpt.selected = true;
+    sel.appendChild(unknownOpt);
+  }
 }
 
 async function loadEmployees() {
@@ -5053,7 +5103,8 @@ function openEmpModal() {
   editingEmpCode = null;
   document.getElementById('empModalTitle').textContent = 'เพิ่มพนักงาน';
   document.getElementById('empCodeOrig').value = '';
-  ['empCode','empZkId','empName','empNick','empPhone','empLineId','empPayDay','empNote'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['empCode','empZkId','empName','empNick','empPhone','empPayDay','empNote'].forEach(function(id){ document.getElementById(id).value=''; });
+  populateEmpLineDropdown('');
   document.getElementById('empPayType').value = 'monthly';
   document.getElementById('empBaseSalary').value = 0;
   document.getElementById('empDailyRate').value = 0;
@@ -5079,7 +5130,7 @@ function editEmployee(code) {
   document.getElementById('empName').value = e.name || '';
   document.getElementById('empNick').value = e.nickname || '';
   document.getElementById('empPhone').value = e.phone || '';
-  document.getElementById('empLineId').value = e.line_user_id || '';
+  populateEmpLineDropdown(e.line_user_id || '');
   document.getElementById('empPayType').value = e.pay_type || 'monthly';
   document.getElementById('empPayDay').value = e.pay_cycle_day || '';
   document.getElementById('empBaseSalary').value = e.base_salary || 0;
@@ -5681,6 +5732,7 @@ if (typeof _origShowPage_qrAtt === 'function') {
         <option value="owner">⭐ Owner — เห็นทุกอย่าง</option>
         <option value="manager">👔 Manager — แก้ทุกอย่างยกเว้น users</option>
         <option value="staff">👤 Staff — คีย์ออเดอร์/POS</option>
+        <option value="packing">📦 Packing — พนักงานแพ็คของ</option>
         <option value="technician">🔧 Technician — ดูออเดอร์อย่างเดียว</option>
         <option value="customer">👋 Customer — ปฏิเสธเข้า admin</option>
         <option value="blocked">🚫 Blocked — บล็อกถาวร</option>
