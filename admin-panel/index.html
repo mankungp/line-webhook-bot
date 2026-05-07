@@ -1503,12 +1503,13 @@ async function loadBotCustomers() {
 }
 
 function updateBotUI(data) {
-  var on = data.globalMode;
+  // ⚠️ code base กลับขั้ว: data.globalMode === true → Bot หลัก "ปิด"
+  var globalOff = data.globalMode === true;
   var badge = document.getElementById('globalStatusBadge');
   var btn = document.getElementById('globalToggleBtn');
   var hint = document.getElementById('globalHint');
 
-  if (on) {
+  if (globalOff) {
     badge.textContent = 'ปิดอยู่';
     badge.className = 'status-badge off';
     btn.textContent = 'เปิด Bot';
@@ -1537,7 +1538,8 @@ function updateBotUI(data) {
   }
 
   // ถ้า Global Bot OFF → disable ปุ่มรายคน (กดไปไม่มีผล เพราะบอทปิดรวมอยู่แล้ว)
-  var globalDisabled = !on;
+  // ⚠️ globalMode === true = Bot ปิด (code base กลับขั้ว)
+  var globalDisabled = globalOff;
 
   var html = '';
   entries.forEach(function(entry) {
