@@ -521,15 +521,32 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
       var event = events[i];
       console.log('[WEBHOOK] Event type:', event.type);
 
+      // บันทึก customer ทุก event ที่มี source.userId (follow / message / postback / sticker / image)
+      var evtUserId = (event.source && event.source.userId) ? event.source.userId : null;
+      if (evtUserId) {
+        pingCustomer(evtUserId);
+      }
+
+      // Handle Follow Event (มีคน Add เพื่อนใหม่)
+      if (event.type === 'follow') {
+        console.log('[WEBHOOK] 👋 Follow event - userId:', evtUserId);
+        if (event.replyToken) {
+          try {
+            await replyToLine(event.replyToken, [{ type: 'text', text: WELCOME_MSG }]);
+            if (evtUserId) await markWelcomeSent(evtUserId);
+          } catch (e) {
+            console.error('[WEBHOOK] Follow reply error:', e.message);
+          }
+        }
+        continue;
+      }
+
       if (event.type === 'message' && event.message.type === 'text') {
         var userMessage = event.message.text;
         var replyToken = event.replyToken;
         var userId = (event.source && event.source.userId) ? event.source.userId : 'unknown';
 
         console.log('[WEBHOOK] User message:', userMessage, '| User:', userId);
-
-        // Track customer activity
-        pingCustomer(userId);
 
         // Check if first time user - send welcome
         var sent = await isWelcomeSent(userId);
