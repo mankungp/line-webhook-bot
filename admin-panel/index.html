@@ -749,6 +749,9 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('hr')" data-page="hr" data-perm="hr:read">
       <span class="icon">🧑‍💼</span> <span>พนักงาน</span>
     </a>
+    <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read">
+      <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
+    </a>
     <a onclick="showPage('users')" data-page="users" data-owner-only>
       <span class="icon">👥</span> <span>ผู้ใช้ระบบ</span>
     </a>
@@ -1346,6 +1349,93 @@ input:focus, textarea:focus, select:focus {
     </div>
   </div>
 
+  <!-- ============ MARKETPLACE PAGE ============ -->
+  <div id="page-marketplace" class="page" style="display:none;" data-perm="marketplace:read">
+    <div class="page-header">
+      <h2>🛍️ ช่องทางขาย</h2>
+      <p>เชื่อมต่อ Lazada / TikTok / Shopee · รอ API approval แล้วใส่ credentials</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:14px;">
+
+      <!-- Lazada Card -->
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <h3 style="margin:0;"><span style="color:#FF6B0F;">◆</span> Lazada</h3>
+          <span id="lzStatusBadge" class="status-badge" style="font-size:11px;">...</span>
+        </div>
+        <div style="font-size:13px; color:#666; margin-bottom:10px;">
+          เชื่อมต่อ Lazada Open Platform — sync order → stock → สร้างบิล
+        </div>
+        <div id="lzInfo" style="font-size:12px; color:#999; margin-bottom:10px;"></div>
+        <button class="btn btn-primary btn-sm" onclick="openMarketplaceConfig('lazada')">⚙️ ตั้งค่า credentials</button>
+        <button class="btn btn-secondary btn-sm" onclick="syncMarketplace('lazada')" id="lzSyncBtn">🔄 Sync orders</button>
+        <div style="margin-top:10px; padding:8px; background:#f6f8fa; border-radius:6px; font-size:11px; font-family:monospace;">
+          Webhook URL:<br/><code style="word-break:break-all;">/api/marketplace/lazada/webhook</code>
+        </div>
+      </div>
+
+      <!-- TikTok Card -->
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <h3 style="margin:0;"><span style="color:#000;">◆</span> TikTok Shop</h3>
+          <span id="tkStatusBadge" class="status-badge" style="font-size:11px;">...</span>
+        </div>
+        <div style="font-size:13px; color:#666; margin-bottom:10px;">
+          เชื่อมต่อ TikTok Shop Partner Center — sync order + product
+        </div>
+        <div id="tkInfo" style="font-size:12px; color:#999; margin-bottom:10px;"></div>
+        <button class="btn btn-primary btn-sm" onclick="openMarketplaceConfig('tiktok')">⚙️ ตั้งค่า credentials</button>
+        <button class="btn btn-secondary btn-sm" onclick="syncMarketplace('tiktok')" id="tkSyncBtn">🔄 Sync orders</button>
+        <div style="margin-top:10px; padding:8px; background:#f6f8fa; border-radius:6px; font-size:11px; font-family:monospace;">
+          Webhook URL:<br/><code style="word-break:break-all;">/api/marketplace/tiktok/webhook</code>
+        </div>
+      </div>
+
+      <!-- Shopee Card -->
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <h3 style="margin:0;"><span style="color:#EE4D2D;">◆</span> Shopee</h3>
+          <span class="status-badge off" style="font-size:11px;">รอ approval</span>
+        </div>
+        <div style="font-size:13px; color:#666; margin-bottom:10px;">
+          Shopee Open Platform — ติด partner platform จะ approve ได้
+        </div>
+        <div style="padding:10px; background:#fff3cd; border:1px solid #ffe69c; border-radius:6px; font-size:12px; color:#856404;">
+          ⚠️ ต้องมี Lazada/TikTok integration ก่อน — จึงจะสมัคร Shopee ได้
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Marketplace Config Modal -->
+  <div class="modal" id="marketplaceModal">
+    <div class="modal-content" style="max-width:520px;">
+      <button class="close-btn" onclick="closeMarketplaceModal()">×</button>
+      <h2 id="mpModalTitle">ตั้งค่า Marketplace</h2>
+      <input type="hidden" id="mpProvider">
+      <div style="font-size:12px; color:#666; margin-bottom:14px;">
+        ข้อมูลต่อไปนี้จะได้หลัง marketplace approve App — อยู่ใน Developer Console
+      </div>
+      <div><label>App Key</label><input type="text" id="mpAppKey" style="width:100%;"></div>
+      <div style="margin-top:10px;"><label>App Secret</label><input type="password" id="mpAppSecret" style="width:100%;"></div>
+      <div style="margin-top:10px;"><label>Access Token</label><input type="text" id="mpAccessToken" style="width:100%;"></div>
+      <div style="margin-top:10px;"><label>Refresh Token</label><input type="text" id="mpRefreshToken" style="width:100%;"></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+        <div><label>Shop ID</label><input type="text" id="mpShopId"></div>
+        <div id="mpShopCipherWrap" style="display:none;"><label>Shop Cipher (TikTok)</label><input type="text" id="mpShopCipher"></div>
+      </div>
+      <div style="margin-top:14px;">
+        <label><input type="checkbox" id="mpEnabled"> เปิดใช้งาน (sync auto)</label>
+      </div>
+      <div id="mpStatusMsg" style="margin-top:12px;"></div>
+      <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeMarketplaceModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveMarketplaceConfig()">💾 บันทึก</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ USERS PAGE (owner only) ============ -->
   <div id="page-users" class="page" style="display:none;" data-owner-only>
     <div class="page-header">
@@ -1686,6 +1776,7 @@ function showPage(page) {
   if (page === 'members') loadMembers();
   if (page === 'cameras') loadCameras();
   if (page === 'hr') loadHr();
+  if (page === 'marketplace') loadMarketplace();
   if (page === 'users') loadAdminUsers();
   if (page === 'reports') {
     if (!document.getElementById('rFrom').value) setReportPeriod('today');
@@ -5182,6 +5273,103 @@ async function deleteJob() {
     closeJobModal();
     loadTechJobs();
   } catch (e) { alert('❌ ' + e.message); }
+}
+
+// ============ MARKETPLACE ============
+async function loadMarketplace() {
+  try {
+    var r = await fetch('/api/marketplace/status');
+    var d = await r.json();
+    renderMarketplaceCard('lazada', d.lazada);
+    renderMarketplaceCard('tiktok', d.tiktok);
+  } catch (e) { console.error('loadMarketplace:', e); }
+}
+
+function renderMarketplaceCard(provider, data) {
+  var prefix = provider === 'lazada' ? 'lz' : 'tk';
+  var badge = document.getElementById(prefix + 'StatusBadge');
+  var info = document.getElementById(prefix + 'Info');
+  if (!badge || !info) return;
+  if (data.configured && data.enabled) {
+    badge.textContent = '🟢 ใช้งาน';
+    badge.className = 'status-badge on';
+  } else if (data.configured) {
+    badge.textContent = '⚪ ตั้งค่าแล้ว (ปิด)';
+    badge.className = 'status-badge';
+    badge.style.background = '#999'; badge.style.color = '#fff';
+  } else {
+    badge.textContent = '⚠️ ยังไม่ตั้งค่า';
+    badge.className = 'status-badge off';
+  }
+  var lines = ['Events: ' + data.events_count];
+  if (data.latest_event) lines.push('Latest: ' + new Date(data.latest_event).toLocaleString('th-TH'));
+  info.textContent = lines.join(' | ');
+}
+
+async function openMarketplaceConfig(provider) {
+  document.getElementById('mpProvider').value = provider;
+  document.getElementById('mpModalTitle').textContent = 'ตั้งค่า ' + (provider === 'lazada' ? 'Lazada' : 'TikTok Shop');
+  document.getElementById('mpShopCipherWrap').style.display = provider === 'tiktok' ? 'block' : 'none';
+  try {
+    var r = await fetch('/api/marketplace/' + provider + '/config');
+    var c = await r.json();
+    document.getElementById('mpAppKey').value = c.has_app_key ? '(ตั้งไว้แล้ว — ลบเพื่อเปลี่ยน)' : '';
+    document.getElementById('mpAppSecret').value = '';
+    document.getElementById('mpAccessToken').value = c.has_access_token ? '(ตั้งไว้แล้ว)' : '';
+    document.getElementById('mpRefreshToken').value = '';
+    document.getElementById('mpShopId').value = c.shop_id || '';
+    document.getElementById('mpShopCipher').value = c.shop_cipher || '';
+    document.getElementById('mpEnabled').checked = !!c.enabled;
+  } catch (e) {}
+  document.getElementById('mpStatusMsg').textContent = '';
+  document.getElementById('marketplaceModal').classList.add('active');
+}
+
+function closeMarketplaceModal() {
+  document.getElementById('marketplaceModal').classList.remove('active');
+}
+
+async function saveMarketplaceConfig() {
+  var provider = document.getElementById('mpProvider').value;
+  var data = { enabled: document.getElementById('mpEnabled').checked };
+  var fieldMap = {
+    mpAppKey: 'app_key', mpAppSecret: 'app_secret',
+    mpAccessToken: 'access_token', mpRefreshToken: 'refresh_token',
+    mpShopId: 'shop_id', mpShopCipher: 'shop_cipher'
+  };
+  Object.keys(fieldMap).forEach(function(id) {
+    var v = (document.getElementById(id).value || '').trim();
+    if (!v || v.startsWith('(')) return;
+    data[fieldMap[id]] = v;
+  });
+  document.getElementById('mpStatusMsg').textContent = '⏳ กำลังบันทึก...';
+  try {
+    var r = await fetch('/api/marketplace/' + provider + '/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    var result = await r.json();
+    if (!r.ok || result.error) throw new Error(result.error || 'failed');
+    document.getElementById('mpStatusMsg').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว</span>';
+    setTimeout(function() { closeMarketplaceModal(); loadMarketplace(); }, 600);
+  } catch (e) {
+    document.getElementById('mpStatusMsg').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+async function syncMarketplace(provider) {
+  var btn = document.getElementById((provider === 'lazada' ? 'lz' : 'tk') + 'SyncBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ sync...';
+  try {
+    var r = await fetch('/api/marketplace/' + provider + '/sync-orders', { method: 'POST' });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'failed');
+    alert('✅ Sync สำเร็จ\n\n' + JSON.stringify(d, null, 2).slice(0, 500));
+    loadMarketplace();
+  } catch (e) { alert('❌ ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '🔄 Sync orders'; }
 }
 </script>
 

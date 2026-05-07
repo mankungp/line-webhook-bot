@@ -176,6 +176,18 @@ app.post('/api/tech-jobs', forwardWithCookie('POST'));
 app.put('/api/tech-jobs/:id', forwardWithCookie('PUT'));
 app.delete('/api/tech-jobs/:id', forwardWithCookie('DELETE'));
 
+// ============ MARKETPLACE PROXIES ============
+app.get('/api/marketplace/status', forwardWithCookie('GET'));
+app.get('/api/marketplace/lazada/config', forwardWithCookie('GET'));
+app.put('/api/marketplace/lazada/config', forwardWithCookie('PUT'));
+app.post('/api/marketplace/lazada/sync-orders', forwardWithCookie('POST'));
+app.get('/api/marketplace/tiktok/config', forwardWithCookie('GET'));
+app.put('/api/marketplace/tiktok/config', forwardWithCookie('PUT'));
+app.post('/api/marketplace/tiktok/sync-orders', forwardWithCookie('POST'));
+// Webhooks: ไม่ต้อง forward cookie (Lazada/TikTok call ไม่มี session) — raw forward
+app.post('/api/marketplace/lazada/webhook', forwardWithCookie('POST'));
+app.post('/api/marketplace/tiktok/webhook', forwardWithCookie('POST'));
+
 
 // LINE signature verification
 function verifyLineSignature(req, res, next) {
