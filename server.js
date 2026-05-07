@@ -177,6 +177,10 @@ app.put('/api/tech-jobs/:id', forwardWithCookie('PUT'));
 app.delete('/api/tech-jobs/:id', forwardWithCookie('DELETE'));
 
 // ============ PAYROLL PROXIES (Phase 3) ============
+app.get('/api/holidays', forwardWithCookie('GET'));
+app.get('/api/holidays/:yearMonth', forwardWithCookie('GET'));
+app.put('/api/holidays/:yearMonth', forwardWithCookie('PUT'));
+app.delete('/api/holidays/:yearMonth', forwardWithCookie('DELETE'));
 app.get('/api/payroll/preview', forwardWithCookie('GET'));
 app.get('/api/payroll/preview-all', forwardWithCookie('GET'));
 app.post('/api/payroll/commit', forwardWithCookie('POST'));

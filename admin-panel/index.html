@@ -1368,6 +1368,34 @@ input:focus, textarea:focus, select:focus {
       <div id="payrollMsg" style="margin-top:8px; font-size:13px;"></div>
     </div>
 
+    <div class="card" id="holidayCard" data-owner-only style="margin-bottom:14px;">
+      <h3 style="margin-top:0;">📅 วันหยุดเดือน (โควต้านักขัตฤกษ์)</h3>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <input type="month" id="holYearMonth" value="" style="padding:6px; border:1px solid #ddd; border-radius:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="loadHolidaysForMonth()">🔄 โหลด</button>
+        <span style="margin-left:auto; font-size:12px; color:#666;">
+          ค่าเริ่มต้น: monthly_quota = 4 วัน
+        </span>
+      </div>
+      <div style="margin-top:10px;">
+        <label>โควต้านักขัตฤกษ์ (วัน):
+          <input type="number" id="holExtraQuota" min="0" max="10" value="0" style="width:60px; padding:4px;">
+        </label>
+        <span style="font-size:12px; color:#999; margin-left:10px;">
+          ปกติ 4 วัน + อันนี้ + วันที่กำหนดด้านล่าง
+        </span>
+      </div>
+      <div style="margin-top:10px;">
+        <label>วันที่กำหนดบังคับ (สงกรานต์, ปีใหม่ ฯลฯ):</label>
+        <div id="fixedHolidaysList" style="margin-top:6px;"></div>
+        <button class="btn btn-secondary btn-sm" onclick="addFixedHoliday()" style="margin-top:6px;">+ เพิ่มวันหยุด</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-primary" onclick="saveHolidays()">💾 บันทึก</button>
+        <span id="holStatus" style="margin-left:10px;"></span>
+      </div>
+    </div>
+
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <h3 style="margin:0;">ผลลัพธ์</h3>
@@ -1380,12 +1408,13 @@ input:focus, textarea:focus, select:focus {
           <thead>
             <tr>
               <th>Code</th><th>ชื่อ</th><th class="num">วันทำงาน</th>
+              <th class="num">โควต้า/ใช้</th><th class="num">โบนัส/หัก</th>
               <th class="num">ฐาน</th><th class="num">คอมช่าง</th>
               <th class="num">หัก</th><th class="num">สุทธิ</th>
               <th>สถานะ</th><th>จัดการ</th>
             </tr>
           </thead>
-          <tbody id="payrollTableBody"><tr><td colspan="9" style="text-align:center; color:#888;">เลือกรอบแล้วกด Preview</td></tr></tbody>
+          <tbody id="payrollTableBody"><tr><td colspan="11" style="text-align:center; color:#888;">เลือกรอบแล้วกด Preview</td></tr></tbody>
         </table>
       </div>
       <div id="payrollFooter" style="margin-top:12px; display:none; gap:8px; justify-content:flex-end;">
@@ -5728,6 +5757,8 @@ function initPayrollPage() {
   var s = document.getElementById('payPeriodStart');
   var e = document.getElementById('payPeriodEnd');
   if (!s.value && !e.value) setPayrollPreset('first-half');
+  // โหลด holidays ของเดือนปัจจุบัน
+  try { loadHolidaysForMonth(); } catch (err) { console.warn('holidays init', err); }
 }
 
 function setPayrollPreset(kind) {
@@ -5762,6 +5793,74 @@ function _payrollPeriod() {
 
 function _fmt(n) {
   return Number(n||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ===== Holidays (owner-managed leave quota) =====
+var hol_state = { fixed_holidays: [] };
+
+function _ensureHolYM() {
+  var el = document.getElementById('holYearMonth');
+  if (!el) return null;
+  if (!el.value) {
+    var d = new Date();
+    el.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+  return el.value;
+}
+
+async function loadHolidaysForMonth() {
+  var ym = _ensureHolYM();
+  if (!ym) return;
+  try {
+    var r = await fetch('/api/holidays/' + ym);
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    document.getElementById('holExtraQuota').value = d.holiday_quota_extra || 0;
+    hol_state.fixed_holidays = (d.fixed_holidays || []).map(function(fh){ return { date: fh.date||'', name: fh.name||'', mandatory: fh.mandatory !== false }; });
+    renderFixedHolidays();
+  } catch (e) { console.error('loadHolidays err', e); }
+}
+
+function renderFixedHolidays() {
+  var el = document.getElementById('fixedHolidaysList');
+  if (!el) return;
+  var html = hol_state.fixed_holidays.map(function(fh, i) {
+    return '<div style="display:flex; gap:6px; margin-bottom:4px; align-items:center;">' +
+      '<input type="date" value="' + (fh.date||'') + '" onchange="hol_state.fixed_holidays[' + i + '].date=this.value" style="padding:4px;">' +
+      '<input type="text" value="' + (fh.name || '').replace(/"/g,'&quot;') + '" placeholder="ชื่อวันหยุด" onchange="hol_state.fixed_holidays[' + i + '].name=this.value" style="flex:1; padding:4px;">' +
+      '<label style="font-size:12px;"><input type="checkbox" ' + (fh.mandatory ? 'checked' : '') + ' onchange="hol_state.fixed_holidays[' + i + '].mandatory=this.checked"> บังคับ</label>' +
+      '<button class="btn btn-danger btn-sm" onclick="hol_state.fixed_holidays.splice(' + i + ',1); renderFixedHolidays();">🗑️</button>' +
+    '</div>';
+  }).join('');
+  el.innerHTML = html || '<div style="font-size:12px; color:#999;">ไม่มีวันหยุดบังคับ</div>';
+}
+
+function addFixedHoliday() {
+  hol_state.fixed_holidays.push({ date: '', name: '', mandatory: true });
+  renderFixedHolidays();
+}
+
+async function saveHolidays() {
+  var ym = document.getElementById('holYearMonth').value;
+  if (!ym) { alert('เลือกเดือน'); return; }
+  var data = {
+    holiday_quota_extra: parseInt(document.getElementById('holExtraQuota').value, 10) || 0,
+    fixed_holidays: hol_state.fixed_holidays.filter(function(fh) { return fh.date; })
+  };
+  var statusEl = document.getElementById('holStatus');
+  try {
+    var r = await fetch('/api/holidays/' + ym, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    var result = await r.json();
+    if (!r.ok || result.error) throw new Error(result.error || 'failed');
+    statusEl.innerHTML = '<span style="color:#0a7a2e;">✅ บันทึก</span>';
+    setTimeout(function(){ statusEl.textContent = ''; }, 2000);
+  } catch (e) {
+    statusEl.innerHTML = '<span style="color:#c0392b;">❌ ' + (e.message || 'error') + '</span>';
+  }
 }
 
 async function loadPayrollPreview() {
@@ -5800,7 +5899,7 @@ function renderPayrollTable(slips, committed) {
   var tb = document.getElementById('payrollTableBody');
   var footer = document.getElementById('payrollFooter');
   if (!slips || slips.length === 0) {
-    tb.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#888;">ไม่มีข้อมูล</td></tr>';
+    tb.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#888;">ไม่มีข้อมูล</td></tr>';
     footer.style.display = 'none';
     document.getElementById('payrollSummary').textContent = '';
     return;
@@ -5820,10 +5919,20 @@ function renderPayrollTable(slips, committed) {
       actions += ' <button class="btn btn-sm" onclick="sendPayslipLine(\'' + s.id + '\')" style="padding:3px 8px;">📲</button>';
       if (s.status !== 'paid') actions += ' <button class="btn btn-sm btn-primary" onclick="markPayslipPaid(\'' + s.id + '\')" style="padding:3px 8px;">✓</button>';
     }
+    var quotaCell = '-';
+    var bonusCell = '-';
+    if (s.leave_info) {
+      quotaCell = s.leave_info.total_quota + '/' + s.leave_info.days_absent;
+      if (s.leave_info.unused_quota > 0) bonusCell = '<span style="color:#0a7a2e;">+' + _fmt(s.leave_info.leave_bonus) + '</span>';
+      else if (s.leave_info.excess_days > 0) bonusCell = '<span style="color:#c0392b;">-' + _fmt(s.leave_info.leave_excess_deduction) + '</span>';
+      else bonusCell = '0';
+    }
     return '<tr>' +
       '<td>' + s.emp_code + '</td>' +
       '<td>' + (s.name || '-') + '</td>' +
       '<td class="num">' + s.days_worked + '/' + s.days_in_period + '</td>' +
+      '<td class="num">' + quotaCell + '</td>' +
+      '<td class="num">' + bonusCell + '</td>' +
       '<td class="num">' + _fmt(s.base_earning) + '</td>' +
       '<td class="num">' + _fmt(s.tech_commission) + '</td>' +
       '<td class="num" style="color:#c0392b;">' + _fmt(s.total_deduction) + '</td>' +
@@ -5849,11 +5958,19 @@ function showPayslip(idOrCode) {
   html += '<table class="table" style="width:100%; font-size:13px;"><tbody>';
   html += '<tr><td>เงินเดือน/รายวัน</td><td class="num">' + _fmt(s.base_earning) + '</td></tr>';
   if (s.tech_commission > 0) html += '<tr><td>คอมช่าง (' + (s.tech_jobs_included||[]).length + ' งาน)</td><td class="num">+' + _fmt(s.tech_commission) + '</td></tr>';
+  if (s.leave_bonus && s.leave_bonus > 0) {
+    var liShow = s.leave_info || {};
+    html += '<tr><td>โบนัสโควต้าคงเหลือ (' + (liShow.unused_quota||0) + '/' + (liShow.total_quota||0) + ' วัน)</td><td class="num" style="color:#0a7a2e;">+' + _fmt(s.leave_bonus) + '</td></tr>';
+  }
   html += '<tr style="font-weight:bold; border-top:1px solid #ddd;"><td>รวมรายได้</td><td class="num">' + _fmt(s.gross) + '</td></tr>';
   if (s.time_deduction > 0) html += '<tr><td>หักเวลา (สาย ' + s.late_minutes + '/ออกก่อน ' + s.early_minutes + '/พักเกิน ' + s.excess_break_minutes + '/ขาด ' + s.absent_deduct_minutes + ' นาที)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.time_deduction) + '</td></tr>';
   if (s.social_security > 0) html += '<tr><td>ประกันสังคม 5%</td><td class="num" style="color:#c0392b;">-' + _fmt(s.social_security) + '</td></tr>';
   if (s.advance_deduction > 0) html += '<tr><td>เบิกล่วงหน้า (' + (s.advances_included||[]).length + ' รายการ)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.advance_deduction) + '</td></tr>';
   if (s.carryover_deduction > 0) html += '<tr><td>ยอดค้างงวดก่อน</td><td class="num" style="color:#c0392b;">-' + _fmt(s.carryover_deduction) + '</td></tr>';
+  if (s.leave_excess_deduction && s.leave_excess_deduction > 0) {
+    var liShow2 = s.leave_info || {};
+    html += '<tr><td>ขาดเกินโควต้าลา (' + (liShow2.excess_days||0) + ' วัน)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.leave_excess_deduction) + '</td></tr>';
+  }
   html += '<tr style="font-weight:bold; border-top:1px solid #ddd;"><td>รวมหัก</td><td class="num">' + _fmt(s.total_deduction) + '</td></tr>';
   html += '<tr style="font-weight:bold; font-size:15px; border-top:2px solid #000;"><td>เงินสุทธิ</td><td class="num">' + _fmt(s.final_pay) + '</td></tr>';
   html += '</tbody></table>';
