@@ -740,19 +740,19 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('reports')" data-page="reports" data-perm="reports:read">
       <span class="icon">📊</span> <span>รายงาน</span>
     </a>
-    <a onclick="showPage('cameras')" data-page="cameras" data-perm="cameras:read">
+    <a onclick="showPage('cameras')" data-page="cameras" data-owner-only>
       <span class="icon">📷</span> <span>กล้อง</span>
     </a>
-    <a onclick="showPage('hr')" data-page="hr" data-perm="hr:read">
+    <a onclick="showPage('hr')" data-page="hr" data-owner-only>
       <span class="icon">🧑‍💼</span> <span>พนักงาน</span>
     </a>
-    <a onclick="showPage('payroll')" data-page="payroll" data-perm="hr:read">
+    <a onclick="showPage('payroll')" data-page="payroll" data-owner-only>
       <span class="icon">💰</span> <span>เงินเดือน</span>
     </a>
     <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read">
       <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
     </a>
-    <a onclick="showPage('qr-att')" data-page="qr-att" data-perm="hr:read">
+    <a onclick="showPage('qr-att')" data-page="qr-att" data-owner-only>
       <span class="icon">📱</span> <span>QR ลงเวลา</span>
     </a>
     <a onclick="showPage('users')" data-page="users" data-owner-only>
@@ -1122,7 +1122,7 @@ input:focus, textarea:focus, select:focus {
 
   <!-- ============ CUSTOMERS PAGE ============ -->
   <!-- ============ CAMERAS PAGE ============ -->
-  <div id="page-cameras" class="page" style="display:none;">
+  <div id="page-cameras" class="page" style="display:none;" data-owner-only>
     <div class="page-header">
       <h2>📷 กล้องวงจรปิด</h2>
       <p>ดูสถานะกล้อง + snapshots ตอน paid</p>
@@ -1134,7 +1134,7 @@ input:focus, textarea:focus, select:focus {
   </div>
 
   <!-- ============ HR PAGE (พนักงาน) ============ -->
-  <div id="page-hr" class="page" style="display:none;" data-perm="hr:read">
+  <div id="page-hr" class="page" style="display:none;" data-owner-only>
     <div class="page-header">
       <h2>🧑‍💼 พนักงาน</h2>
       <p>จัดการพนักงาน · ลงเวลา · เบิกล่วงหน้า · งานช่างซ่อม</p>
@@ -1340,7 +1340,7 @@ input:focus, textarea:focus, select:focus {
   </div>
 
   <!-- ============ PAYROLL PAGE (เงินเดือน) ============ -->
-  <div id="page-payroll" class="page" style="display:none;" data-perm="hr:read">
+  <div id="page-payroll" class="page" style="display:none;" data-owner-only>
     <div class="page-header">
       <h2>💰 เงินเดือน</h2>
       <p>คำนวณ & ออกสลิปเงินเดือน · รอบรายสัปดาห์ / รายเดือน</p>
@@ -1493,7 +1493,7 @@ input:focus, textarea:focus, select:focus {
     </div>
   </div>
 
-<div id="page-qr-att" class="page" style="display:none;" data-perm="hr:read">
+<div id="page-qr-att" class="page" style="display:none;" data-owner-only>
   <div class="page-header">
     <h2>📱 QR ลงเวลา</h2>
     <p>แสดง QR Code สำหรับพนักงานสแกนลงเวลา · เปลี่ยนทุก 30 วินาที</p>
