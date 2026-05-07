@@ -1466,6 +1466,9 @@ var API_BASE = ''; // Uses relative proxy on same origin
 
 // ============ PAGE NAVIGATION ============
 function showPage(page) {
+  // หยุด camera polling เมื่อออกจากหน้า cameras
+  if (page !== 'cameras' && typeof stopCameraPoll === 'function') stopCameraPoll();
+
   document.querySelectorAll('.page').forEach(function(p) { p.style.display = 'none'; });
   document.getElementById('page-' + page).style.display = 'block';
   document.querySelectorAll('.sidebar nav a').forEach(function(a) { a.classList.remove('active'); });
@@ -4157,9 +4160,62 @@ function playRecording(url) {
   }, 100);
 }
 
+// ============ CAMERAS LIVE POLLING ============
+var cameraPollTimer = null;
+var cameraList = [];
+var cameraPollInterval = 2000; // รีเฟรชทุก 2 วินาที
+var cameraPollPaused = false;
+
+function stopCameraPoll() {
+  if (cameraPollTimer) { clearInterval(cameraPollTimer); cameraPollTimer = null; }
+}
+
+function refreshCameraImages() {
+  if (cameraPollPaused) return;
+  if (document.hidden) return; // ไม่ poll ตอน tab ไม่อยู่
+  cameraList.forEach(function(c) {
+    var img = document.getElementById('cam-img-' + c.id);
+    if (!img) return;
+    // สร้างภาพใหม่ไว้ใน buffer เพื่อกันภาพกระพริบตอน swap
+    var next = new Image();
+    next.onload = function() { img.src = next.src; };
+    next.onerror = function() { /* เงียบ — เก็บภาพเก่าไว้ */ };
+    next.src = '/api/cameras/' + c.id + '/snapshot?t=' + Date.now();
+  });
+}
+
+function startCameraPoll() {
+  stopCameraPoll();
+  if (!cameraList || cameraList.length === 0) return;
+  cameraPollTimer = setInterval(refreshCameraImages, cameraPollInterval);
+}
+
+function setCameraPollInterval(ms) {
+  cameraPollInterval = ms;
+  startCameraPoll();
+  var label = document.getElementById('camPollLabel');
+  if (label) label.textContent = (ms / 1000).toFixed(1) + ' วิ';
+}
+
+function toggleCameraPause() {
+  cameraPollPaused = !cameraPollPaused;
+  var btn = document.getElementById('camPauseBtn');
+  if (btn) btn.textContent = cameraPollPaused ? '▶️ เล่นต่อ' : '⏸ หยุด';
+}
+
+// หยุด polling เมื่อ tab ไม่อยู่ (ประหยัด bandwidth)
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    stopCameraPoll();
+  } else if (cameraList.length > 0 && document.getElementById('page-cameras').style.display !== 'none') {
+    startCameraPoll();
+  }
+});
+
 async function loadCameras() {
   var box = document.getElementById('cameraList');
   if (!box) return;
+  stopCameraPoll();
   box.innerHTML = '<div style="color:#999; padding:24px; text-align:center;">⏳ กำลังโหลด...</div>';
   try {
     var r = await fetch('/api/cameras');
@@ -4172,12 +4228,24 @@ async function loadCameras() {
       box.innerHTML = '<div style="color:#999; padding:24px; text-align:center;">⚠️ ยังไม่มีกล้องเชื่อมเข้า Synology<br/><small>เพิ่มกล้องผ่าน Surveillance Station ใน DSM ก่อน</small></div>';
       return;
     }
-    var html = '';
+    cameraList = d.cameras;
+
+    // แถบ control speed/pause
+    var controlBar = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;font-size:13px;">' +
+      '<span style="color:#666;">⚡ รีเฟรช:</span>' +
+      '<button class="btn btn-secondary btn-sm" onclick="setCameraPollInterval(1000)">เร็ว (1วิ)</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="setCameraPollInterval(2000)">ปกติ (2วิ)</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="setCameraPollInterval(5000)">ประหยัด (5วิ)</button>' +
+      '<button class="btn btn-secondary btn-sm" id="camPauseBtn" onclick="toggleCameraPause()">⏸ หยุด</button>' +
+      '<span style="color:#999;margin-left:auto;">รีเฟรชทุก <span id="camPollLabel">' + (cameraPollInterval/1000).toFixed(1) + ' วิ</span></span>' +
+      '</div>';
+
+    var html = controlBar + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">';
     d.cameras.forEach(function(c) {
       var isOnline = c.status === 1;
       html += '<div class="card" style="padding:12px;">';
       html += '<div style="position:relative;">';
-      html += '<img src="/api/cameras/' + c.id + '/snapshot?t=' + Date.now() + '" style="width:100%; border-radius:6px; aspect-ratio:16/9; object-fit:cover; background:#000;" onerror="this.style.background=\'#333\';this.alt=\'⚠️ no snapshot\';">';
+      html += '<img id="cam-img-' + c.id + '" src="/api/cameras/' + c.id + '/snapshot?t=' + Date.now() + '" style="width:100%; border-radius:6px; aspect-ratio:16/9; object-fit:cover; background:#000;" onerror="this.style.background=\'#333\';this.alt=\'⚠️ no snapshot\';">';
       html += '<div style="position:absolute; top:8px; right:8px; background:' + (isOnline ? '#0a0' : '#d33') + '; color:white; padding:2px 6px; border-radius:4px; font-size:11px;">' + (isOnline ? '🟢 LIVE' : '🔴 OFFLINE') + '</div>';
       html += '</div>';
       html += '<div style="margin-top:8px;"><strong>' + escapeHtml(c.newName || ('Camera ' + c.id)) + '</strong></div>';
@@ -4185,11 +4253,17 @@ async function loadCameras() {
       html += '<div style="font-size:12px; color:#999;">' + escapeHtml(c.ip || '') + (c.port ? ':' + c.port : '') + '</div>';
       html += '</div>';
     });
+    html += '</div>';
     box.innerHTML = html;
+
+    // เริ่ม polling
+    startCameraPoll();
   } catch (e) {
     box.innerHTML = '<div style="color:#d33; padding:24px; text-align:center;">❌ ' + escapeHtml(e.message) + '</div>';
   }
 }
+
+// (showPage เรียก stopCameraPoll เมื่อเปลี่ยนหน้า — ไม่ต้อง wrap ซ้ำ)
 
 // Close videos modal on outside click
 document.addEventListener('click', function(e) {
