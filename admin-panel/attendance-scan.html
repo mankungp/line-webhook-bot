@@ -220,6 +220,25 @@
     return u.searchParams.get('token');
   }
 
+  function getPresetType() {
+    const u = new URL(location.href);
+    const t = u.searchParams.get('type');
+    if (t === 'check_in' || t === 'check_out') return t;
+    return null;
+  }
+
+  // ขอ token สด (สำหรับกรณีมาจาก /tech ไม่มี token)
+  async function fetchFreshToken() {
+    // ลอง self endpoint ก่อน (ช่างมีสิทธิ์) → fallback admin endpoint
+    for (const url of ['/api/attendance/qr-token-self', '/api/attendance/qr-token']) {
+      try {
+        const r = await api(url);
+        if (r.ok && r.body && r.body.token) return r.body.token;
+      } catch(_) {}
+    }
+    return null;
+  }
+
   function fmtTime(d = new Date()) {
     return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   }
@@ -428,6 +447,14 @@
 
     $('btnIn').addEventListener('click', () => { state.selectedType = 'check_in'; showCamera(); });
     $('btnOut').addEventListener('click', () => { state.selectedType = 'check_out'; showCamera(); });
+
+    // ถ้า URL มี ?type=check_in/check_out → auto-skip
+    if (state.presetType) {
+      const t = state.presetType;
+      state.presetType = null; // ใช้ครั้งเดียว
+      state.selectedType = t;
+      setTimeout(() => showCamera(), 300);
+    }
   }
 
   async function showCamera() {
@@ -571,9 +598,22 @@
   // ---------- Init ----------
   async function init() {
     state.token = getToken();
+    state.presetType = getPresetType(); // ถ้า ?type=check_out → skip ไปถ่ายรูปเลย
     if (!state.token) {
-      showError('ไม่พบ token ใน URL — กรุณาสแกน QR ใหม่');
-      return;
+      // ลองขอ token สด (กรณีช่างกดปุ่ม จากหน้า /tech)
+      showLoading('กำลังขอ QR token...');
+      const fresh = await fetchFreshToken();
+      if (!fresh) {
+        showError('ไม่พบ token — กรุณาสแกน QR จากหน้าจอลงเวลา', () => location.reload());
+        return;
+      }
+      state.token = fresh;
+      // อัพเดต URL ให้มี token (ไม่ reload)
+      try {
+        const u = new URL(location.href);
+        u.searchParams.set('token', fresh);
+        history.replaceState({}, '', u.toString());
+      } catch(_) {}
     }
 
     // 1) verify token

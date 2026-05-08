@@ -207,6 +207,7 @@ app.get('/api/payroll/:id/pdf', async function(req, res) {
 
 // Attendance (QR check-in)
 app.get('/api/attendance/qr-token', forwardWithCookie('GET'));
+app.get('/api/attendance/qr-token-self', forwardWithCookie('GET'));
 app.get('/api/attendance/today', forwardWithCookie('GET'));
 app.post('/api/attendance/manual', forwardWithCookie('POST'));
 app.post('/api/attendance/verify-token', forwardWithCookie('POST'));
