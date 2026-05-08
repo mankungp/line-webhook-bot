@@ -1,7 +1,7 @@
 {
-  "name": "ระบบช่าง — Tech Jobs",
-  "short_name": "งานช่าง",
-  "description": "ระบบจัดการงานซ่อมสำหรับช่าง",
+  "name": "KKT SERVICE",
+  "short_name": "KKT SERVICE",
+  "description": "ระบบจัดการงานซ่อม KKT SERVICE",
   "start_url": "/tech",
   "scope": "/tech",
   "display": "standalone",
