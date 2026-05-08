@@ -236,6 +236,7 @@ app.get('/api/tech/products', forwardWithCookie('GET'));
 app.get('/api/tech-jobs/pending-approval', forwardWithCookie('GET'));
 app.post('/api/tech-jobs/:id/approve', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/reject', forwardWithCookie('POST'));
+app.post('/api/tech-jobs/:id/return-to-fixing', forwardWithCookie('POST'));
 
 // Static mobile app + PWA assets — no-cache HTML to ensure latest version
 function sendTechApp(req, res) {
@@ -970,6 +971,43 @@ function lookupUserName(lineUserId) {
   } catch (e) {}
   return 'Owner ' + String(lineUserId).slice(-6);
 }
+
+// ============ INTERNAL: NOTIFY TECH (job returned to fixing) ============
+app.post('/api/_internal/notify-tech-return', async function(req, res) {
+  try {
+    var token = req.headers['x-internal-token'] || '';
+    var expected = process.env.INTERNAL_TOKEN || '';
+    if (expected && token !== expected) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    var body = req.body || {};
+    var job = body.job;
+    var techLineId = body.tech_line_id;
+    var reason = body.reason || '';
+    if (!job || !job.id || !techLineId) return res.status(400).json({ error: 'missing fields' });
+    if (!LINE_CHANNEL_ACCESS_TOKEN) {
+      return res.json({ ok: true, skipped: true });
+    }
+
+    var msgLines = [
+      '🔄 งานซ่อมถูกส่งกลับ',
+      '',
+      '📝 ' + job.id,
+      '👤 ' + (job.customer_name || '-'),
+      '🏍️ ' + ((job.device && job.device.brand) || '') + ' ' + ((job.device && job.device.model) || ''),
+      ''
+    ];
+    if (reason) msgLines.push('รายละเอียด: ' + reason);
+    msgLines.push('');
+    msgLines.push('กรุณาตรวจชิ้นงานและซ่อมต่อ');
+    var msg = msgLines.join('\n');
+
+    var ok = await pushTextToLine(techLineId, msg);
+    res.json({ ok: ok });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ============ INTERNAL: NOTIFY OWNER (TECH JOB DECISION: approve/reject) ============
 app.post('/api/_internal/notify-tech-decision', async function(req, res) {

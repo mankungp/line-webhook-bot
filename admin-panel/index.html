@@ -5617,10 +5617,12 @@ async function loadTechApprovalList() {
       html += '<div style="flex:1;"><span style="color:#999; font-size:12px;">รวม</span><br><strong style="font-size:18px;">฿' + (j.amount||0).toLocaleString() + '</strong></div>';
       html += '<div style="flex:1;"><span style="color:#999; font-size:12px;">คอม</span><br><strong style="font-size:18px; color:#0a8;">฿' + (j.commission_amount||0).toLocaleString() + '</strong></div>';
       html += '</div>';
-      html += '<div style="display:flex; gap:6px; margin-top:10px;">';
-      html += '<button class="btn btn-secondary btn-sm" onclick="viewTechJob(\'' + j.id + '\')" style="flex:1;">👁️ ดู</button>';
-      html += '<button class="btn btn-success btn-sm" onclick="approveTechJob(\'' + j.id + '\')" style="flex:2; background:#27ae60;">✅ อนุมัติ</button>';
-      html += '<button class="btn btn-danger btn-sm" onclick="rejectTechJob(\'' + j.id + '\')" style="flex:1;">❌ Reject</button>';
+      html += '<div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">';
+      html += '<button class="btn btn-success btn-sm" onclick="approveTechJob(\'' + j.id + '\')" style="flex:2; min-width:100px; background:#27ae60;">✅ อนุมัติ</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="editTechJobOwner(\'' + j.id + '\')" style="flex:1; min-width:80px;">✏️ แก้ไข</button>';
+      html += '<button class="btn btn-warning btn-sm" onclick="returnToFixing(\'' + j.id + '\')" style="flex:1; min-width:100px; background:#f39c12; color:white;">🔄 ส่งกลับซ่อม</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="viewTechJob(\'' + j.id + '\')" style="flex:1; min-width:60px;">👁️</button>';
+      html += '<button class="btn btn-danger btn-sm" onclick="rejectTechJob(\'' + j.id + '\')" style="flex:1; min-width:80px;">❌ Reject</button>';
       html += '</div>';
       html += '</div>';
     });
@@ -5668,6 +5670,68 @@ async function rejectTechJob(id) {
 function viewTechJob(id) {
   // เปิดใน new tab สำหรับดูเต็ม (mobile app เปิดได้)
   window.open('/tech?job=' + encodeURIComponent(id), '_blank');
+}
+
+// ส่งงานกลับไปซ่อมต่อ (revert delivered → fixing)
+async function returnToFixing(id) {
+  var reason = prompt('รายละเอียดที่ต้องซ่อมเพิ่ม (ช่างจะได้รับแจ้ง LINE):');
+  if (!reason || !reason.trim()) return;
+  try {
+    var r = await fetch('/api/tech-jobs/' + id + '/return-to-fixing', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({reason: reason.trim()})
+    });
+    if (!r.ok) {
+      var d = await r.json().catch(function(){return {};});
+      throw new Error(d.error || ('HTTP '+r.status));
+    }
+    alert('✅ ส่งงานกลับไปซ่อมแล้ว');
+    loadTechApprovalList();
+    if (typeof loadTechJobs === 'function') loadTechJobs();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+// แก้ไขงานช่าง (ฟอร์มเรียบง่าย — prompt ทีละช่อง)
+async function editTechJobOwner(id) {
+  try {
+    var r = await fetch('/api/tech-jobs/' + id);
+    var d = await r.json();
+    var jobs = (d.jobs || []).filter(function(j){ return j.id === id; });
+    var j = jobs[0] || (Array.isArray(d) ? d.find(function(x){return x.id===id;}) : null);
+    if (!j) {
+      // try get list and filter
+      var r2 = await fetch('/api/tech-jobs');
+      var d2 = await r2.json();
+      var arr = d2.jobs || d2;
+      j = (Array.isArray(arr) ? arr : []).find(function(x){ return x.id === id; });
+    }
+    if (!j) return alert('ไม่พบงาน');
+
+    var newLabor = prompt('ค่าแรง (บาท):', j.labor_charge || 0);
+    if (newLabor === null) return;
+    var newRate = prompt('% คอมช่าง (ปัจจุบัน ' + (j.commission_rate||0) + '%):', j.commission_rate || 0);
+    if (newRate === null) return;
+    var newNote = prompt('หมายเหตุ:', j.note || '');
+    if (newNote === null) return;
+
+    var r3 = await fetch('/api/tech-jobs/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        labor_charge: parseFloat(newLabor) || 0,
+        commission_rate: parseFloat(newRate) || 0,
+        note: newNote
+      })
+    });
+    if (!r3.ok) {
+      var de = await r3.json().catch(function(){return {};});
+      throw new Error(de.error || ('HTTP '+r3.status));
+    }
+    alert('✅ บันทึกแล้ว');
+    loadTechApprovalList();
+    if (typeof loadTechJobs === 'function') loadTechJobs();
+  } catch (e) { alert('❌ ' + e.message); }
 }
 
 // ============ TECH JOBS ============
