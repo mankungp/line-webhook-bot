@@ -1646,22 +1646,29 @@ input:focus, textarea:focus, select:focus {
       <p>จัดการสิทธิ์การใช้งาน · เฉพาะ owner เท่านั้น</p>
     </div>
 
-    <!-- ============ QR Code ลงทะเบียนระบบ ============ -->
-    <div class="card" style="margin-bottom:14px;">
-      <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
-        <div id="loginQrBox" style="background:white; padding:14px; border-radius:10px; border:2px solid #e0e8e3;">
+    <!-- ============ QR Code สมัครเข้าระบบ ============ -->
+    <div class="card" style="margin-bottom:14px; background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%); border:1px solid #bbf7d0;">
+      <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+        <div id="loginQrBox" style="background:white; padding:14px; border-radius:10px; border:2px solid #0a8855;">
           <div id="loginQrImg"></div>
         </div>
-        <div style="flex:1; min-width:240px;">
-          <h3 style="margin:0 0 8px; color:#0a8855;">📲 QR ลงทะเบียนระบบ</h3>
-          <p style="margin:0 0 10px; color:#3a5547; line-height:1.5;">
-            สำหรับพนักงานใหม่ — สแกนขึ้นระบบครั้งแรก<br>
-            ไม่ต้องส่งลิงก์ผ่านแชต
+        <div style="flex:1; min-width:260px;">
+          <h3 style="margin:0 0 6px; color:#0a8855;">📲 QR สมัครเข้าระบบ (ทุกตำแหน่ง)</h3>
+          <p style="margin:0 0 10px; color:#3a5547; line-height:1.6; font-size:14px;">
+            พนักงานใหม่สแกน QR นี้ → Login ด้วย LINE → รออนุมัติจาก Owner<br>
+            <span style="color:#0a8855; font-weight:600;">⚡ รองรับทุก role:</span> Manager / Staff / Packing / Technician
           </p>
-          <div style="font-family:monospace; font-size:13px; color:#666; word-break:break-all; background:#f5f9f7; padding:8px; border-radius:6px;" id="loginQrUrl">-</div>
+          <div style="background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; line-height:1.6; color:#92400e;">
+            <b>ขั้นตอน:</b><br>
+            1️⃣ พนักงานสแกน QR → LINE Login<br>
+            2️⃣ ระบบสร้าง user ใหม่ (role = customer — รออนุมัติ)<br>
+            3️⃣ Owner มาหน้านี้ → กรอง role = <b>customer</b> → เปลี่ยนเป็น role ปลายทาง
+          </div>
+          <div style="font-family:monospace; font-size:12px; color:#666; word-break:break-all; background:white; padding:8px 10px; border-radius:6px; border:1px solid #e0e8e3;" id="loginQrUrl">-</div>
           <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="copyLoginUrl()" style="width:auto;margin:0">📋 คัดลิงก์</button>
             <button class="btn btn-secondary btn-sm" onclick="openLoginQrFull()" style="width:auto;margin:0">🔍 ขยายเต็มจอ</button>
+            <button class="btn btn-primary btn-sm" onclick="filterPendingUsers()" style="width:auto;margin:0;background:#f59e0b;border-color:#f59e0b;">⏳ ดูผู้รออนุมัติ</button>
           </div>
         </div>
       </div>
@@ -5835,6 +5842,17 @@ function copyLoginUrl() {
   } else {
     prompt('ลิงก์ลงทะเบียน:', url);
   }
+}
+
+function filterPendingUsers() {
+  var sel = document.getElementById('usrRoleFilter');
+  if (sel) {
+    sel.value = 'customer';
+    if (typeof renderAdminUsersList === 'function') renderAdminUsersList();
+  }
+  // เลื่อนหน้าลงไปที่ตาราง
+  var t = document.getElementById('usersTable');
+  if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function openLoginQrFull() {
