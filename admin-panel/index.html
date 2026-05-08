@@ -5665,12 +5665,29 @@ async function loadActiveJobsList() {
       html += '🔧 ' + escapeHtml(fixerLabel);
       html += '</div>';
       html += '</div>';
+      // ปุ่มลบ (owner only)
+      html += '<button class="btn btn-danger btn-sm" onclick="deleteTechJobActive(\'' + j.id + '\')" style="flex-shrink:0; background:#dc2626; color:white; border-color:#dc2626; padding:6px 10px;" title="ลบงาน">🗑️</button>';
       html += '</div>';
     });
     box.innerHTML = html;
   } catch (e) {
     console.error('loadActiveJobsList:', e);
   }
+}
+
+async function deleteTechJobActive(id) {
+  if (!confirm('⚠️ ยืนยันลบงาน ' + id + '?\n\n• ถ้าตัด stock ไปแล้ว → คืน stock อัตโนมัติ\n• รูปทั้งหมดจะถูกลบ\n• ไม่สามารถกู้คืนได้')) return;
+  try {
+    var r = await fetch('/api/tech-jobs/' + encodeURIComponent(id), { method: 'DELETE' });
+    if (!r.ok) {
+      var d = await r.json().catch(function(){return {};});
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
+    if (typeof showToast === 'function') showToast('ลบงานแล้ว', 'success');
+    loadActiveJobsList();
+    if (typeof loadTechJobs === 'function') loadTechJobs();
+    if (typeof loadCommSummary === 'function') loadCommSummary();
+  } catch (e) { alert('❌ ' + e.message); }
 }
 
 async function loadTechApprovalList() {
