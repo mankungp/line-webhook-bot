@@ -768,28 +768,41 @@
   function renderNewJob() {
     renderTopbar({ title: 'รับเครื่องใหม่', back: true, onBack: () => navigate('dashboard') });
 
-    const formState = { photos: [] };
+    // form state เก็บทุก field — ไม่หายตอนถ่ายรูป/rerender
+    const formState = {
+      cName: '', cPhone: '',
+      dBrand: '', dModel: '', dSerial: '', dProblem: '',
+      photos: []
+    };
+
+    function snapshotInputs() {
+      ['cName','cPhone','dBrand','dModel','dSerial','dProblem'].forEach(id => {
+        const el = $(id);
+        if (el) formState[id] = el.value;
+      });
+    }
 
     function rerender() {
+      const fs = formState;
       root.innerHTML = `
         <div class="card">
           <div style="font-weight:700;color:#0a8855;margin-bottom:8px">👤 ลูกค้า</div>
           <label>ชื่อ <span class="req">*</span></label>
-          <input type="text" id="cName" placeholder="คุณสมชาย" />
+          <input type="text" id="cName" placeholder="คุณสมชาย" value="${escapeHtml(fs.cName)}" />
           <label>เบอร์โทร</label>
-          <input type="tel" id="cPhone" placeholder="081-xxx-xxxx" />
+          <input type="tel" id="cPhone" placeholder="081-xxx-xxxx" value="${escapeHtml(fs.cPhone)}" />
         </div>
 
         <div class="card">
           <div style="font-weight:700;color:#0a8855;margin-bottom:8px">🏍️ เครื่อง</div>
           <label>ยี่ห้อ <span class="req">*</span></label>
-          <input type="text" id="dBrand" placeholder="Honda / Stihl / ฯลฯ" />
+          <input type="text" id="dBrand" placeholder="Honda / Stihl / ฯลฯ" value="${escapeHtml(fs.dBrand)}" />
           <label>รุ่น</label>
-          <input type="text" id="dModel" placeholder="Wave 110" />
+          <input type="text" id="dModel" placeholder="Wave 110" value="${escapeHtml(fs.dModel)}" />
           <label>Serial / เลขเครื่อง</label>
-          <input type="text" id="dSerial" />
+          <input type="text" id="dSerial" value="${escapeHtml(fs.dSerial)}" />
           <label>อาการ <span class="req">*</span></label>
-          <textarea id="dProblem" placeholder="เช่น สตาร์ทไม่ติด ไฟไม่เข้า..."></textarea>
+          <textarea id="dProblem" placeholder="เช่น สตาร์ทไม่ติด ไฟไม่เข้า...">${escapeHtml(fs.dProblem)}</textarea>
         </div>
 
         <div class="card">
@@ -810,16 +823,24 @@
         <button class="btn btn-ghost" id="btnCancel">ยกเลิก</button>
       `;
 
+      // sync input → state ระหว่างพิมพ์ (เผื่อ ถอด keyboard ปิดหรือ focus ออก)
+      ['cName','cPhone','dBrand','dModel','dSerial','dProblem'].forEach(id => {
+        const el = $(id);
+        if (el) el.addEventListener('input', () => { formState[id] = el.value; });
+      });
+
       $$('#photoGrid .x').forEach(b => {
         b.addEventListener('click', (e) => {
           e.stopPropagation();
           const idx = +b.dataset.idx;
+          snapshotInputs();
           formState.photos.splice(idx, 1);
           rerender();
         });
       });
 
       $('btnAddPhoto').addEventListener('click', () => {
+        snapshotInputs();  // เก็บที่กรอกไว้ก่อนเปิดกล้อง
         openCamera({
           label: 'รับเครื่อง',
           onSnap: ({ label, base64 }) => {
@@ -834,12 +855,13 @@
     }
 
     async function submit() {
-      const customer_name = $('cName').value.trim();
-      const customer_phone = $('cPhone').value.trim();
-      const brand = $('dBrand').value.trim();
-      const model = $('dModel').value.trim();
-      const serial = $('dSerial').value.trim();
-      const problem = $('dProblem').value.trim();
+      snapshotInputs();
+      const customer_name = (formState.cName || '').trim();
+      const customer_phone = (formState.cPhone || '').trim();
+      const brand = (formState.dBrand || '').trim();
+      const model = (formState.dModel || '').trim();
+      const serial = (formState.dSerial || '').trim();
+      const problem = (formState.dProblem || '').trim();
 
       if (!customer_name) return alert('กรุณากรอกชื่อลูกค้า');
       if (!brand) return alert('กรุณากรอกยี่ห้อเครื่อง');
