@@ -1496,17 +1496,27 @@ app.get('/snapshots/:filename', async function(req, res) {
 });
 
 // Tech app photos: /snapshots/tech/JOB-xxx/file.jpg + attendance: /snapshots/att/...
+// ถ้าไม่พบ (404) → fallback ไปลองขอจาก archive (รูปเก่าที่ archive ไป NAS แล้ว)
 app.get('/snapshots/:type/:dir/:filename', async function(req, res) {
   try {
-    var url = LOCAL_API_BASE + '/snapshots/' +
-      encodeURIComponent(req.params.type) + '/' +
-      encodeURIComponent(req.params.dir) + '/' +
-      encodeURIComponent(req.params.filename);
-    var r = await fetch(url);
-    if (!r.ok) return res.status(404).send('not found');
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.send(Buffer.from(await r.arrayBuffer()));
+    var paths = [
+      '/snapshots/' + encodeURIComponent(req.params.type) + '/' +
+        encodeURIComponent(req.params.dir) + '/' +
+        encodeURIComponent(req.params.filename),
+      '/snapshots-archive/' + encodeURIComponent(req.params.type) + '/' +
+        encodeURIComponent(req.params.dir) + '/' +
+        encodeURIComponent(req.params.filename)
+    ];
+    for (var i = 0; i < paths.length; i++) {
+      var r = await fetch(LOCAL_API_BASE + paths[i]);
+      if (r.ok) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        if (i > 0) res.setHeader('X-Snapshot-Source', 'archive');
+        return res.send(Buffer.from(await r.arrayBuffer()));
+      }
+    }
+    return res.status(404).send('not found');
   } catch (err) { res.status(500).send('error'); }
 });
 
