@@ -237,13 +237,15 @@ app.get('/api/tech-jobs/pending-approval', forwardWithCookie('GET'));
 app.post('/api/tech-jobs/:id/approve', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/reject', forwardWithCookie('POST'));
 
-// Static mobile app + PWA assets
-app.get('/tech', function(req, res) {
+// Static mobile app + PWA assets — no-cache HTML to ensure latest version
+function sendTechApp(req, res) {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'admin-panel', 'tech-app.html'));
-});
-app.get('/tech/', function(req, res) {
-  res.sendFile(path.join(__dirname, 'admin-panel', 'tech-app.html'));
-});
+}
+app.get('/tech', sendTechApp);
+app.get('/tech/', sendTechApp);
 app.get('/tech-manifest.json', function(req, res) {
   res.sendFile(path.join(__dirname, 'admin-panel', 'tech-manifest.json'));
 });
