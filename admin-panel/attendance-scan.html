@@ -427,26 +427,53 @@
     });
   }
 
-  function showReady() {
+  async function showReady() {
     const displayName = (state.user && (state.user.displayName || state.user.name)) || 'พนักงาน';
-    setHTML(`
+
+    // ลองดึง next_action จาก backend (technician เท่านั้น)
+    let nextAction = null;
+    try {
+      const sum = await api('/api/tech/today-summary');
+      if (sum && sum.ok && (sum.next_action === 'check_in' || sum.next_action === 'check_out')) {
+        nextAction = sum.next_action;
+      }
+    } catch (_) {
+      // fallback → 2 ปุ่ม
+    }
+
+    const headerHtml = `
       <div class="center">
         <div class="muted">สวัสดี</div>
         <div class="name">${escapeHtml(displayName)}</div>
         <div class="clock" id="clk">${fmtTime()}</div>
         <div class="muted" style="margin-bottom:14px">${new Date().toLocaleDateString('th-TH', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
-      </div>
+      </div>`;
+
+    let buttonsHtml;
+    if (nextAction === 'check_in') {
+      buttonsHtml = `<button class="btn btn-primary" id="btnClock">✅ ลงเวลาเข้างาน</button>`;
+    } else if (nextAction === 'check_out') {
+      buttonsHtml = `<button class="btn btn-danger" id="btnClock">🚪 ลงเวลาออกงาน</button>`;
+    } else {
+      buttonsHtml = `
       <button class="btn btn-primary" id="btnIn">✅ เข้างาน</button>
-      <button class="btn btn-danger" id="btnOut">🚪 ออกงาน</button>
-    `);
+      <button class="btn btn-danger" id="btnOut">🚪 ออกงาน</button>`;
+    }
+
+    setHTML(headerHtml + buttonsHtml);
+
     if (state.timer) clearInterval(state.timer);
     state.timer = setInterval(() => {
       const el = $('clk');
       if (el) el.textContent = fmtTime();
     }, 1000);
 
-    $('btnIn').addEventListener('click', () => { state.selectedType = 'check_in'; showCamera(); });
-    $('btnOut').addEventListener('click', () => { state.selectedType = 'check_out'; showCamera(); });
+    if (nextAction) {
+      $('btnClock').addEventListener('click', () => { state.selectedType = nextAction; showCamera(); });
+    } else {
+      $('btnIn').addEventListener('click', () => { state.selectedType = 'check_in'; showCamera(); });
+      $('btnOut').addEventListener('click', () => { state.selectedType = 'check_out'; showCamera(); });
+    }
 
     // ถ้า URL มี ?type=check_in/check_out → auto-skip
     if (state.presetType) {
