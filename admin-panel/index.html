@@ -1219,6 +1219,13 @@ input:focus, textarea:focus, select:focus {
 
     <!-- Tab: Jobs -->
     <div id="hrtab-jobs" class="hr-tab" style="display:none;">
+      <!-- Pending Approval Section (NEW) -->
+      <div class="card" id="techApprovalCard" data-owner-only style="margin-bottom:14px; border:2px solid #f39c12;">
+        <h3 style="margin-top:0; color:#e67e22;">⏳ งานรออนุมัติคอม</h3>
+        <div id="techApprovalList" style="display:grid; gap:10px;">
+          <div style="text-align:center; color:#999; padding:16px;">กำลังโหลด...</div>
+        </div>
+      </div>
       <div class="card">
         <div class="toolbar">
           <button class="btn btn-primary btn-sm" onclick="openJobModal()">➕ เพิ่มงานช่าง</button>
@@ -5039,7 +5046,10 @@ function switchHrTab(name) {
   document.getElementById('hrtab-' + name).style.display = 'block';
   if (name === 'attendance') { var f = document.getElementById('attFrom'); if (!f.value) { var d = new Date(); var t = d.toISOString().slice(0,10); f.value = t; document.getElementById('attTo').value = t; } loadAttendance(); pingZk(); }
   if (name === 'advances') loadAdvances();
-  if (name === 'jobs') loadTechJobs();
+  if (name === 'jobs') {
+    loadTechApprovalList();
+    loadTechJobs();
+  }
 }
 
 async function loadHr() {
@@ -5380,6 +5390,95 @@ async function deleteAdvance(id) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     loadAdvances();
   } catch (e) { alert('❌ ' + e.message); }
+}
+
+// ============ TECH APPROVE ============
+async function loadTechApprovalList() {
+  try {
+    var r = await fetch('/api/tech-jobs/pending-approval');
+    var d = await r.json();
+    var jobs = d.jobs || [];
+    var box = document.getElementById('techApprovalList');
+    if (!box) return;
+    if (jobs.length === 0) {
+      box.innerHTML = '<div style="text-align:center; color:#999; padding:16px;">ไม่มีงานรออนุมัติ</div>';
+      return;
+    }
+    var html = '';
+    jobs.forEach(function(j) {
+      var photoCount = (j.photos || []).length;
+      var techName = (allEmployees || []).find(function(e){return e.emp_code===j.fixed_by;});
+      var techLabel = techName ? (techName.nickname || techName.name) : (j.fixed_by || '-');
+      var partsCount = (j.parts_used || []).length;
+      html += '<div style="border:1px solid #ddd; border-radius:8px; padding:12px; background:#fff;">';
+      html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">';
+      html += '<strong>' + escapeHtml(j.id) + '</strong>';
+      html += '<span style="color:#666; font-size:12px;">' + escapeHtml(j.delivered_at ? new Date(j.delivered_at).toLocaleString('th-TH') : '-') + '</span>';
+      html += '</div>';
+      html += '<div style="font-size:13px; color:#666; margin-bottom:6px;">';
+      html += '👤 ' + escapeHtml(j.customer_name || '-') + ' / 📞 ' + escapeHtml(j.customer_phone || '-');
+      html += '</div>';
+      html += '<div style="font-size:13px; margin-bottom:6px;">';
+      html += '🏍️ ' + escapeHtml((j.device && j.device.brand) || '-') + ' ' + escapeHtml((j.device && j.device.model) || '');
+      html += '</div>';
+      html += '<div style="font-size:13px; color:#666; margin-bottom:6px;">';
+      html += '🔧 ช่างซ่อม: ' + escapeHtml(techLabel) + ' | อะไหล่ ' + partsCount + ' รายการ | 📷 ' + photoCount + ' รูป';
+      html += '</div>';
+      html += '<div style="display:flex; gap:8px; align-items:center; margin-top:10px;">';
+      html += '<div style="flex:1;"><span style="color:#999; font-size:12px;">รวม</span><br><strong style="font-size:18px;">฿' + (j.amount||0).toLocaleString() + '</strong></div>';
+      html += '<div style="flex:1;"><span style="color:#999; font-size:12px;">คอม</span><br><strong style="font-size:18px; color:#0a8;">฿' + (j.commission_amount||0).toLocaleString() + '</strong></div>';
+      html += '</div>';
+      html += '<div style="display:flex; gap:6px; margin-top:10px;">';
+      html += '<button class="btn btn-secondary btn-sm" onclick="viewTechJob(\'' + j.id + '\')" style="flex:1;">👁️ ดู</button>';
+      html += '<button class="btn btn-success btn-sm" onclick="approveTechJob(\'' + j.id + '\')" style="flex:2; background:#27ae60;">✅ อนุมัติ</button>';
+      html += '<button class="btn btn-danger btn-sm" onclick="rejectTechJob(\'' + j.id + '\')" style="flex:1;">❌ Reject</button>';
+      html += '</div>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    console.error('loadTechApprovalList:', e);
+  }
+}
+
+async function approveTechJob(id) {
+  if (!confirm('อนุมัติคอมงานนี้?')) return;
+  try {
+    var r = await fetch('/api/tech-jobs/' + id + '/approve', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({via:'admin_ui'})
+    });
+    if (!r.ok) {
+      var d = await r.json().catch(function(){return {};});
+      throw new Error(d.error || ('HTTP '+r.status));
+    }
+    loadTechApprovalList();
+    if (typeof loadTechJobs === 'function') loadTechJobs();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function rejectTechJob(id) {
+  var reason = prompt('เหตุผล Reject:');
+  if (!reason) return;
+  try {
+    var r = await fetch('/api/tech-jobs/' + id + '/reject', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({reason: reason})
+    });
+    if (!r.ok) {
+      var d = await r.json().catch(function(){return {};});
+      throw new Error(d.error || ('HTTP '+r.status));
+    }
+    loadTechApprovalList();
+    if (typeof loadTechJobs === 'function') loadTechJobs();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+function viewTechJob(id) {
+  // เปิดใน new tab สำหรับดูเต็ม (mobile app เปิดได้)
+  window.open('/tech?job=' + encodeURIComponent(id), '_blank');
 }
 
 // ============ TECH JOBS ============
