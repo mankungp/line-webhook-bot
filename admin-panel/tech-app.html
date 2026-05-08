@@ -784,29 +784,17 @@
 
     function rerender() {
       const fs = formState;
+      const photoCount = formState.photos.length;
       root.innerHTML = `
-        <div class="card">
-          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">👤 ลูกค้า</div>
-          <label>ชื่อ <span class="req">*</span></label>
-          <input type="text" id="cName" placeholder="คุณสมชาย" value="${escapeHtml(fs.cName)}" />
-          <label>เบอร์โทร</label>
-          <input type="tel" id="cPhone" placeholder="081-xxx-xxxx" value="${escapeHtml(fs.cPhone)}" />
+        <div class="card" style="background:#fffbeb;border:1px solid #fde68a;">
+          <div style="color:#92400e;font-size:13px;line-height:1.5">
+            ⚡ <b>จำเป็นแค่ อาการ + รูป</b><br>
+            ข้อมูลอื่น ติดต่อลูกค้าได้ทีหลัง
+          </div>
         </div>
 
         <div class="card">
-          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">🏍️ เครื่อง</div>
-          <label>ยี่ห้อ <span class="req">*</span></label>
-          <input type="text" id="dBrand" placeholder="Honda / Stihl / ฯลฯ" value="${escapeHtml(fs.dBrand)}" />
-          <label>รุ่น</label>
-          <input type="text" id="dModel" placeholder="Wave 110" value="${escapeHtml(fs.dModel)}" />
-          <label>Serial / เลขเครื่อง</label>
-          <input type="text" id="dSerial" value="${escapeHtml(fs.dSerial)}" />
-          <label>อาการ <span class="req">*</span></label>
-          <textarea id="dProblem" placeholder="เช่น สตาร์ทไม่ติด ไฟไม่เข้า...">${escapeHtml(fs.dProblem)}</textarea>
-        </div>
-
-        <div class="card">
-          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">📷 รูป (เลือกได้)</div>
+          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">📷 รูปเครื่อง <span class="req">*</span></div>
           <div class="photo-grid" id="photoGrid">
             ${formState.photos.map((p,i) => `
               <div class="photo-thumb">
@@ -816,8 +804,33 @@
               </div>
             `).join('')}
           </div>
-          <button class="btn btn-secondary btn-sm" id="btnAddPhoto">+ ถ่ายรูป รับเครื่อง</button>
+          <button class="btn btn-secondary btn-sm" id="btnAddPhoto">${photoCount?'+ ถ่ายรูปเพิ่ม':'📷 ถ่ายรูปเครื่อง'}</button>
+          ${!photoCount ? '<div style="font-size:12px;color:#dc2626;margin-top:6px">ต้องถ่ายรูปอย่างน้อย 1 รูป</div>' : ''}
         </div>
+
+        <div class="card">
+          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">⚠️ อาการ <span class="req">*</span></div>
+          <textarea id="dProblem" placeholder="เช่น สตาร์ทไม่ติด ไฟไม่เข้า เสียงดัง..." rows="3">${escapeHtml(fs.dProblem)}</textarea>
+        </div>
+
+        <details class="card" style="margin-bottom:14px">
+          <summary style="font-weight:700;color:#0a8855;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px">
+            <span>➕ ข้อมูลเพิ่มเติม (ไม่บังคับ)</span>
+            <span style="color:#999;font-size:12px;font-weight:normal;margin-left:auto">ลูกค้า · รุ่น · Serial</span>
+          </summary>
+          <div style="margin-top:12px">
+            <label>ชื่อลูกค้า</label>
+            <input type="text" id="cName" placeholder="คุณสมชาย" value="${escapeHtml(fs.cName)}" />
+            <label>เบอร์โทร</label>
+            <input type="tel" id="cPhone" placeholder="081-xxx-xxxx" value="${escapeHtml(fs.cPhone)}" />
+            <label>ยี่ห้อ</label>
+            <input type="text" id="dBrand" placeholder="Honda / Stihl / ฯลฯ" value="${escapeHtml(fs.dBrand)}" />
+            <label>รุ่น</label>
+            <input type="text" id="dModel" placeholder="Wave 110" value="${escapeHtml(fs.dModel)}" />
+            <label>Serial / เลขเครื่อง</label>
+            <input type="text" id="dSerial" value="${escapeHtml(fs.dSerial)}" />
+          </div>
+        </details>
 
         <button class="btn btn-primary" id="btnSave">💾 บันทึกงานใหม่</button>
         <button class="btn btn-ghost" id="btnCancel">ยกเลิก</button>
@@ -863,9 +876,9 @@
       const serial = (formState.dSerial || '').trim();
       const problem = (formState.dProblem || '').trim();
 
-      if (!customer_name) return alert('กรุณากรอกชื่อลูกค้า');
-      if (!brand) return alert('กรุณากรอกยี่ห้อเครื่อง');
-      if (!problem) return alert('กรุณากรอกอาการ');
+      // บังคับแค่ อาการ + รูป
+      if (!problem) return alert('กรุณากรอกอาการของเครื่อง');
+      if (!formState.photos.length) return alert('กรุณาถ่ายรูปเครื่องอย่างน้อย 1 รูป');
 
       $('btnSave').disabled = true;
       $('btnSave').textContent = 'กำลังบันทึก...';
