@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0a8855" />
+<title>ระบบช่าง — Tech Jobs</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(160deg, #e8f7ef 0%, #f5fff9 100%);
+    color: #1a2e22;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 24px;
+  }
+  /* Sticky header */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: #0a8855;
+    color: #fff;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .topbar .title {
+    flex: 1;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar .sub {
+    font-size: 12px;
+    opacity: .9;
+    font-weight: 500;
+  }
+  .topbar .iconbtn {
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    border: none;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .topbar .iconbtn:active { transform: scale(.95); }
+  .commission-pill {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .body { padding: 14px; flex: 1; }
+
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(10, 136, 85, 0.08);
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .card.compact { padding: 12px; }
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0a8855;
+    margin: 14px 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .section-title .count {
+    background: #d8ead9;
+    color: #0a8855;
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 56px;
+    border: none;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .1s;
+    font-family: inherit;
+    padding: 0 14px;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-primary { background: #0a8855; color: #fff; box-shadow: 0 4px 12px rgba(10,136,85,.25); }
+  .btn-secondary { background: #fff; color: #0a8855; border: 2px solid #0a8855; }
+  .btn-warn { background: #e0941c; color: #fff; }
+  .btn-danger { background: #d8633a; color: #fff; }
+  .btn-ghost { background: transparent; color: #5a7a6b; border: 1px solid #c7d8cf; }
+  .btn-sm { min-height: 40px; font-size: 14px; padding: 0 12px; }
+  .btn + .btn { margin-top: 10px; }
+
+  input[type="text"], input[type="tel"], input[type="number"], input[type="search"], textarea, select {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 12px;
+    font-size: 16px;
+    border: 1px solid #c7d8cf;
+    border-radius: 10px;
+    background: #fafefb;
+    font-family: inherit;
+    margin-bottom: 10px;
+    color: #1a2e22;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #0a8855; box-shadow: 0 0 0 3px rgba(10,136,85,.15); }
+  label { display: block; font-size: 13px; color: #3a5547; margin-bottom: 4px; font-weight: 600; }
+  label .req { color: #d8633a; }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 4px solid #d8ead9;
+    border-top-color: #0a8855;
+    border-radius: 50%;
+    animation: spin .9s linear infinite;
+    margin: 16px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .center { text-align: center; }
+  .muted { color: #5a7a6b; font-size: 13px; }
+  .big-emoji { font-size: 56px; margin-bottom: 8px; }
+
+  .alert {
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  .alert-error { background: #fce8e0; color: #a23315; border: 1px solid #f0c4b0; }
+  .alert-warn { background: #fff5dc; color: #7a5410; border: 1px solid #f0d99a; }
+  .alert-info { background: #e0f0ff; color: #155488; border: 1px solid #b8d8f5; }
+  .alert-success { background: #d8f0d8; color: #1a5e2c; border: 1px solid #a8d8a8; }
+
+  /* Job card */
+  .job-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(10,136,85,0.06);
+    border-left: 4px solid #c7d8cf;
+    cursor: pointer;
+  }
+  .job-card:active { transform: scale(.99); }
+  .job-card .row1 {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px;
+  }
+  .job-card .jid {
+    font-weight: 700; color: #0a8855; font-size: 14px;
+  }
+  .job-card .device {
+    font-size: 15px; font-weight: 600; color: #1a2e22;
+    margin-bottom: 2px;
+  }
+  .job-card .cust {
+    font-size: 13px; color: #5a7a6b;
+  }
+  .job-card .row-bot {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 6px;
+  }
+  .job-card .com {
+    font-size: 13px; color: #0a8855; font-weight: 600;
+  }
+  .job-card[data-status="received"] { border-left-color: #888; }
+  .job-card[data-status="fixing"] { border-left-color: #e0941c; }
+  .job-card[data-status="done"] { border-left-color: #2196f3; }
+  .job-card[data-status="delivered"] { border-left-color: #9c27b0; }
+  .job-card[data-status="approved"] { border-left-color: #0a8855; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-received { background:#eee; color:#555; }
+  .badge-fixing { background:#fff3d6; color:#a06600; }
+  .badge-done { background:#d8e6fa; color:#155488; }
+  .badge-delivered { background:#ead6f5; color:#5e2188; }
+  .badge-approved { background:#d8f0d8; color:#1a5e2c; }
+  .badge-paid { background:#0a8855; color:#fff; }
+
+  /* Timeline chips */
+  .timeline {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 4px 0;
+    margin: 8px 0;
+  }
+  .chip {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: #eee;
+    color: #888;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .chip.active { background: #0a8855; color: #fff; font-weight: 600; }
+  .chip.done { background: #d8ead9; color: #0a8855; }
+
+  /* Photo grid */
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .photo-thumb {
+    aspect-ratio: 1/1;
+    background: #eee;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+  }
+  .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo-thumb .lbl {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.6), transparent);
+    color: #fff;
+    font-size: 10px;
+    padding: 8px 4px 3px;
+    text-align: center;
+  }
+  .photo-thumb .x {
+    position: absolute;
+    top: 2px; right: 2px;
+    background: rgba(255,80,80,0.9);
+    color: #fff;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Photo viewer (fullscreen) */
+  .viewer {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 1000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .viewer img { max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px; }
+  .viewer .vlabel { color: #fff; margin-top: 12px; font-size: 14px; }
+  .viewer .vclose {
+    position: absolute; top: 14px; right: 14px;
+    background: rgba(255,255,255,0.2); color: #fff; border: none;
+    width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer;
+  }
+
+  /* Camera modal */
+  .cam-modal {
+    position: fixed; inset: 0;
+    background: #000;
+    z-index: 900;
+    display: flex; flex-direction: column;
+  }
+  .cam-modal .cam-header {
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .cam-modal .cam-header .iconbtn {
+    background: rgba(255,255,255,0.18); color: #fff;
+    border: none; width: 36px; height: 36px; border-radius: 10px;
+    font-size: 18px; cursor: pointer;
+  }
+  .cam-modal .cam-body {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+    overflow: hidden;
+  }
+  .cam-modal video, .cam-modal img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .cam-modal .cam-foot {
+    background: rgba(0,0,0,0.7);
+    padding: 14px;
+    display: flex; gap: 10px;
+  }
+  .cam-modal .cam-foot .btn { flex: 1; }
+  .cam-label-row { padding: 10px 14px; background: rgba(0,0,0,0.6); }
+  .cam-label-row select {
+    width: 100%; margin: 0;
+    background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.3);
+  }
+  .cam-label-row select option { color: #1a2e22; }
+
+  /* Bottom sheet modal (parts picker) */
+  .sheet {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 800;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .sheet-inner {
+    background: #fff;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    border-radius: 16px 16px 0 0;
+    display: flex; flex-direction: column;
+  }
+  .sheet-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid #eee;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sheet-header .title { flex:1; font-weight: 700; color: #0a8855; }
+  .sheet-body { flex:1; overflow-y: auto; padding: 12px; }
+  .sheet-foot { padding: 10px 14px; border-top: 1px solid #eee; }
+
+  /* Parts list item */
+  .part-item {
+    background: #fafefb;
+    border: 1px solid #e6efe9;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+  .part-item .pname { font-weight: 600; font-size: 15px; }
+  .part-item .psku { font-size: 11px; color: #5a7a6b; }
+  .part-item .prow {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  }
+  .part-item .price { color: #0a8855; font-weight: 700; }
+  .part-item .stock { font-size: 12px; color: #5a7a6b; }
+  .part-item .qty-input {
+    width: 60px; min-height: 36px;
+    margin: 0; text-align: center;
+  }
+  .part-item .add-btn {
+    margin: 0 0 0 auto;
+    min-height: 36px;
+    font-size: 14px;
+    padding: 0 14px;
+  }
+
+  /* Selected parts list */
+  .part-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    background: #fafefb;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .part-row .pn { flex: 1; }
+  .part-row .pq { color: #5a7a6b; }
+  .part-row .pt { font-weight: 700; color: #0a8855; }
+  .part-row .pdel {
+    background: transparent; color: #d8633a; border: none;
+    cursor: pointer; font-size: 16px; padding: 4px 6px;
+  }
+
+  .total-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0;
+    font-size: 14px;
+  }
+  .total-row.big {
+    font-size: 17px; font-weight: 700;
+    border-top: 1px dashed #c7d8cf;
+    padding-top: 10px; margin-top: 6px;
+    color: #0a8855;
+  }
+  .com-row {
+    background: #f5fff9;
+    border: 1px solid #d8ead9;
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .com-row label { margin: 0; }
+  .com-row input[type=number] { margin: 0; width: 80px; min-height: 36px; }
+  .com-row .amt { margin-left: auto; font-weight: 700; color: #0a8855; }
+
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .hidden { display: none !important; }
+  .footer { text-align: center; font-size: 11px; color: #8aa599; padding: 12px 0 6px; }
+
+  .save-status {
+    font-size: 11px;
+    color: #5a7a6b;
+    text-align: right;
+    padding: 0 4px 4px;
+    height: 16px;
+  }
+  .save-status.saving { color: #e0941c; }
+  .save-status.saved { color: #0a8855; }
+  .save-status.error { color: #d8633a; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div id="topbar"></div>
+  <div class="body" id="content">
+    <div class="center"><div class="spinner"></div><div class="muted">กำลังโหลด...</div></div>
+  </div>
+  <div class="footer">© <span id="year"></span> Tech Jobs</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- State ----------
+  const state = {
+    user: null,            // /auth/me payload
+    me: null,              // /api/tech/me — emp + commission summary
+    page: 'dashboard',     // dashboard|new|detail
+    jobId: null,
+    job: null,             // current job detail
+    myJobs: [],
+    pendingJobs: [],
+    productsCache: [],     // last search result
+    saveTimer: null,
+    saveStatus: 'idle',    // idle|saving|saved|error
+    cam: { stream: null, videoEl: null, label: 'รับเครื่อง', lastDataUrl: null, onSnap: null },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel) => document.querySelectorAll(sel);
+  const root = $('content');
+  const topbar = $('topbar');
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+  function fmtMoney(n) {
+    n = Number(n) || 0;
+    return '฿' + n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
+  }
+  function fmtDate(s) {
+    if (!s) return '-';
+    try {
+      const d = new Date(s);
+      return d.toLocaleDateString('th-TH', { day:'numeric', month:'short' }) + ' ' +
+             d.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+    } catch(_) { return s; }
+  }
+  function statusLabel(s) {
+    return ({
+      received: 'รับแล้ว',
+      fixing: 'กำลังซ่อม',
+      done: 'ซ่อมเสร็จ',
+      delivered: 'ส่งแล้ว',
+      approved: 'อนุมัติ',
+      paid: 'จ่ายแล้ว',
+    })[s] || s || '-';
+  }
+  function statusBadge(s) {
+    return `<span class="badge badge-${escapeHtml(s||'received')}">${escapeHtml(statusLabel(s))}</span>`;
+  }
+
+  async function api(path, opts = {}) {
+    const r = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      ...opts,
+    });
+    let body = null;
+    try { body = await r.json(); } catch (_) {}
+    return { status: r.status, ok: r.ok, body };
+  }
+
+  function setLoading(msg = 'กำลังโหลด...') {
+    root.innerHTML = `<div class="center"><div class="spinner"></div><div class="muted">${escapeHtml(msg)}</div></div>`;
+  }
+  function showError(msg, retryFn) {
+    root.innerHTML = `
+      <div class="card center">
+        <div class="big-emoji">⚠️</div>
+        <h3 style="margin:6px 0">เกิดข้อผิดพลาด</h3>
+        <div class="alert alert-error">${escapeHtml(msg)}</div>
+        ${retryFn ? '<button class="btn btn-primary" id="btnRetry">ลองอีกครั้ง</button>' : ''}
+      </div>`;
+    if (retryFn) $('btnRetry').addEventListener('click', retryFn);
+  }
+  function showNoPerm(msg) {
+    topbar.innerHTML = '';
+    root.innerHTML = `
+      <div class="card center">
+        <div class="big-emoji">🚫</div>
+        <h3 style="margin:6px 0">ไม่มีสิทธิ์เข้าถึง</h3>
+        <p class="muted">${escapeHtml(msg || 'คุณไม่มีสิทธิ์เข้าถึงระบบช่าง')}</p>
+      </div>`;
+  }
+
+  // ---------- Topbar ----------
+  function renderTopbar(opts = {}) {
+    const back = opts.back ? `<button class="iconbtn" id="btnBack" title="กลับ">‹</button>` : '';
+    const title = opts.title || 'ระบบช่าง';
+    const sub = opts.sub || '';
+    const right = opts.right || '';
+    topbar.innerHTML = `
+      <div class="topbar">
+        ${back}
+        <div class="title">${escapeHtml(title)}${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ''}</div>
+        ${right}
+      </div>`;
+    if (opts.back && $('btnBack')) {
+      $('btnBack').addEventListener('click', opts.onBack || (() => navigate('dashboard')));
+    }
+  }
+
+  // ---------- Camera ----------
+  async function openCamera({ label = 'รับเครื่อง', labels = ['รับเครื่อง','ระหว่างซ่อม','ก่อนส่ง','อะไหล่','อื่น ๆ'], onSnap }) {
+    state.cam.label = label;
+    state.cam.onSnap = onSnap;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'cam-modal';
+    wrap.innerHTML = `
+      <div class="cam-header">
+        <button class="iconbtn" id="camClose">✕</button>
+        <div style="flex:1;font-weight:600">📷 ถ่ายรูป</div>
+      </div>
+      <div class="cam-label-row">
+        <select id="camLabel">
+          ${labels.map(l => `<option value="${escapeHtml(l)}" ${l===label?'selected':''}>${escapeHtml(l)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="cam-body" id="camBody">
+        <video id="camVid" playsinline muted autoplay></video>
+      </div>
+      <div class="cam-foot" id="camFoot">
+        <button class="btn btn-primary" id="camSnap">📸 ถ่าย</button>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+
+    const closeAll = () => {
+      try { state.cam.stream && state.cam.stream.getTracks().forEach(t=>t.stop()); } catch(_){}
+      state.cam.stream = null;
+      state.cam.videoEl = null;
+      wrap.remove();
+    };
+    $('camClose').addEventListener('click', closeAll);
+    $('camLabel').addEventListener('change', (e) => { state.cam.label = e.target.value; });
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+        audio: false,
+      });
+      state.cam.stream = stream;
+      const v = $('camVid');
+      state.cam.videoEl = v;
+      v.srcObject = stream;
+      await v.play();
+    } catch (err) {
+      $('camBody').innerHTML = `<div style="color:#fff;padding:20px;text-align:center">
+        ไม่สามารถเปิดกล้องได้<br><small>${escapeHtml(err.message || err.name || '')}</small>
+      </div>`;
+      $('camFoot').innerHTML = `<button class="btn btn-ghost" id="camCancel">ปิด</button>`;
+      $('camCancel').addEventListener('click', closeAll);
+      return;
+    }
+
+    $('camSnap').addEventListener('click', () => {
+      const v = state.cam.videoEl;
+      if (!v) return;
+      const maxSide = 800;
+      let w = v.videoWidth || 720, h = v.videoHeight || 720;
+      const scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w*scale); h = Math.round(h*scale);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(v, 0, 0, w, h);
+      const dataUrl = c.toDataURL('image/jpeg', 0.75);
+      state.cam.lastDataUrl = dataUrl;
+
+      // preview
+      try { state.cam.stream && state.cam.stream.getTracks().forEach(t=>t.stop()); } catch(_){}
+      state.cam.stream = null;
+      $('camBody').innerHTML = `<img src="${dataUrl}" alt="preview" />`;
+      $('camFoot').innerHTML = `
+        <button class="btn btn-ghost" id="camRetake">🔄 ถ่ายใหม่</button>
+        <button class="btn btn-primary" id="camOk">✓ ใช้รูปนี้</button>
+      `;
+      $('camRetake').addEventListener('click', () => {
+        wrap.remove();
+        openCamera({ label: state.cam.label, labels, onSnap });
+      });
+      $('camOk').addEventListener('click', async () => {
+        const lbl = state.cam.label;
+        const data = dataUrl;
+        closeAll();
+        if (typeof onSnap === 'function') {
+          await onSnap({ label: lbl, base64: data });
+        }
+      });
+    });
+  }
+
+  // ---------- Photo viewer ----------
+  function openPhotoViewer(photo, onDelete) {
+    const v = document.createElement('div');
+    v.className = 'viewer';
+    v.innerHTML = `
+      <button class="vclose" id="vClose">✕</button>
+      <img src="${escapeHtml(photo.url || photo.base64 || '')}" alt="" />
+      <div class="vlabel">${escapeHtml(photo.label || '')} • ${escapeHtml(fmtDate(photo.ts))}${photo.by?(' • '+escapeHtml(photo.by)):''}</div>
+      ${onDelete ? '<button class="btn btn-danger" id="vDel" style="margin-top:14px;max-width:200px">🗑️ ลบรูปนี้</button>':''}
+    `;
+    document.body.appendChild(v);
+    $('vClose').addEventListener('click', () => v.remove());
+    if (onDelete && $('vDel')) {
+      $('vDel').addEventListener('click', async () => {
+        if (!confirm('ลบรูปนี้?')) return;
+        v.remove();
+        await onDelete();
+      });
+    }
+  }
+
+  // ---------- Navigation ----------
+  function navigate(page, params = {}) {
+    state.page = page;
+    state.jobId = params.jobId || null;
+    if (page === 'dashboard') renderDashboard();
+    else if (page === 'new') renderNewJob();
+    else if (page === 'detail') renderDetail();
+  }
+
+  // ---------- Dashboard ----------
+  async function renderDashboard() {
+    const me = state.me || {};
+    const emp = me.emp || me.employee || me;
+    const empName = emp.name || emp.full_name || (state.user && state.user.displayName) || 'ช่าง';
+    const empCode = emp.emp_code || emp.code || '';
+    const com = me.commission_this_month != null ? me.commission_this_month
+              : (me.commission && me.commission.this_month) || 0;
+
+    renderTopbar({
+      title: `คุณ ${empName}${empCode?` (${empCode})`:''}`,
+      sub: `คอมเดือนนี้ ${fmtMoney(com)}`,
+    });
+
+    setLoading();
+
+    let mine = [], pending = [];
+    try {
+      const [mRes, pRes] = await Promise.all([
+        api('/api/tech/jobs?mine=true'),
+        api('/api/tech/jobs?status=received'),
+      ]);
+      if (mRes.ok && mRes.body) mine = mRes.body.jobs || mRes.body.data || mRes.body || [];
+      if (pRes.ok && pRes.body) pending = pRes.body.jobs || pRes.body.data || pRes.body || [];
+      if (!Array.isArray(mine)) mine = [];
+      if (!Array.isArray(pending)) pending = [];
+      // pending ที่แสดง = received และยังไม่มีคนรับซ่อม (fixed_by ว่าง)
+      pending = pending.filter(j => !j.fixed_by);
+    } catch(e) {
+      showError('โหลดงานไม่สำเร็จ: ' + e.message, () => renderDashboard());
+      return;
+    }
+
+    state.myJobs = mine;
+    state.pendingJobs = pending;
+
+    root.innerHTML = `
+      <button class="btn btn-primary" id="btnNew" style="margin-bottom:14px">➕ รับเครื่องใหม่</button>
+
+      <div class="section-title">📋 งานของคุณ <span class="count">${mine.length}</span></div>
+      <div id="myList">${mine.length ? mine.map(jobCardHtml).join('') : '<div class="card muted center">ยังไม่มีงานของคุณ</div>'}</div>
+
+      <div class="section-title">📥 งานรอรับซ่อม <span class="count">${pending.length}</span></div>
+      <div id="pendList">${pending.length ? pending.map(jobCardHtml).join('') : '<div class="card muted center">ไม่มีงานรอรับ</div>'}</div>
+    `;
+    $('btnNew').addEventListener('click', () => navigate('new'));
+    $$('#myList .job-card, #pendList .job-card').forEach(el => {
+      el.addEventListener('click', () => navigate('detail', { jobId: el.dataset.id }));
+    });
+  }
+
+  function jobCardHtml(j) {
+    const dev = (j.device && (j.device.brand || '') + (j.device.model ? ' ' + j.device.model : '')) || '-';
+    const cust = j.customer_name || '-';
+    const com = j.commission_amount != null ? j.commission_amount : 0;
+    const fixedBy = j.fixed_by || '';
+    return `
+      <div class="job-card" data-id="${escapeHtml(j.id)}" data-status="${escapeHtml(j.status||'received')}">
+        <div class="row1">
+          <span class="jid">${escapeHtml(j.id)}</span>
+          ${statusBadge(j.status)}
+        </div>
+        <div class="device">${escapeHtml(dev)}</div>
+        <div class="cust">${escapeHtml(cust)}${j.customer_phone?(' • '+escapeHtml(j.customer_phone)):''}</div>
+        <div class="row-bot">
+          <span class="muted">${fixedBy ? ('ช่าง: '+escapeHtml(fixedBy)) : 'ยังไม่รับซ่อม'}</span>
+          ${com ? `<span class="com">คอม ${fmtMoney(com)}</span>` : ''}
+        </div>
+      </div>`;
+  }
+
+  // ---------- New Job ----------
+  function renderNewJob() {
+    renderTopbar({ title: 'รับเครื่องใหม่', back: true, onBack: () => navigate('dashboard') });
+
+    const formState = { photos: [] };
+
+    function rerender() {
+      root.innerHTML = `
+        <div class="card">
+          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">👤 ลูกค้า</div>
+          <label>ชื่อ <span class="req">*</span></label>
+          <input type="text" id="cName" placeholder="คุณสมชาย" />
+          <label>เบอร์โทร</label>
+          <input type="tel" id="cPhone" placeholder="081-xxx-xxxx" />
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">🏍️ เครื่อง</div>
+          <label>ยี่ห้อ <span class="req">*</span></label>
+          <input type="text" id="dBrand" placeholder="Honda / Stihl / ฯลฯ" />
+          <label>รุ่น</label>
+          <input type="text" id="dModel" placeholder="Wave 110" />
+          <label>Serial / เลขเครื่อง</label>
+          <input type="text" id="dSerial" />
+          <label>อาการ <span class="req">*</span></label>
+          <textarea id="dProblem" placeholder="เช่น สตาร์ทไม่ติด ไฟไม่เข้า..."></textarea>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;color:#0a8855;margin-bottom:8px">📷 รูป (เลือกได้)</div>
+          <div class="photo-grid" id="photoGrid">
+            ${formState.photos.map((p,i) => `
+              <div class="photo-thumb">
+                <img src="${p.base64}" />
+                <div class="lbl">${escapeHtml(p.label||'')}</div>
+                <button class="x" data-idx="${i}">✕</button>
+              </div>
+            `).join('')}
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnAddPhoto">+ ถ่ายรูป รับเครื่อง</button>
+        </div>
+
+        <button class="btn btn-primary" id="btnSave">💾 บันทึกงานใหม่</button>
+        <button class="btn btn-ghost" id="btnCancel">ยกเลิก</button>
+      `;
+
+      $$('#photoGrid .x').forEach(b => {
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = +b.dataset.idx;
+          formState.photos.splice(idx, 1);
+          rerender();
+        });
+      });
+
+      $('btnAddPhoto').addEventListener('click', () => {
+        openCamera({
+          label: 'รับเครื่อง',
+          onSnap: ({ label, base64 }) => {
+            formState.photos.push({ label, base64 });
+            rerender();
+          },
+        });
+      });
+
+      $('btnCancel').addEventListener('click', () => navigate('dashboard'));
+      $('btnSave').addEventListener('click', submit);
+    }
+
+    async function submit() {
+      const customer_name = $('cName').value.trim();
+      const customer_phone = $('cPhone').value.trim();
+      const brand = $('dBrand').value.trim();
+      const model = $('dModel').value.trim();
+      const serial = $('dSerial').value.trim();
+      const problem = $('dProblem').value.trim();
+
+      if (!customer_name) return alert('กรุณากรอกชื่อลูกค้า');
+      if (!brand) return alert('กรุณากรอกยี่ห้อเครื่อง');
+      if (!problem) return alert('กรุณากรอกอาการ');
+
+      $('btnSave').disabled = true;
+      $('btnSave').textContent = 'กำลังบันทึก...';
+
+      const payload = {
+        customer_name, customer_phone,
+        device: { brand, model, serial, problem_description: problem },
+        photos: formState.photos,
+      };
+
+      const r = await api('/api/tech/jobs', { method: 'POST', body: JSON.stringify(payload) });
+      if (r.ok && r.body && (r.body.id || (r.body.job && r.body.job.id))) {
+        const id = r.body.id || r.body.job.id;
+        navigate('detail', { jobId: id });
+      } else {
+        $('btnSave').disabled = false;
+        $('btnSave').textContent = '💾 บันทึกงานใหม่';
+        alert('บันทึกไม่สำเร็จ: ' + ((r.body && (r.body.error || r.body.message)) || `HTTP ${r.status}`));
+      }
+    }
+
+    rerender();
+  }
+
+  // ---------- Job Detail ----------
+  async function renderDetail() {
+    renderTopbar({ title: state.jobId || 'งาน', back: true, onBack: () => navigate('dashboard') });
+    setLoading();
+    const r = await api('/api/tech/jobs/' + encodeURIComponent(state.jobId));
+    if (!r.ok || !r.body) {
+      showError('โหลดงานไม่สำเร็จ', () => renderDetail());
+      return;
+    }
+    state.job = r.body.job || r.body;
+    drawDetail();
+  }
+
+  function drawDetail() {
+    const j = state.job || {};
+    const myEmpCode = (state.me && (state.me.emp || state.me.employee || state.me).emp_code) || '';
+    const isOwnJob = j.fixed_by === myEmpCode;
+    const role = (state.user && state.user.role) || '';
+    const isOwner = role === 'owner' || role === 'manager';
+
+    const dev = j.device || {};
+    const photos = Array.isArray(j.photos) ? j.photos : [];
+    const parts = Array.isArray(j.parts_used) ? j.parts_used : [];
+
+    const partsTotal = parts.reduce((s,p) => s + (Number(p.total)||(Number(p.unit_price)*Number(p.qty)||0)), 0);
+    const labor = Number(j.labor_charge) || 0;
+    const amount = partsTotal + labor;
+    const comRate = j.commission_rate != null ? Number(j.commission_rate) : 30;
+    const comAmt = Math.round(amount * comRate / 100);
+
+    // Timeline chips
+    const order = ['received','fixing','done','delivered','approved'];
+    const curIdx = order.indexOf(j.status);
+    const tlLabels = { received:'รับ', fixing:'ซ่อม', done:'เสร็จ', delivered:'ส่ง', approved:'อนุมัติ' };
+    const timeline = order.map((s, i) => {
+      const cls = i < curIdx ? 'done' : (i === curIdx ? 'active' : '');
+      return `<span class="chip ${cls}">${escapeHtml(tlLabels[s])}</span>`;
+    }).join('');
+
+    // Action buttons
+    let actions = '';
+    if (j.status === 'received') {
+      if (j.fixed_by && j.fixed_by !== myEmpCode) {
+        actions = `<div class="alert alert-info">งานนี้ ${escapeHtml(j.fixed_by)} กำลังจะรับซ่อม</div>`;
+      } else {
+        actions = `<button class="btn btn-primary" id="btnStart">🔧 รับงานซ่อม</button>`;
+      }
+    } else if (j.status === 'fixing') {
+      if (isOwnJob) actions = `<button class="btn btn-primary" id="btnDone">✅ ซ่อมเสร็จ</button>`;
+      else actions = `<div class="alert alert-info">${escapeHtml(j.fixed_by||'-')} กำลังซ่อม</div>`;
+    } else if (j.status === 'done') {
+      actions = `<button class="btn btn-primary" id="btnDeliver">🚚 ส่งงานให้ลูกค้า</button>`;
+    } else if (j.status === 'delivered') {
+      actions = `<div class="alert alert-warn">⏳ รออนุมัติจาก Owner</div>`;
+    } else if (j.status === 'approved') {
+      actions = `<div class="alert alert-success">✅ อนุมัติแล้ว — รอเข้า payroll</div>`;
+    } else if (j.status === 'paid') {
+      actions = `<div class="alert alert-success">💰 จ่ายค่าคอมแล้ว</div>`;
+    }
+
+    const editable = (j.status === 'fixing' && isOwnJob) || (j.status === 'received' && !j.fixed_by) || isOwner;
+
+    root.innerHTML = `
+      <div class="card compact">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div style="font-weight:700;flex:1">สถานะ</div>
+          ${statusBadge(j.status)}
+        </div>
+        <div class="timeline">${timeline}</div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;color:#0a8855;margin-bottom:6px">👤 ลูกค้า</div>
+        <div style="font-size:16px;font-weight:600">${escapeHtml(j.customer_name||'-')}</div>
+        ${j.customer_phone ? `
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+            <span>📞 ${escapeHtml(j.customer_phone)}</span>
+            <a class="btn btn-secondary btn-sm" style="margin:0 0 0 auto;width:auto" href="tel:${encodeURIComponent(j.customer_phone)}">โทร</a>
+          </div>` : ''}
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;color:#0a8855;margin-bottom:6px">🏍️ เครื่อง</div>
+        <div style="font-size:16px;font-weight:600">${escapeHtml((dev.brand||'') + (dev.model?(' '+dev.model):'')) || '-'}</div>
+        ${dev.serial ? `<div class="muted">Serial: ${escapeHtml(dev.serial)}</div>`:''}
+        ${dev.problem_description ? `<div style="margin-top:6px;color:#3a5547">อาการ: ${escapeHtml(dev.problem_description)}</div>`:''}
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="font-weight:700;color:#0a8855;flex:1">📷 รูป (${photos.length})</div>
+          ${editable ? '<button class="btn btn-secondary btn-sm" id="btnAddPhoto" style="width:auto;margin:0">+ เพิ่ม</button>':''}
+        </div>
+        <div class="photo-grid" id="photoGrid">
+          ${photos.map((p,i) => `
+            <div class="photo-thumb" data-idx="${i}">
+              <img src="${escapeHtml(p.url || p.base64 || '')}" />
+              <div class="lbl">${escapeHtml(p.label||'')}</div>
+            </div>
+          `).join('') || '<div class="muted" style="grid-column:1/-1;text-align:center">ยังไม่มีรูป</div>'}
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="font-weight:700;color:#0a8855;flex:1">🔧 อะไหล่ (${parts.length})</div>
+          ${editable ? '<button class="btn btn-secondary btn-sm" id="btnPickParts" style="width:auto;margin:0">+ เลือกอะไหล่</button>':''}
+        </div>
+        <div id="partsList">
+          ${parts.map((p,i) => `
+            <div class="part-row">
+              <div class="pn">${escapeHtml(p.name_tech || p.name || p.sku || '-')}</div>
+              <div class="pq">× ${escapeHtml(p.qty)}</div>
+              <div class="pt">${fmtMoney(p.total || (Number(p.unit_price)*Number(p.qty)))}</div>
+              ${editable ? `<button class="pdel" data-idx="${i}">🗑️</button>` : ''}
+            </div>
+          `).join('') || '<div class="muted" style="text-align:center;padding:8px">ยังไม่มีอะไหล่</div>'}
+        </div>
+        <div class="total-row"><span>รวมอะไหล่</span><span>${fmtMoney(partsTotal)}</span></div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;color:#0a8855;margin-bottom:8px">💵 ค่าแรง</div>
+        <input type="number" id="laborInput" value="${labor}" inputmode="numeric" min="0" ${editable?'':'disabled'} placeholder="0" />
+        <div class="total-row big"><span>💰 รวมเงิน</span><span>${fmtMoney(amount)}</span></div>
+        <div class="com-row">
+          <label>คอม %</label>
+          <input type="number" id="comRate" value="${comRate}" inputmode="numeric" min="0" max="100" ${editable?'':'disabled'} />
+          <span class="amt" id="comAmtDisp">${fmtMoney(comAmt)}</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;color:#0a8855;margin-bottom:6px">📝 บันทึก</div>
+        <textarea id="noteInput" ${editable?'':'disabled'} placeholder="หมายเหตุ...">${escapeHtml(j.note||'')}</textarea>
+        <div class="save-status" id="saveStatus"></div>
+      </div>
+
+      <div id="actions">${actions}</div>
+    `;
+
+    // Photo viewer
+    $$('#photoGrid .photo-thumb').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = +el.dataset.idx;
+        const p = photos[idx];
+        if (!p) return;
+        const canDel = editable && (!p.by || p.by === myEmpCode || isOwner);
+        openPhotoViewer(p, canDel ? () => deletePhoto(idx) : null);
+      });
+    });
+
+    if (editable) {
+      // Add photo
+      const addBtn = $('btnAddPhoto');
+      if (addBtn) addBtn.addEventListener('click', () => {
+        openCamera({
+          label: j.status === 'fixing' ? 'ระหว่างซ่อม' : (j.status === 'done' ? 'ก่อนส่ง' : 'รับเครื่อง'),
+          onSnap: async ({ label, base64 }) => {
+            updateSaveStatus('saving');
+            const r = await api(`/api/tech/jobs/${encodeURIComponent(j.id)}/photos`, {
+              method: 'POST',
+              body: JSON.stringify({ label, base64 }),
+            });
+            if (r.ok) { updateSaveStatus('saved'); await renderDetail(); }
+            else { updateSaveStatus('error'); alert('อัปโหลดไม่สำเร็จ'); }
+          },
+        });
+      });
+
+      // Pick parts
+      const pickBtn = $('btnPickParts');
+      if (pickBtn) pickBtn.addEventListener('click', openPartsPicker);
+
+      // Delete part
+      $$('#partsList .pdel').forEach(b => {
+        b.addEventListener('click', async () => {
+          const idx = +b.dataset.idx;
+          if (!confirm('ลบอะไหล่นี้?')) return;
+          const newParts = parts.slice();
+          newParts.splice(idx, 1);
+          state.job.parts_used = newParts;
+          await saveJob({ parts_used: newParts });
+          drawDetail();
+        });
+      });
+
+      // Auto-save labor + commission + note
+      const onChange = () => {
+        const newLabor = Number($('laborInput').value) || 0;
+        const newComRate = Number($('comRate').value) || 0;
+        const newNote = $('noteInput').value;
+        const newPartsTotal = parts.reduce((s,p) => s + (Number(p.total)||0), 0);
+        const newAmount = newPartsTotal + newLabor;
+        const newComAmt = Math.round(newAmount * newComRate / 100);
+        $('comAmtDisp').textContent = fmtMoney(newComAmt);
+
+        state.job.labor_charge = newLabor;
+        state.job.commission_rate = newComRate;
+        state.job.note = newNote;
+        state.job.amount = newAmount;
+        state.job.commission_amount = newComAmt;
+
+        debouncedSave({ labor_charge: newLabor, commission_rate: newComRate, note: newNote });
+      };
+      ['laborInput','comRate','noteInput'].forEach(id => {
+        const el = $(id);
+        if (el) el.addEventListener('input', onChange);
+      });
+    }
+
+    // Action handlers
+    if ($('btnStart')) $('btnStart').addEventListener('click', () => doAction('start-fixing'));
+    if ($('btnDone')) $('btnDone').addEventListener('click', () => {
+      if (!confirm('ยืนยันว่าซ่อมเสร็จแล้ว?')) return;
+      doAction('done');
+    });
+    if ($('btnDeliver')) $('btnDeliver').addEventListener('click', () => {
+      if (!confirm('ส่งงานให้ลูกค้าแล้ว?')) return;
+      doAction('deliver');
+    });
+  }
+
+  async function doAction(action) {
+    const id = state.job && state.job.id;
+    if (!id) return;
+    const btn = document.querySelector('#actions .btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
+    const r = await api(`/api/tech/jobs/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+    if (r.ok) await renderDetail();
+    else { alert('ไม่สำเร็จ: ' + ((r.body && (r.body.error||r.body.message))||`HTTP ${r.status}`)); if (btn) btn.disabled = false; }
+  }
+
+  async function deletePhoto(idx) {
+    const id = state.job && state.job.id;
+    if (!id) return;
+    updateSaveStatus('saving');
+    const r = await api(`/api/tech/jobs/${encodeURIComponent(id)}/photos/${idx}`, { method: 'DELETE' });
+    if (r.ok) { updateSaveStatus('saved'); await renderDetail(); }
+    else { updateSaveStatus('error'); alert('ลบไม่สำเร็จ'); }
+  }
+
+  function debouncedSave(patch) {
+    if (state.saveTimer) clearTimeout(state.saveTimer);
+    updateSaveStatus('saving');
+    state.saveTimer = setTimeout(() => saveJob(patch), 500);
+  }
+
+  async function saveJob(patch) {
+    const id = state.job && state.job.id;
+    if (!id) return;
+    updateSaveStatus('saving');
+    const r = await api(`/api/tech/jobs/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    });
+    if (r.ok) {
+      updateSaveStatus('saved');
+      if (r.body && (r.body.job || r.body.id)) {
+        const updated = r.body.job || r.body;
+        // merge gentle fields ที่ server คำนวณกลับมา (amount, commission_amount, parts_total)
+        ['amount','commission_amount','parts_total','updated_at'].forEach(k => {
+          if (updated[k] != null) state.job[k] = updated[k];
+        });
+      }
+    } else {
+      updateSaveStatus('error');
+    }
+  }
+
+  function updateSaveStatus(s) {
+    state.saveStatus = s;
+    const el = $('saveStatus');
+    if (!el) return;
+    el.classList.remove('saving','saved','error');
+    if (s === 'saving') { el.textContent = '💾 กำลังบันทึก...'; el.classList.add('saving'); }
+    else if (s === 'saved') { el.textContent = '✓ บันทึกแล้ว'; el.classList.add('saved'); setTimeout(()=>{ if(el && state.saveStatus==='saved') el.textContent=''; }, 1500); }
+    else if (s === 'error') { el.textContent = '⚠️ บันทึกไม่สำเร็จ'; el.classList.add('error'); }
+    else el.textContent = '';
+  }
+
+  // ---------- Parts Picker ----------
+  function openPartsPicker() {
+    const sheet = document.createElement('div');
+    sheet.className = 'sheet';
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <div class="sheet-header">
+          <div class="title">เลือกอะไหล่</div>
+          <button class="iconbtn" id="ppClose" style="background:#eee;color:#1a2e22;width:32px;height:32px;border-radius:8px;border:none;font-size:16px;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:10px 12px 0">
+          <input type="search" id="ppSearch" placeholder="🔍 ค้นหา SKU / ชื่อช่าง" autocomplete="off" />
+        </div>
+        <div class="sheet-body" id="ppBody">
+          <div class="center"><div class="spinner"></div><div class="muted">กำลังโหลด...</div></div>
+        </div>
+        <div class="sheet-foot">
+          <button class="btn btn-primary" id="ppDone">เสร็จสิ้น</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(sheet);
+
+    const close = () => sheet.remove();
+    $('ppClose').addEventListener('click', close);
+    $('ppDone').addEventListener('click', close);
+    sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
+
+    let searchTimer = null;
+    const doSearch = (q) => {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadParts(q), 250);
+    };
+
+    async function loadParts(q) {
+      const body = $('ppBody');
+      body.innerHTML = `<div class="center"><div class="spinner"></div></div>`;
+      const r = await api('/api/tech/products?q=' + encodeURIComponent(q || ''));
+      if (!r.ok || !r.body) {
+        body.innerHTML = `<div class="alert alert-error">โหลดอะไหล่ไม่สำเร็จ</div>`;
+        return;
+      }
+      const items = r.body.products || r.body.data || r.body || [];
+      state.productsCache = Array.isArray(items) ? items : [];
+      renderList();
+    }
+
+    function renderList() {
+      const body = $('ppBody');
+      const items = state.productsCache;
+      if (!items.length) {
+        body.innerHTML = `<div class="muted center" style="padding:20px">ไม่พบอะไหล่</div>`;
+        return;
+      }
+      body.innerHTML = items.map(p => {
+        const name = p.name_tech || p.name || '-';
+        const sku = p.sku || '';
+        const price = Number(p.repair_price != null ? p.repair_price : p.price) || 0;
+        const stock = p.stock != null ? p.stock : (p.qty_in_stock != null ? p.qty_in_stock : '-');
+        const pid = p.id || p.product_id || sku;
+        return `
+          <div class="part-item" data-id="${escapeHtml(pid)}">
+            <div class="pname">${escapeHtml(name)}</div>
+            <div class="psku">${escapeHtml(sku)}</div>
+            <div class="prow">
+              <div class="price">${fmtMoney(price)}</div>
+              <div class="stock">stock: ${escapeHtml(String(stock))}</div>
+              <input type="number" class="qty-input" value="1" min="1" />
+              <button class="btn btn-primary add-btn">+ เพิ่ม</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      $$('#ppBody .part-item').forEach(el => {
+        el.querySelector('.add-btn').addEventListener('click', () => {
+          const pid = el.dataset.id;
+          const qty = Math.max(1, +el.querySelector('.qty-input').value || 1);
+          const prod = items.find(x => String(x.id||x.product_id||x.sku) === String(pid));
+          if (!prod) return;
+          addPart(prod, qty);
+          // visual feedback
+          el.style.background = '#d8f0d8';
+          setTimeout(() => { el.style.background = ''; }, 400);
+        });
+      });
+    }
+
+    $('ppSearch').addEventListener('input', (e) => doSearch(e.target.value));
+    loadParts('');
+  }
+
+  function addPart(prod, qty) {
+    const j = state.job;
+    if (!j) return;
+    const unit = Number(prod.repair_price != null ? prod.repair_price : prod.price) || 0;
+    const item = {
+      product_id: prod.id || prod.product_id || null,
+      sku: prod.sku || '',
+      name_tech: prod.name_tech || prod.name || '',
+      qty: qty,
+      unit_price: unit,
+      total: unit * qty,
+    };
+    const list = Array.isArray(j.parts_used) ? j.parts_used.slice() : [];
+    // ถ้ามี product_id ซ้ำ → รวม qty
+    const existIdx = list.findIndex(x => x.product_id && item.product_id && x.product_id === item.product_id);
+    if (existIdx >= 0) {
+      list[existIdx].qty = (Number(list[existIdx].qty)||0) + qty;
+      list[existIdx].total = (Number(list[existIdx].unit_price)||unit) * list[existIdx].qty;
+    } else {
+      list.push(item);
+    }
+    j.parts_used = list;
+    saveJob({ parts_used: list }).then(() => drawDetail());
+  }
+
+  // ---------- Init ----------
+  async function init() {
+    // 1) auth
+    const me = await api('/auth/me');
+    if (me.status === 401 || !me.ok) {
+      const next = encodeURIComponent(location.pathname + location.search);
+      location.href = '/auth/login?next=' + next;
+      return;
+    }
+    state.user = (me.body && (me.body.user || me.body)) || null;
+    const role = state.user && state.user.role;
+    if (role !== 'technician' && role !== 'owner' && role !== 'manager') {
+      showNoPerm('ระบบนี้สำหรับช่างเท่านั้น');
+      return;
+    }
+
+    // 2) /api/tech/me
+    const t = await api('/api/tech/me');
+    if (!t.ok) {
+      showError('โหลดข้อมูลช่างไม่สำเร็จ: ' + ((t.body && (t.body.error||t.body.message)) || `HTTP ${t.status}`), () => init());
+      return;
+    }
+    state.me = t.body || {};
+
+    // 3) dashboard
+    navigate('dashboard');
+  }
+
+  init().catch(err => {
+    console.error(err);
+    showError('เริ่มระบบไม่สำเร็จ: ' + (err.message || err), () => init());
+  });
+})();
+</script>
+</body>
+</html>
+</content>
+</invoke>
