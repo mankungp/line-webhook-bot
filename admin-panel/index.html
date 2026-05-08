@@ -3631,18 +3631,67 @@ function selectMemberForPos(payloadStr) {
   var data;
   try { data = JSON.parse(payloadStr); } catch (e) { return; }
   posSelectedMember = data.id;
+  posSelectedMemberTier = data.tier || 'regular';
   document.getElementById('posMemberResults').style.display = 'none';
   document.getElementById('posMemberSearch').value = '';
   var sel = document.getElementById('posMemberSelected');
-  sel.innerHTML = '✅ <strong>' + escapeHtml(data.name) + '</strong> (' + escapeHtml(data.code) + ') — <a href="javascript:void(0)" onclick="clearPosMember()" style="color:#d33;">ลบ</a>';
+  var tierLabel = ({ regular:'ทั่วไป', wholesale:'ขายส่ง/ช่าง', vip:'VIP' })[data.tier] || 'ทั่วไป';
+  var tierColor = ({ regular:'#666', wholesale:'#0a8855', vip:'#d4a017' })[data.tier] || '#666';
+  sel.innerHTML = '✅ <strong>' + escapeHtml(data.name) + '</strong> (' + escapeHtml(data.code) + ') ' +
+    '<span style="background:' + tierColor + ';color:white;padding:2px 8px;border-radius:4px;font-size:11px;margin:0 4px;">' + tierLabel + '</span>' +
+    '<a href="javascript:void(0)" onclick="clearPosMember()" style="color:#d33;">ลบ</a>';
   sel.style.display = 'block';
+  // อัปเดตราคาของสินค้าในตะกร้าตาม tier ใหม่
+  recalcPosCartPrices();
 }
 
 function clearPosMember() {
   posSelectedMember = null;
+  posSelectedMemberTier = 'regular';
   var sel = document.getElementById('posMemberSelected');
   if (sel) sel.style.display = 'none';
+  recalcPosCartPrices();
 }
+
+// เลือกราคาตาม tier (fallback chain: vip → wholesale → regular)
+function pickPriceForTier(product, tier) {
+  if (tier === 'vip') {
+    if (Number(product.priceVip) > 0) return Number(product.priceVip);
+    if (Number(product.priceWholesale) > 0) return Number(product.priceWholesale);
+    return Number(product.price) || 0;
+  }
+  if (tier === 'wholesale') {
+    if (Number(product.priceWholesale) > 0) return Number(product.priceWholesale);
+    return Number(product.price) || 0;
+  }
+  return Number(product.price) || 0;
+}
+
+// รีเฏสราคา cart ตาม tier ปัจจุบัน (ไม่รีเฏถ้า user override ราคาไปแล้ว)
+async function recalcPosCartPrices() {
+  if (!posCart.length) return;
+  var tier = posSelectedMemberTier || 'regular';
+  try {
+    var ids = posCart.map(function(it){ return it.productId; });
+    var r = await fetch('/api/products?status=active&limit=1000');
+    var data = await r.json();
+    var arr = Array.isArray(data) ? data : (data && data.products) ? data.products : [];
+    var pmap = {};
+    arr.forEach(function(p){ pmap[p.id] = p; });
+    posCart.forEach(function(it) {
+      var p = pmap[it.productId];
+      if (!p) return;
+      // ถ้าไม่สียงราคาเอง (priceOverride !== true) → รีเฏตาม tier
+      if (!it.priceOverride) {
+        it.price = pickPriceForTier(p, tier);
+      }
+    });
+    renderPosCart();
+    updatePosTotal();
+  } catch (e) { console.error('recalcPosCartPrices:', e); }
+}
+
+var posSelectedMemberTier = 'regular';
 
 function searchMembersForOrder(query) {
   clearTimeout(memberSearchTimer);
@@ -3839,12 +3888,22 @@ function searchProductsForPos(query) {
       matched.forEach(function(p) {
         var stockColor = (p.stock > 0) ? '#0a0' : '#d33';
         var nameEsc = JSON.stringify(p.name || '').replace(/"/g, '&quot;');
-        html += '<div onclick="addToPosCart(' + p.id + ',' + (p.price || 0) + ',' + (p.stock || 0) + ',' + nameEsc + ')" style="padding:12px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f0f9ff&quot;" onmouseout="this.style.background=&quot;&quot;">';
+        // pass full product object for tier pricing
+        var prodEsc = JSON.stringify({
+          id: p.id, name: p.name, price: p.price || 0,
+          priceWholesale: p.priceWholesale || 0,
+          priceVip: p.priceVip || 0
+        }).replace(/"/g, '&quot;');
+        // แสดงราคาตาม tier ปัจจุบันใน dropdown
+        var tierPrice = pickPriceForTier(p, posSelectedMemberTier || 'regular');
+        var tierLabel = ({ regular:'', wholesale:' (ราคาส่ง)', vip:' (ราคา VIP)' })[posSelectedMemberTier] || '';
+        html += '<div onclick="addToPosCart(' + p.id + ',' + tierPrice + ',' + (p.stock || 0) + ',' + nameEsc + ',' + prodEsc + ')" style="padding:12px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f0f9ff&quot;" onmouseout="this.style.background=&quot;&quot;">';
         html += '<div style="display:flex; justify-content:space-between;">';
         html += '<div><strong>' + escapeHtml(p.name) + '</strong>';
         if (p.sku) html += ' <small style="color:#999;">' + escapeHtml(p.sku) + '</small>';
         html += '</div>';
-        html += '<div><strong>' + numFormat(p.price || 0) + '</strong></div>';
+        html += '<div style="text-align:right;"><strong>' + numFormat(tierPrice) + '</strong>' +
+          (tierLabel ? '<div style="font-size:10px;color:#0a8855;">' + tierLabel + '</div>' : '') + '</div>';
         html += '</div>';
         html += '<div style="font-size:12px; color:' + stockColor + ';">stock: ' + (p.stock || 0) + ' ' + escapeHtml(p.unit || '') + '</div>';
         html += '</div>';
@@ -3855,12 +3914,17 @@ function searchProductsForPos(query) {
   }, 200);
 }
 
-function addToPosCart(productId, price, stock, name) {
+function addToPosCart(productId, price, stock, name, product) {
   var existing = posCart.find(function(it){ return it.productId === productId; });
   if (existing) {
     existing.quantity += 1;
   } else {
-    posCart.push({ productId: productId, name: name, quantity: 1, price: price });
+    // ถ้ามี product object → pick ราคาตาม tier
+    var pickedPrice = price;
+    if (product) {
+      pickedPrice = pickPriceForTier(product, posSelectedMemberTier || 'regular');
+    }
+    posCart.push({ productId: productId, name: name, quantity: 1, price: pickedPrice, priceOverride: false });
   }
   document.getElementById('posProductSearch').value = '';
   document.getElementById('posProductResults').style.display = 'none';
