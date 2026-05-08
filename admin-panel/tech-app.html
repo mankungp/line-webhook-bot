@@ -694,12 +694,17 @@
     const emp = me.emp || me.employee || me;
     const empName = emp.name || emp.full_name || (state.user && state.user.displayName) || 'ช่าง';
     const empCode = emp.emp_code || emp.code || '';
-    const com = me.commission_this_month != null ? me.commission_this_month
-              : (me.commission && me.commission.this_month) || 0;
+    // Backend ส่ง me.commission_summary.current_month (canonical)
+    // รองรับ field เก่า me.commission_this_month / me.commission.this_month ไว้ด้วย
+    const summary = me.commission_summary || {};
+    const com = summary.current_month != null ? summary.current_month
+              : (me.commission_this_month != null ? me.commission_this_month
+                : (me.commission && me.commission.this_month) || 0);
+    const jobCount = summary.job_count_current_month != null ? summary.job_count_current_month : 0;
 
     renderTopbar({
       title: `คุณ ${empName}${empCode?` (${empCode})`:''}`,
-      sub: `คอมเดือนนี้ ${fmtMoney(com)}`,
+      sub: `คอมเดือนนี้ ${fmtMoney(com)}${jobCount?` (${jobCount} งาน)`:''}`,
     });
 
     setLoading();
