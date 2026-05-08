@@ -761,28 +761,43 @@
     });
   }
 
-  function showActionMenu() {
+  async function showActionMenu() {
     // ปิด menu เก่าถ้ามี
     const old = document.getElementById('actionMenuOverlay');
     if (old) { old.remove(); return; }
+
+    // รีเฟรช today-summary เพื่อรู้สถานะล่าสุด (in หรือ out)
+    let nextAction = 'check_out';
+    try {
+      const sumRes = await api('/api/tech/today-summary');
+      if (sumRes.ok && sumRes.body && sumRes.body.next_action) {
+        nextAction = sumRes.body.next_action;
+      }
+    } catch(_){}
+
+    const isCheckIn = nextAction === 'check_in';
+    const label = isCheckIn ? '✅ ลงเวลาเข้างาน' : '🚪 ลงเวลาออกงาน';
+    const color = isCheckIn ? '#0a8855' : '#dc2626';
+    const confirmMsg = isCheckIn ? '✅ ยืนยันลงเวลาเข้างาน?' : '✅ ยืนยันลงเวลาออกงาน?';
+
     const ov = document.createElement('div');
     ov.id = 'actionMenuOverlay';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9000;';
     const menu = document.createElement('div');
     menu.style.cssText = 'position:fixed;top:60px;right:14px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:200px;z-index:9001;overflow:hidden;';
     menu.innerHTML = `
-      <button id="miClockOut" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:#dc2626;">
-        🚪 ลงเวลาออกงาน
+      <button id="miClock" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:${color};">
+        ${label}
       </button>
     `;
     ov.addEventListener('click', () => { ov.remove(); menu.remove(); });
     document.body.appendChild(ov);
     document.body.appendChild(menu);
-    document.getElementById('miClockOut').addEventListener('click', (e) => {
+    document.getElementById('miClock').addEventListener('click', (e) => {
       e.stopPropagation();
       ov.remove(); menu.remove();
-      if (confirm('✅ ยืนยันลงเวลาออกงาน?')) {
-        location.href = '/attendance/scan?type=check_out';
+      if (confirm(confirmMsg)) {
+        location.href = '/attendance/scan?type=' + nextAction;
       }
     });
   }
@@ -1507,16 +1522,18 @@
     }
     state.me = t.body || {};
 
-    // 2.5) ตรวจว่าช่าง check_in วันนี้แล้วหรือยัง — ถ้ายังไม่ → บังคับไปหน้า attendance scan
+    // 2.5) ตรวจสถานะการลงเวลา — ถ้ายังไม่มี check_in วันนี้ → ไปลงเวลาก่อน
     if (state.user && state.user.role === 'technician') {
       try {
         const sumRes = await api('/api/tech/today-summary');
-        if (sumRes.ok && sumRes.body && !sumRes.body.first_in) {
-          // ยังไม่ได้ลงเวลาเข้างานวันนี้
-          location.href = '/attendance/scan?type=check_in';
-          return;
+        if (sumRes.ok && sumRes.body) {
+          state.todaySummary = sumRes.body;
+          if (!sumRes.body.first_in) {
+            location.href = '/attendance/scan?type=check_in';
+            return;
+          }
         }
-      } catch (_) { /* ignore — ไปต่อ dashboard */ }
+      } catch (_) {}
     }
 
     // 3) dashboard
