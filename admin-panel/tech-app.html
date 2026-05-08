@@ -963,7 +963,8 @@
       actions = `<div class="alert alert-success">💰 จ่ายค่าคอมแล้ว</div>`;
     }
 
-    const editable = (j.status === 'fixing' && isOwnJob) || (j.status === 'received' && !j.fixed_by) || isOwner;
+    // แก้ parts/labor ได้เฉพาะสถานะ fixing (ช่างตัวเอง) หรือ owner
+    const editable = (j.status === 'fixing' && isOwnJob) || isOwner;
 
     root.innerHTML = `
       <div class="card compact">
