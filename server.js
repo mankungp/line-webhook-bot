@@ -33,7 +33,7 @@ function adminFetch(url, opts) {
 const WELCOME_MSG = '🌾 สวัสดีค่ะ! ยินดีต้อนรับเข้าสู่ร้านเกิดการเกษตรค่ะ\n\n📍 ที่อยู่ร้าน: อ.โพนทอง จ.ร้อยเอ็ด\n📞 โทร: 091-414-5767\n🗺️ แผนที่: https://maps.app.goo.gl/yq9LvRcEp3xrb7p28\n⏰ เปิดทำการ: ทุกวัน 08:00-17:00 น.\n\n🤖 AI ผู้ช่วยอัจฉริยะ สามารถ:\n• เช็คราคาสินค้าได้ทันที (ราคาปลีก/ราคาส่ง*)\n• สั่งซื้อสินค้าออนไลน์ได้เลย\n• ตอบคำถามทั่วไปเกี่ยวกับสินค้า\n\n*ราคาส่ง ต้องสมัครสมาชิกร้านค้าค่ะ\n\n💬 ติดต่อแอดมิน: 08:00-17:00 น.\n\nมีอะไรให้ช่วยไหมคะ?';
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 app.use(function(req, res, next) {
   console.log('\n[' + new Date().toISOString() + '] ' + req.method + ' ' + req.path);
@@ -217,6 +217,32 @@ app.get('/api/attendance/active-employees', forwardWithCookie('GET'));
 // Mobile attendance scan page (public — token required in query)
 app.get('/attendance/scan', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'admin-panel', 'attendance-scan.html'));
+});
+
+// ============ TECH APP PROXIES (Phase A) ============
+app.get('/api/tech/me', forwardWithCookie('GET'));
+app.get('/api/tech/jobs', forwardWithCookie('GET'));
+app.get('/api/tech/jobs/:id', forwardWithCookie('GET'));
+app.post('/api/tech/jobs', forwardWithCookie('POST'));
+app.put('/api/tech/jobs/:id', forwardWithCookie('PUT'));
+app.post('/api/tech/jobs/:id/photos', forwardWithCookie('POST'));
+app.delete('/api/tech/jobs/:id/photos/:idx', forwardWithCookie('DELETE'));
+app.post('/api/tech/jobs/:id/start-fixing', forwardWithCookie('POST'));
+app.post('/api/tech/jobs/:id/done', forwardWithCookie('POST'));
+app.post('/api/tech/jobs/:id/deliver', forwardWithCookie('POST'));
+app.get('/api/tech/products', forwardWithCookie('GET'));
+
+// Approve
+app.get('/api/tech-jobs/pending-approval', forwardWithCookie('GET'));
+app.post('/api/tech-jobs/:id/approve', forwardWithCookie('POST'));
+app.post('/api/tech-jobs/:id/reject', forwardWithCookie('POST'));
+
+// Static mobile app (Phase B จะสร้าง tech-app.html)
+app.get('/tech', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'tech-app.html'));
+});
+app.get('/tech/', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'tech-app.html'));
 });
 
 // ============ MARKETPLACE PROXIES ============
@@ -457,6 +483,82 @@ async function replyToLine(replyToken, messages) {
   }
 }
 
+// ============ PUSH FLEX TO LINE ============
+
+// ส่ง LINE Flex message ไปยัง userId เฉพาะ (push)
+async function pushFlexToLine(toUserId, altText, flexContents) {
+  try {
+    var url = 'https://api.line.me/v2/bot/message/push';
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        to: toUserId,
+        messages: [{
+          type: 'flex',
+          altText: altText,
+          contents: flexContents
+        }]
+      })
+    });
+    var data = await res.json().catch(function(){return {};});
+    if (!res.ok) {
+      console.error('[pushFlexToLine] HTTP', res.status, data);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[pushFlexToLine] err:', e.message);
+    return false;
+  }
+}
+
+// Build approve flex bubble
+function buildTechJobApproveFlex(job) {
+  var amt = (job.amount || 0).toLocaleString();
+  var comm = (job.commission_amount || 0).toLocaleString();
+  return {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        { type: 'text', text: '🔧 งานซ่อมเสร็จ', weight: 'bold', size: 'lg', color: '#e67e22' },
+        { type: 'text', text: job.id, size: 'sm', color: '#999999', margin: 'sm' },
+        { type: 'separator', margin: 'md' },
+        { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: [
+          { type: 'text', text: '👤 ' + (job.customer_name || '-'), size: 'sm' },
+          { type: 'text', text: '📞 ' + (job.customer_phone || '-'), size: 'sm', color: '#666666' },
+          { type: 'text', text: '🏍️ ' + ((job.device && job.device.brand) || '') + ' ' + ((job.device && job.device.model) || ''), size: 'sm' }
+        ]},
+        { type: 'separator', margin: 'md' },
+        { type: 'box', layout: 'horizontal', margin: 'md', contents: [
+          { type: 'text', text: 'รวม', flex: 1, color: '#999999', size: 'sm' },
+          { type: 'text', text: '฿' + amt, flex: 2, weight: 'bold', align: 'end' }
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: 'คอม', flex: 1, color: '#999999', size: 'sm' },
+          { type: 'text', text: '฿' + comm, flex: 2, weight: 'bold', color: '#0a8855', align: 'end' }
+        ]}
+      ]
+    },
+    footer: {
+      type: 'box',
+      layout: 'horizontal',
+      spacing: 'sm',
+      contents: [
+        { type: 'button', style: 'primary', color: '#27ae60', height: 'sm',
+          action: { type: 'postback', label: '✅ อนุมัติ', data: 'tech_approve:' + job.id, displayText: 'อนุมัติ ' + job.id }},
+        { type: 'button', style: 'secondary', height: 'sm',
+          action: { type: 'postback', label: '❌ Reject', data: 'tech_reject:' + job.id, displayText: 'Reject ' + job.id }}
+      ]
+    }
+  };
+}
+
 // ============ BUILD CONTEXT ============
 
 async function buildStoreContext() {
@@ -674,6 +776,24 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
         } else if (data === 'action_admin') {
           var replyText = await callGroqAPI('Customer wants to contact admin', '', 'admin');
           await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
+        } else if (data.indexOf('tech_approve:') === 0) {
+          var jobId = data.substring('tech_approve:'.length);
+          var lineUserId = event.source && event.source.userId;
+          try {
+            var r = await fetch(LOCAL_API_BASE + '/api/tech-jobs/' + encodeURIComponent(jobId) + '/approve', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json','X-Admin-Token':process.env.ADMIN_TOKEN || ''},
+              body: JSON.stringify({via:'line_button', approved_by_line_user: lineUserId})
+            });
+            var dd = await r.json().catch(function(){return {};});
+            var msg = r.ok ? '✅ อนุมัติงาน ' + jobId + ' แล้ว' : '❌ ' + (dd.error || ('HTTP ' + r.status));
+            await replyToLine(replyToken, [{type:'text', text: msg}]);
+          } catch (e) {
+            await replyToLine(replyToken, [{type:'text', text:'❌ ' + e.message}]);
+          }
+        } else if (data.indexOf('tech_reject:') === 0) {
+          var jobId2 = data.substring('tech_reject:'.length);
+          await replyToLine(replyToken, [{type:'text', text:'❌ Rejected งาน ' + jobId2 + '\nกรุณา reject ผ่าน Admin UI พร้อมระบุเหตุผล'}]);
         } else {
           await replyToLine(replyToken, [{ type: 'text', text: 'Thank you' }]);
         }
@@ -685,6 +805,37 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
   } catch (error) {
     console.error('[WEBHOOK] Error:', error.message);
     res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ============ INTERNAL: NOTIFY OWNER (TECH JOB DELIVERED) ============
+// Called by local-api after marking job delivered. Best-effort push to LINE owners.
+app.post('/api/_internal/notify-tech-delivered', async function(req, res) {
+  try {
+    var token = req.headers['x-internal-token'] || '';
+    var expected = process.env.INTERNAL_TOKEN || '';
+    if (expected && token !== expected) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    var body = req.body || {};
+    var job = body.job;
+    var ownerIds = Array.isArray(body.owner_line_ids) ? body.owner_line_ids : [];
+    if (!job || !job.id) return res.status(400).json({ error: 'missing job' });
+    if (!LINE_CHANNEL_ACCESS_TOKEN) {
+      console.warn('[notify-tech-delivered] no LINE token, skip');
+      return res.json({ ok: true, skipped: true, reason: 'no LINE token' });
+    }
+    var flex = buildTechJobApproveFlex(job);
+    var alt = 'งานซ่อมเสร็จ ' + job.id + ' รออนุมัติคอม';
+    var sent = 0;
+    for (var i = 0; i < ownerIds.length; i++) {
+      var ok = await pushFlexToLine(ownerIds[i], alt, flex);
+      if (ok) sent++;
+    }
+    res.json({ ok: true, sent: sent, total: ownerIds.length });
+  } catch (e) {
+    console.error('[notify-tech-delivered] err:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
