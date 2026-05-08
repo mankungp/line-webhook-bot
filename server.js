@@ -649,10 +649,18 @@ function buildTechJobApproveFlex(job) {
         ]},
         { type: 'separator', margin: 'sm' },
         { type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'sm', contents: [
-          { type: 'button', style: 'primary', color: '#27ae60', height: 'sm', flex: 1,
-            action: { type: 'postback', label: '✅ อนุมัติ', data: 'tech_approve:' + job.id, displayText: 'อนุมัติ ' + job.id }},
-          { type: 'button', style: 'secondary', height: 'sm', flex: 1,
-            action: { type: 'postback', label: '❌ ไม่อนุมัติ', data: 'tech_reject:' + job.id, displayText: 'Reject ' + job.id }}
+          { type: 'button', style: 'primary', color: '#27ae60', height: 'sm', flex: 2,
+            action: { type: 'postback', label: '✅ อนุมัติ', data: 'tech_approve:' + job.id, displayText: 'อนุมัติ ' + job.id }}
+        ]},
+        { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+          { type: 'button', style: 'secondary', color: '#f39c12', height: 'sm', flex: 1,
+            action: { type: 'postback', label: '🔄 ส่งกลับ', data: 'tech_return:' + job.id, displayText: 'ส่งกลับซ่อม ' + job.id }},
+          { type: 'button', style: 'secondary', color: '#dc2626', height: 'sm', flex: 1,
+            action: { type: 'uri', label: '❌ ยกเลิก', uri: baseUrl + '/admin/?focus=' + encodeURIComponent(job.id) + '#tech-cancel' }}
+        ]},
+        { type: 'box', layout: 'horizontal', margin: 'sm', contents: [
+          { type: 'button', style: 'link', height: 'sm', flex: 1,
+            action: { type: 'uri', label: '✏️ แก้ไข / ดูรายละเอียด', uri: baseUrl + '/admin/?focus=' + encodeURIComponent(job.id) + '#tech-edit' }}
         ]}
       ]
     }
@@ -907,21 +915,25 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
           } catch (e) {
             await replyToLine(replyToken, [{type:'text', text:'❌ ' + e.message}]);
           }
-        } else if (data.indexOf('tech_reject:') === 0) {
-          var jobId2 = data.substring('tech_reject:'.length);
-          var lineUserId2 = event.source && event.source.userId;
+        } else if (data.indexOf('tech_return:') === 0) {
+          var jobIdR = data.substring('tech_return:'.length);
+          var lineUserIdR = event.source && event.source.userId;
           try {
-            var r2 = await fetch(LOCAL_API_BASE + '/api/tech-jobs/' + encodeURIComponent(jobId2) + '/reject', {
+            var rR = await fetch(LOCAL_API_BASE + '/api/tech-jobs/' + encodeURIComponent(jobIdR) + '/return-to-fixing', {
               method: 'POST',
               headers: {'Content-Type':'application/json','X-Admin-Token':process.env.ADMIN_TOKEN || ''},
-              body: JSON.stringify({via:'line_button', approved_by_line_user: lineUserId2, reason: '(ไม่ระบุเหตุผลผ่าน LINE)'})
+              body: JSON.stringify({via:'line_button', approved_by_line_user: lineUserIdR, reason: '(ส่งกลับผ่าน LINE — ตรวจชิ้นงาน/ซ่อมเพิ่ม)'})
             });
-            var dd2 = await r2.json().catch(function(){return {};});
-            var msg2 = r2.ok ? '❌ Rejected งาน ' + jobId2 + ' แล้ว' : '❌ ' + (dd2.error || ('HTTP ' + r2.status));
-            await replyToLine(replyToken, [{type:'text', text: msg2}]);
-          } catch (e2) {
-            await replyToLine(replyToken, [{type:'text', text:'❌ ' + e2.message}]);
+            var ddR = await rR.json().catch(function(){return {};});
+            var msgR = rR.ok ? '🔄 ส่งงาน ' + jobIdR + ' กลับไปซ่อมต่อแล้ว (ช่างได้รับแจ้งทาง LINE)' : '❌ ' + (ddR.error || ('HTTP ' + rR.status));
+            await replyToLine(replyToken, [{type:'text', text: msgR}]);
+          } catch (eR) {
+            await replyToLine(replyToken, [{type:'text', text:'❌ ' + eR.message}]);
           }
+        } else if (data.indexOf('tech_reject:') === 0) {
+          // legacy: reject button → บอกให้ owner ไปที่ admin UI เพราะต้องระบุออปชั่น
+          var jobId2 = data.substring('tech_reject:'.length);
+          await replyToLine(replyToken, [{type:'text', text: '⚠️ กรุณายกเลิกผ่าน admin panel — ต้องระบุค่าใช้จ่าย + จัดการ stock\n\nลิงก์: ' + (process.env.RENDER_BASE_URL || '') + '/admin/?focus=' + encodeURIComponent(jobId2) + '#tech-cancel'}]);
         } else {
           await replyToLine(replyToken, [{ type: 'text', text: 'Thank you' }]);
         }
