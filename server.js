@@ -1292,6 +1292,21 @@ app.get('/snapshots/:filename', async function(req, res) {
   } catch (err) { res.status(500).send('error'); }
 });
 
+// Tech app photos: /snapshots/tech/JOB-xxx/file.jpg + attendance: /snapshots/att/...
+app.get('/snapshots/:type/:dir/:filename', async function(req, res) {
+  try {
+    var url = LOCAL_API_BASE + '/snapshots/' +
+      encodeURIComponent(req.params.type) + '/' +
+      encodeURIComponent(req.params.dir) + '/' +
+      encodeURIComponent(req.params.filename);
+    var r = await fetch(url);
+    if (!r.ok) return res.status(404).send('not found');
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (err) { res.status(500).send('error'); }
+});
+
 app.post('/api/orders/:id/snapshot', async function(req, res) {
   try {
     var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/snapshot', { method: 'POST' });
