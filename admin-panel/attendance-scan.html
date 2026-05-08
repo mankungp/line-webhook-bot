@@ -515,6 +515,19 @@
       showTokenExpired(reason === 'token_expired' ? 'QR หมดอายุ กรุณาสแกนใหม่' : 'Token ไม่ถูกต้อง');
       return;
     }
+    // 429 cooldown / 409 duplicate — แสดง UI เฉพาะ
+    if (r.status === 429 || (r.body && r.body.duplicate)) {
+      setHTML(`
+        <div class="center">
+          <div class="big-emoji">⏰</div>
+          <h2 style="margin:6px 0">${r.status === 429 ? 'รอสักครู่' : 'ลงเวลาซ้ำ'}</h2>
+          <div class="alert alert-warn">${escapeHtml(reason)}</div>
+        </div>
+        <button class="btn btn-ghost" id="btnClose" type="button">ปิดหน้านี้</button>
+      `);
+      $('btnClose').addEventListener('click', () => { try { window.close(); } catch(_){} });
+      return;
+    }
 
     const msg = (r.body && r.body.message) || reason || `HTTP ${r.status}`;
     showError('ลงเวลาไม่สำเร็จ: ' + msg, () => showReady());
