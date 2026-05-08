@@ -216,6 +216,9 @@ app.get('/api/attendance/active-employees', forwardWithCookie('GET'));
 
 // Mobile attendance scan page (public — token required in query)
 app.get('/attendance/scan', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(require('path').join(__dirname, 'admin-panel', 'attendance-scan.html'));
 });
 
