@@ -922,6 +922,95 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
   }
 });
 
+// Helper: push plain text to LINE
+async function pushTextToLine(toUserId, text) {
+  if (!LINE_CHANNEL_ACCESS_TOKEN) return false;
+  try {
+    var res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN
+      },
+      body: JSON.stringify({
+        to: toUserId,
+        messages: [{ type: 'text', text: text }]
+      })
+    });
+    if (!res.ok) {
+      var data = await res.text().catch(function(){return ''; });
+      console.error('[pushTextToLine] HTTP', res.status, data);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[pushTextToLine] err:', e.message);
+    return false;
+  }
+}
+
+// Helper: หาชื่อผู้ approve จาก lineUserId ของ user
+function lookupUserName(lineUserId) {
+  if (!lineUserId || lineUserId === 'admin-token') return 'Admin (token)';
+  try {
+    var fs2 = require('fs');
+    // ลองอ่าน users.json จาก NAS-mounted path ไม่ได้ — fallback ใช้ lineUserId snippet
+  } catch (e) {}
+  return 'Owner ' + String(lineUserId).slice(-6);
+}
+
+// ============ INTERNAL: NOTIFY OWNER (TECH JOB DECISION: approve/reject) ============
+app.post('/api/_internal/notify-tech-decision', async function(req, res) {
+  try {
+    var token = req.headers['x-internal-token'] || '';
+    var expected = process.env.INTERNAL_TOKEN || '';
+    if (expected && token !== expected) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    var body = req.body || {};
+    var action = body.action; // 'approved' | 'rejected'
+    var job = body.job;
+    var fixerName = body.fixer_name || '-';
+    var approver = body.approver || {};
+    var ownerIds = Array.isArray(body.owner_line_ids) ? body.owner_line_ids : [];
+    if (!job || !job.id || !action) return res.status(400).json({ error: 'missing fields' });
+    if (!LINE_CHANNEL_ACCESS_TOKEN) {
+      console.warn('[notify-tech-decision] no LINE token, skip');
+      return res.json({ ok: true, skipped: true });
+    }
+
+    var approverName = approver.displayName || approver.name || lookupUserName(approver.lineUserId);
+    var emoji = action === 'approved' ? '✅' : '❌';
+    var label = action === 'approved' ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ';
+
+    var msgLines = [
+      emoji + ' งานซ่อม ' + label,
+      '',
+      '📝 ' + job.id,
+      '👤 ' + (job.customer_name || '-'),
+      '🏍️ ' + ((job.device && job.device.brand) || '') + ' ' + ((job.device && job.device.model) || ''),
+      '🔧 ช่าง: ' + fixerName,
+      '💰 รวม ฿' + (Number(job.amount)||0).toLocaleString() + ' / คอม ฿' + (Number(job.commission_amount)||0).toLocaleString(),
+      '',
+      '👍 โดย: ' + approverName
+    ];
+    if (action === 'rejected' && approver.reason) {
+      msgLines.push('เหตุผล: ' + approver.reason);
+    }
+    var msg = msgLines.join('\n');
+
+    var sent = 0;
+    for (var i = 0; i < ownerIds.length; i++) {
+      var ok = await pushTextToLine(ownerIds[i], msg);
+      if (ok) sent++;
+    }
+    res.json({ ok: true, sent: sent, total: ownerIds.length, action: action });
+  } catch (e) {
+    console.error('[notify-tech-decision] err:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============ INTERNAL: NOTIFY OWNER (TECH JOB DELIVERED) ============
 // Called by local-api after marking job delivered. Best-effort push to LINE owners.
 app.post('/api/_internal/notify-tech-delivered', async function(req, res) {
