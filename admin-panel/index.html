@@ -1645,6 +1645,28 @@ input:focus, textarea:focus, select:focus {
       <h2>👥 ผู้ใช้ระบบ</h2>
       <p>จัดการสิทธิ์การใช้งาน · เฉพาะ owner เท่านั้น</p>
     </div>
+
+    <!-- ============ QR Code ลงทะเบียนระบบ ============ -->
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+        <div id="loginQrBox" style="background:white; padding:14px; border-radius:10px; border:2px solid #e0e8e3;">
+          <div id="loginQrImg"></div>
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <h3 style="margin:0 0 8px; color:#0a8855;">📲 QR ลงทะเบียนระบบ</h3>
+          <p style="margin:0 0 10px; color:#3a5547; line-height:1.5;">
+            สำหรับพนักงานใหม่ — สแกนขึ้นระบบครั้งแรก<br>
+            ไม่ต้องส่งลิงก์ผ่านแชต
+          </p>
+          <div style="font-family:monospace; font-size:13px; color:#666; word-break:break-all; background:#f5f9f7; padding:8px; border-radius:6px;" id="loginQrUrl">-</div>
+          <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="copyLoginUrl()" style="width:auto;margin:0">📋 คัดลิงก์</button>
+            <button class="btn btn-secondary btn-sm" onclick="openLoginQrFull()" style="width:auto;margin:0">🔍 ขยายเต็มจอ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="toolbar">
         <button class="btn btn-secondary" onclick="loadAdminUsers()">รีเฟรช</button>
@@ -1982,6 +2004,7 @@ function showPage(page) {
   if (page === 'payroll') initPayrollPage();
   if (page === 'marketplace') loadMarketplace();
   if (page === 'qr-att') loadQrAttendance();
+  if (page === 'users') loadLoginQr();
   if (page === 'tech') {
     var f = document.getElementById('techFrame');
     if (f && !f.src) f.src = '/tech';
@@ -5776,6 +5799,54 @@ function renderQr(elId, text, size) {
   if (!el) return;
   el.innerHTML = '';
   new QRCode(el, { text: text, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+}
+
+// ============ Login QR (สำหรับหน้าผู้ใช้ระบบ) ============
+function getLoginUrl() {
+  return location.origin + '/admin/login';
+}
+
+async function ensureQrLib() {
+  if (typeof QRCode === 'undefined') {
+    await new Promise(function(resolve) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+  }
+}
+
+async function loadLoginQr() {
+  await ensureQrLib();
+  var url = getLoginUrl();
+  renderQr('loginQrImg', url, 200);
+  var u = document.getElementById('loginQrUrl');
+  if (u) u.textContent = url;
+}
+
+function copyLoginUrl() {
+  var url = getLoginUrl();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){
+      if (typeof showToast === 'function') showToast('คัดลิงก์แล้ว', 'success');
+      else alert('คัดลิงก์แล้ว');
+    }).catch(function(){ alert(url); });
+  } else {
+    prompt('ลิงก์ลงทะเบียน:', url);
+  }
+}
+
+function openLoginQrFull() {
+  var url = getLoginUrl();
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;cursor:pointer;padding:20px;';
+  ov.innerHTML = '<div id="loginQrFullImg" style="background:white;padding:24px;border-radius:16px;"></div>' +
+    '<div style="color:white;margin-top:20px;font-size:18px;text-align:center;">สแกนเพื่อลงทะเบียนระบบ</div>' +
+    '<div style="color:#aaa;margin-top:8px;font-size:14px;">แตะที่ไหนก็ได้เพื่อปิด</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(){ ov.remove(); });
+  setTimeout(function(){ renderQr('loginQrFullImg', url, 360); }, 50);
 }
 
 function startQrTimers() {
