@@ -554,6 +554,7 @@
         </div>
         ${summaryHtml}
         ${showTechRedirect ? '<button class="btn btn-primary" id="btnGoTech" type="button">🔧 ไปหน้ารับงาน (<span id="countdown">3</span>)</button>' : ''}
+        ${isCheckOut && isTechnician ? '<div style="text-align:center;color:#666;font-size:13px;margin:14px 0;">🔓 กำลังออกจากระบบใน <span id="logoutCountdown">3</span> วินาที...</div>' : ''}
         <button class="btn btn-ghost" id="btnClose" type="button">ปิดหน้านี้</button>
       `);
       $('btnClose').addEventListener('click', () => { try { window.close(); } catch(_){} });
@@ -574,6 +575,22 @@
           clearInterval(timer);
           location.href = '/tech';
         });
+      }
+
+      // ออกงาน + technician → auto logout หลัง countdown
+      if (isCheckOut && isTechnician) {
+        let lc = 3;
+        const lcEl = $('logoutCountdown');
+        const ltimer = setInterval(async () => {
+          lc--;
+          if (lcEl) lcEl.textContent = lc;
+          if (lc <= 0) {
+            clearInterval(ltimer);
+            try { await fetch('/auth/logout', { method:'POST', credentials:'include' }); } catch(_){}
+            try { sessionStorage.clear(); localStorage.clear(); } catch(_){}
+            location.href = '/admin/login';
+          }
+        }, 1000);
       }
       return;
     }
