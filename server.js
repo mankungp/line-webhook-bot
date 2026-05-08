@@ -907,7 +907,19 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
           }
         } else if (data.indexOf('tech_reject:') === 0) {
           var jobId2 = data.substring('tech_reject:'.length);
-          await replyToLine(replyToken, [{type:'text', text:'❌ Rejected งาน ' + jobId2 + '\nกรุณา reject ผ่าน Admin UI พร้อมระบุเหตุผล'}]);
+          var lineUserId2 = event.source && event.source.userId;
+          try {
+            var r2 = await fetch(LOCAL_API_BASE + '/api/tech-jobs/' + encodeURIComponent(jobId2) + '/reject', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json','X-Admin-Token':process.env.ADMIN_TOKEN || ''},
+              body: JSON.stringify({via:'line_button', approved_by_line_user: lineUserId2, reason: '(ไม่ระบุเหตุผลผ่าน LINE)'})
+            });
+            var dd2 = await r2.json().catch(function(){return {};});
+            var msg2 = r2.ok ? '❌ Rejected งาน ' + jobId2 + ' แล้ว' : '❌ ' + (dd2.error || ('HTTP ' + r2.status));
+            await replyToLine(replyToken, [{type:'text', text: msg2}]);
+          } catch (e2) {
+            await replyToLine(replyToken, [{type:'text', text:'❌ ' + e2.message}]);
+          }
         } else {
           await replyToLine(replyToken, [{ type: 'text', text: 'Thank you' }]);
         }
