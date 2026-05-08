@@ -238,6 +238,7 @@ app.post('/api/tech-jobs/:id/approve', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/reject', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/return-to-fixing', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/cancel', forwardWithCookie('POST'));
+app.post('/api/tech/jobs/:id/customer-link-token', forwardWithCookie('POST'));
 
 // Static mobile app + PWA assets — no-cache HTML to ensure latest version
 function sendTechApp(req, res) {
@@ -847,6 +848,31 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
 
         console.log('[WEBHOOK] User message:', userMessage, '| User:', userId);
 
+        // ✏️ ตรวจ "JOB-xxxxx" — customer พิมพ์หมายเลขงาน→ติดตาม
+        var jobMatch = userMessage.trim().match(/^JOB-?(\d+)$/i);
+        if (jobMatch) {
+          var jobIdQuery = 'JOB-' + jobMatch[1];
+          try {
+            var lk = await fetch(LOCAL_API_BASE + '/api/_internal/link-customer-job', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ job_id: jobIdQuery, line_user_id: userId })
+            });
+            var lkData = await lk.json().catch(function(){return {};});
+            if (lk.ok) {
+              await replyToLine(replyToken, [{ type:'text', text: '✅ ติดตามงาน ' + jobIdQuery + ' แล้ว\nระบบจะแจ้งสถานะไปยังลิงก์นี้ที่ของคุณรถมีความเปลี่ยนแปลง' }]);
+              if (lkData.job) {
+                await pushFlexToLine(userId, 'งานช่างซ่อม ' + jobIdQuery, buildCustomerJobStatusFlex(lkData.job));
+              }
+            } else {
+              await replyToLine(replyToken, [{ type:'text', text: '⚠️ ไม่พบงาน ' + jobIdQuery + ' — ' + (lkData.error || 'ลองตรวจเลขจากช่างอีกครั้ง') }]);
+            }
+          } catch (e) {
+            await replyToLine(replyToken, [{ type:'text', text: '❌ เกิดข้อผิดพลาด: ' + e.message }]);
+          }
+          continue;
+        }
+
         // Check if first time user - send welcome
         var sent = await isWelcomeSent(userId);
         if (!sent) {
@@ -984,6 +1010,102 @@ function lookupUserName(lineUserId) {
   } catch (e) {}
   return 'Owner ' + String(lineUserId).slice(-6);
 }
+
+// ============ CUSTOMER FLEX BUILDER ============
+function buildCustomerJobStatusFlex(job, eventType) {
+  var statusLabel = ({
+    received: 'รับเครื่องแล้ว',
+    fixing: '🔧 กำลังซ่อม',
+    done: '✅ ซ่อมเสร็จแล้ว',
+    delivered: '🚚 ส่งมอบแล้ว',
+    approved: '🚚 ส่งมอบแล้ว',
+    cancelled: '❌ ยกเลิกงาน'
+  })[job.status] || job.status;
+
+  var statusColor = ({
+    received: '#3b82f6',
+    fixing: '#f59e0b',
+    done: '#22c55e',
+    delivered: '#22c55e',
+    approved: '#22c55e',
+    cancelled: '#dc2626'
+  })[job.status] || '#666';
+
+  var baseUrl = process.env.RENDER_BASE_URL || 'https://line-webhook-bot-yniv.onrender.com';
+  var photos = Array.isArray(job.photos) ? job.photos : [];
+  var heroPhoto = null;
+  if (photos.length > 0) {
+    var u = photos[photos.length - 1].url || ''; // รูปล่าสุด
+    if (u.indexOf('http') === 0) heroPhoto = u;
+    else if (u.indexOf('/') === 0) heroPhoto = baseUrl + u;
+  }
+
+  var bubble = {
+    type: 'bubble', size: 'mega',
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'sm',
+      contents: [
+        { type: 'text', text: '🔧 งานซ่อมของคุณ', size: 'sm', color: '#999999' },
+        { type: 'text', text: statusLabel, size: 'xl', weight: 'bold', color: statusColor, wrap: true },
+        { type: 'text', text: job.id, size: 'xs', color: '#999999' },
+        { type: 'separator', margin: 'md' },
+        { type: 'box', layout: 'vertical', margin: 'md', spacing: 'xs', contents: [
+          { type: 'text', text: '🏍️ ' + ((job.device && job.device.brand) || '') + ' ' + ((job.device && job.device.model) || ''), size: 'sm', wrap: true },
+          (job.device && job.device.problem_description ?
+            { type: 'text', text: 'อาการ: ' + job.device.problem_description, size: 'xs', color: '#666666', wrap: true }
+            : { type: 'filler' })
+        ]}
+      ]
+    }
+  };
+
+  if (heroPhoto) {
+    bubble.hero = { type: 'image', url: heroPhoto, size: 'full', aspectRatio: '4:3', aspectMode: 'cover',
+      action: { type: 'uri', uri: heroPhoto } };
+  }
+
+  // ปุ่ม ดูรายละเอียด (ถ้า status ไม่ใช่ cancelled)
+  if (job.status !== 'cancelled') {
+    bubble.footer = {
+      type: 'box', layout: 'vertical', spacing: 'sm',
+      contents: [
+        { type: 'button', style: 'primary', color: '#0a8855', height: 'sm',
+          action: { type: 'uri', label: '📄 ดูรายละเอียด', uri: baseUrl + '/track/' + encodeURIComponent(job.id) }}
+      ]
+    };
+  }
+  return bubble;
+}
+
+// ============ INTERNAL: NOTIFY CUSTOMER (status updates) ============
+app.post('/api/_internal/notify-customer-status', async function(req, res) {
+  try {
+    var token = req.headers['x-internal-token'] || '';
+    var expected = process.env.INTERNAL_TOKEN || '';
+    if (expected && token !== expected) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    var body = req.body || {};
+    var job = body.job;
+    var customerLineId = body.customer_line_id;
+    var eventType = body.event;
+    if (!job || !customerLineId) return res.status(400).json({ error: 'missing fields' });
+    if (!LINE_CHANNEL_ACCESS_TOKEN) return res.json({ ok: true, skipped: true });
+
+    var alt = 'งานซ่อม ' + job.id + ' — ' + (job.status || '');
+    var flex = buildCustomerJobStatusFlex(job, eventType);
+    var ok = await pushFlexToLine(customerLineId, alt, flex);
+    res.json({ ok: ok });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============ TRACKING PAGE (customer-facing, public) ============
+app.get('/track/:jobId', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'track.html'));
+});
+app.get('/api/customer-track/:jobId', forwardWithCookie('GET'));
 
 // ============ INTERNAL: NOTIFY TECH (job returned to fixing) ============
 app.post('/api/_internal/notify-tech-return', async function(req, res) {

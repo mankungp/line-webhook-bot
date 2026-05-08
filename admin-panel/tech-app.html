@@ -989,6 +989,12 @@
             <span>📞 ${escapeHtml(j.customer_phone)}</span>
             <a class="btn btn-secondary btn-sm" style="margin:0 0 0 auto;width:auto" href="tel:${encodeURIComponent(j.customer_phone)}">โทร</a>
           </div>` : ''}
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee">
+          ${j.customer_line_id ? 
+            '<div style="color:#0a8855;font-size:13px;">✅ ลูกค้าติดตามงานผ่าน LINE แล้ว</div>' : 
+            '<button class="btn btn-secondary btn-sm" id="btnCustQr" style="width:auto;margin:0">📲 QR ลูกค้าติดตามงาน</button>'
+          }
+        </div>
       </div>
 
       <div class="card">
@@ -1111,6 +1117,16 @@
       });
     }
 
+    // Customer QR — สร้าง token + แสดง QR
+    const btnQr = $('btnCustQr');
+    if (btnQr) btnQr.addEventListener('click', async () => {
+      try {
+        const r = await api(`/api/tech/jobs/${encodeURIComponent(j.id)}/customer-link-token`, { method: 'POST' });
+        if (!r.ok || !r.body) return alert('สร้าง QR ไม่สำเร็จ');
+        showCustomerQr(r.body, j.id);
+      } catch (e) { alert(e.message); }
+    });
+
     // Action handlers
     if ($('btnStart')) $('btnStart').addEventListener('click', () => doAction('start-fixing'));
     if ($('btnDone')) $('btnDone').addEventListener('click', () => {
@@ -1140,6 +1156,43 @@
     const r = await api(`/api/tech/jobs/${encodeURIComponent(id)}/photos/${idx}`, { method: 'DELETE' });
     if (r.ok) { updateSaveStatus('saved'); await renderDetail(); }
     else { updateSaveStatus('error'); alert('ลบไม่สำเร็จ'); }
+  }
+
+  // QR Modal — ลูกค้าสแกนเพื่อติดตามงาน
+  async function ensureQrLib() {
+    if (typeof QRCode === 'undefined') {
+      await new Promise(resolve => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+        s.onload = resolve;
+        document.head.appendChild(s);
+      });
+    }
+  }
+
+  async function showCustomerQr(data, jobId) {
+    await ensureQrLib();
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:20px;cursor:pointer;';
+    const lineOaUrl = data.line_oa_url || '';
+    const innerHtml = `
+      <div style="background:white;padding:24px;border-radius:16px;text-align:center;max-width:340px;" onclick="event.stopPropagation()">
+        <h3 style="margin:0 0 12px;color:#0a8855;">📲 ลูกค้าสแกนเพื่อติดตามงาน</h3>
+        <p style="font-size:13px;color:#666;margin-bottom:12px;line-height:1.5">สแกน QR นี้ → add LINE ร้าน → ระบบจะส่งสถานะงานให้อัตโนมัติ</p>
+        <div id="custQrBox" style="display:flex;justify-content:center;margin:14px 0;"></div>
+        <div style="font-family:monospace;font-size:14px;color:#0a8855;font-weight:bold;background:#f0fdf4;padding:8px;border-radius:8px;">${jobId}</div>
+        <p style="font-size:11px;color:#999;margin-top:10px;">หรือพิมพ์ <b>${jobId}</b> ในแชต LINE OA</p>
+        <button id="qrClose" style="margin-top:14px;padding:10px 24px;background:#0a8855;color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer;">ปิด</button>
+      </div>
+    `;
+    ov.innerHTML = innerHtml;
+    ov.addEventListener('click', () => ov.remove());
+    document.body.appendChild(ov);
+
+    // สร้าง QR — ถ้ามี LINE OA URL → ใส่ลิงก์ LINE add friend, ถ้าไม่มี — ใช้ jobId ตรงๆ
+    const qrText = lineOaUrl || jobId;
+    new QRCode(document.getElementById('custQrBox'), { text: qrText, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+    document.getElementById('qrClose').addEventListener('click', () => ov.remove());
   }
 
   function debouncedSave(patch) {
