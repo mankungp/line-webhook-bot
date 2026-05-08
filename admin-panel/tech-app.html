@@ -785,10 +785,16 @@
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9000;';
     const menu = document.createElement('div');
     menu.style.cssText = 'position:fixed;top:60px;right:14px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:200px;z-index:9001;overflow:hidden;';
+    const showInstall = !isStandalone();
     menu.innerHTML = `
-      <button id="miClock" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:${color};">
+      <button id="miClock" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:${color};${showInstall ? 'border-bottom:1px solid #f3f4f6;' : ''}">
         ${label}
       </button>
+      ${showInstall ? `
+      <button id="miInstall" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:#2563eb;">
+        📲 ติดตั้งแอปลงหน้าจอหลัก
+      </button>
+      ` : ''}
     `;
     ov.addEventListener('click', () => { ov.remove(); menu.remove(); });
     document.body.appendChild(ov);
@@ -800,6 +806,24 @@
         location.href = '/attendance/scan?type=' + nextAction;
       }
     });
+    if (showInstall) {
+      const btnInstall = document.getElementById('miInstall');
+      if (btnInstall) {
+        btnInstall.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          ov.remove(); menu.remove();
+          if (deferredInstallPrompt) {
+            try {
+              deferredInstallPrompt.prompt();
+              await deferredInstallPrompt.userChoice;
+            } catch(_) {}
+            deferredInstallPrompt = null;
+          } else {
+            showInstallBanner();
+          }
+        });
+      }
+    }
   }
 
   function jobCardHtml(j) {
