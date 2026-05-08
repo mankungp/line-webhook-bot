@@ -4756,6 +4756,11 @@ async function checkAuth() {
     currentUser = data.user || data;
     currentPermissions = (currentUser && currentUser.permissions) || [];
     __authChecked = true;
+    // technician → redirect ไป /tech ตรง ไม่ต้องผ่าน admin panel
+    if (currentUser && currentUser.role === 'technician') {
+      window.location.replace('/tech');
+      return false;
+    }
     renderUserInfo();
     applyRoleVisibility();
     return true;
