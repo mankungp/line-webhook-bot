@@ -988,11 +988,6 @@
         <div style="font-weight:700;color:#0a8855;margin-bottom:8px">💵 ค่าแรง</div>
         <input type="number" id="laborInput" value="${labor}" inputmode="numeric" min="0" ${editable?'':'disabled'} placeholder="0" />
         <div class="total-row big"><span>💰 รวมเงิน</span><span>${fmtMoney(amount)}</span></div>
-        <div class="com-row">
-          <label>คอม %</label>
-          <input type="number" id="comRate" value="${comRate}" inputmode="numeric" min="0" max="100" ${editable?'':'disabled'} />
-          <span class="amt" id="comAmtDisp">${fmtMoney(comAmt)}</span>
-        </div>
       </div>
 
       <div class="card">
@@ -1050,25 +1045,20 @@
         });
       });
 
-      // Auto-save labor + commission + note
+      // Auto-save labor + note (commission_rate อ่านจาก employee setting ช่างแก้ไม่ได้)
       const onChange = () => {
         const newLabor = Number($('laborInput').value) || 0;
-        const newComRate = Number($('comRate').value) || 0;
         const newNote = $('noteInput').value;
         const newPartsTotal = parts.reduce((s,p) => s + (Number(p.total)||0), 0);
         const newAmount = newPartsTotal + newLabor;
-        const newComAmt = Math.round(newAmount * newComRate / 100);
-        $('comAmtDisp').textContent = fmtMoney(newComAmt);
 
         state.job.labor_charge = newLabor;
-        state.job.commission_rate = newComRate;
         state.job.note = newNote;
         state.job.amount = newAmount;
-        state.job.commission_amount = newComAmt;
 
-        debouncedSave({ labor_charge: newLabor, commission_rate: newComRate, note: newNote });
+        debouncedSave({ labor_charge: newLabor, note: newNote });
       };
-      ['laborInput','comRate','noteInput'].forEach(id => {
+      ['laborInput','noteInput'].forEach(id => {
         const el = $(id);
         if (el) el.addEventListener('input', onChange);
       });
