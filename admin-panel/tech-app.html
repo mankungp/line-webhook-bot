@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#0a8855" />
 <title>ระบบช่าง — Tech Jobs</title>
+<!-- PWA: Add to Home Screen -->
+<link rel="manifest" href="/tech-manifest.json" />
+<link rel="apple-touch-icon" sizes="180x180" href="/tech-icon-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/tech-icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="งานช่าง" />
+<meta name="mobile-web-app-capable" content="yes" />
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -1252,6 +1260,65 @@
     saveJob({ parts_used: list }).then(() => drawDetail());
   }
 
+  // ---------- PWA install prompt ----------
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    // แสดงปุ่มติดตั้งบน topbar (Android/Chrome)
+    setTimeout(showInstallBanner, 2000);
+  });
+
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true;
+  }
+
+  function showInstallBanner() {
+    if (isStandalone()) return; // ติดตั้งแล้ว
+    if (sessionStorage.getItem('installBannerDismissed')) return;
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isAndroid = /Android/.test(navigator.userAgent);
+    if (!deferredInstallPrompt && !isIOS) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'installBanner';
+    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#0a8855;color:white;padding:12px 14px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 -2px 12px rgba(0,0,0,0.2);font-size:14px;';
+    if (isIOS) {
+      banner.innerHTML = `
+        <div style="flex:1;line-height:1.4">
+          📲 ติดแอปไว้ที่หน้าจอหลัก<br>
+          <small style="opacity:0.9">กด <b>⬆︎ Share</b> → <b>เพิ่มไปยัง Home Screen</b></small>
+        </div>
+        <button id="banClose" style="background:rgba(255,255,255,0.2);color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer">✕</button>
+      `;
+    } else {
+      banner.innerHTML = `
+        <div style="flex:1;line-height:1.4">
+          📲 ติดระบบงานช่างไว้ที่หน้าจอหลัก
+        </div>
+        <button id="banInstall" style="background:white;color:#0a8855;border:none;padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer">ติดตั้ง</button>
+        <button id="banClose" style="background:rgba(255,255,255,0.2);color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer">✕</button>
+      `;
+    }
+    document.body.appendChild(banner);
+    document.getElementById('banClose').addEventListener('click', () => {
+      banner.remove();
+      sessionStorage.setItem('installBannerDismissed', '1');
+    });
+    const btnInstall = document.getElementById('banInstall');
+    if (btnInstall) {
+      btnInstall.addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        if (choice.outcome === 'accepted') banner.remove();
+        deferredInstallPrompt = null;
+      });
+    }
+  }
+
   // ---------- LINE in-app browser detection ----------
   function isLineInAppBrowser() {
     return /Line\//i.test(navigator.userAgent || '');
@@ -1315,6 +1382,12 @@
 
     // 3) dashboard
     navigate('dashboard');
+
+    // 4) iOS → แสดงหินต์ติดแอป (beforeinstallprompt ไม่มีบน iOS)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS && !isStandalone()) {
+      setTimeout(showInstallBanner, 3000);
+    }
   }
 
   init().catch(err => {

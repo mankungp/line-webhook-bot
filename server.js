@@ -237,12 +237,24 @@ app.get('/api/tech-jobs/pending-approval', forwardWithCookie('GET'));
 app.post('/api/tech-jobs/:id/approve', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/reject', forwardWithCookie('POST'));
 
-// Static mobile app (Phase B จะสร้าง tech-app.html)
+// Static mobile app + PWA assets
 app.get('/tech', function(req, res) {
   res.sendFile(path.join(__dirname, 'admin-panel', 'tech-app.html'));
 });
 app.get('/tech/', function(req, res) {
   res.sendFile(path.join(__dirname, 'admin-panel', 'tech-app.html'));
+});
+app.get('/tech-manifest.json', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'tech-manifest.json'));
+});
+app.get('/tech-icon-192.png', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'tech-icon-192.png'));
+});
+app.get('/tech-icon-512.png', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'tech-icon-512.png'));
+});
+app.get('/tech-icon-180.png', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'tech-icon-180.png'));
 });
 
 // ============ MARKETPLACE PROXIES ============
