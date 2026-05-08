@@ -1229,6 +1229,14 @@ input:focus, textarea:focus, select:focus {
 
     <!-- Tab: Jobs -->
     <div id="hrtab-jobs" class="hr-tab" style="display:none;">
+      <!-- Active Jobs Section (NEW) — งานรอรับ + กำลังซ่อม -->
+      <div class="card" data-owner-only style="margin-bottom:14px; border:2px solid #3b82f6;">
+        <h3 style="margin-top:0; color:#1d4ed8;">🔥 งานที่ยังไม่เสร็จ <span id="activeJobsCount" style="font-size:14px;color:#666;"></span></h3>
+        <div id="activeJobsList" style="display:grid; gap:10px;">
+          <div style="text-align:center; color:#999; padding:16px;">กำลังโหลด...</div>
+        </div>
+      </div>
+
       <!-- Pending Approval Section (NEW) -->
       <div class="card" id="techApprovalCard" data-owner-only style="margin-bottom:14px; border:2px solid #f39c12;">
         <h3 style="margin-top:0; color:#e67e22;">⏳ งานรออนุมัติคอม</h3>
@@ -5235,6 +5243,7 @@ function switchHrTab(name) {
   if (name === 'attendance') { var f = document.getElementById('attFrom'); if (!f.value) { var d = new Date(); var t = d.toISOString().slice(0,10); f.value = t; document.getElementById('attTo').value = t; } loadAttendance(); pingZk(); }
   if (name === 'advances') loadAdvances();
   if (name === 'jobs') {
+    loadActiveJobsList();
     loadTechApprovalList();
     loadTechJobs();
     loadCommSummary();
@@ -5582,6 +5591,88 @@ async function deleteAdvance(id) {
 }
 
 // ============ TECH APPROVE ============
+// 🔥 งานที่ยังไม่เสร็จ (received ไม่มีช่าง หรือ fixing)
+async function loadActiveJobsList() {
+  try {
+    var r = await fetch('/api/tech-jobs');
+    var d = await r.json();
+    var allJobs = d.jobs || d || [];
+    if (!Array.isArray(allJobs)) allJobs = Object.values(allJobs || {});
+
+    // Active = received จริงๆ (ไม่มีคนรับ) + fixing (มีคนซ่อมอยู่) + done (ซ่อมเสร็จ รอส่ง)
+    var active = allJobs.filter(function(j) {
+      return j.status === 'received' || j.status === 'fixing' || j.status === 'done';
+    });
+    // เรียง: received (รอรับ) > fixing > done
+    var order = { received: 0, fixing: 1, done: 2 };
+    active.sort(function(a,b) {
+      if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+      return (b.received_at || '').localeCompare(a.received_at || '');
+    });
+
+    var box = document.getElementById('activeJobsList');
+    var countEl = document.getElementById('activeJobsCount');
+    if (countEl) {
+      var rec = active.filter(function(j){return j.status==='received';}).length;
+      var fix = active.filter(function(j){return j.status==='fixing';}).length;
+      var dn = active.filter(function(j){return j.status==='done';}).length;
+      countEl.textContent = '(รอรับ ' + rec + ' · ซ่อม ' + fix + ' · เสร็จ ' + dn + ')';
+    }
+    if (!box) return;
+
+    if (active.length === 0) {
+      box.innerHTML = '<div style="text-align:center; color:#999; padding:16px;">ไม่มีงานที่ยังทำอยู่</div>';
+      return;
+    }
+
+    var statusBadge = {
+      received: '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:12px;">📥 รอรับซ่อม</span>',
+      fixing: '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:12px;">🔧 กำลังซ่อม</span>',
+      done: '<span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:4px;font-size:12px;">✅ ซ่อมเสร็จ</span>'
+    };
+
+    var html = '';
+    active.forEach(function(j) {
+      var fixerCode = j.fixed_by;
+      var fixerEmp = fixerCode ? (allEmployees || []).find(function(e){return e.emp_code===fixerCode;}) : null;
+      var fixerLabel = fixerCode ? (fixerEmp ? (fixerEmp.nickname || fixerEmp.name) + ' (' + fixerCode + ')' : fixerCode) : '⏳ ไม่มีช่างรับ';
+      var photos = (j.photos || []);
+      var firstPhoto = photos.length > 0 ? (photos[0].url || '') : '';
+
+      html += '<div style="display:flex; gap:12px; padding:10px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; align-items:center;">';
+      // รูป
+      if (firstPhoto) {
+        html += '<img src="' + escapeHtml(firstPhoto) + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;cursor:pointer;" onclick="window.open(this.src,\'_blank\')" />';
+      } else {
+        html += '<div style="width:60px;height:60px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🔧</div>';
+      }
+      // รายละเอียด
+      html += '<div style="flex:1;min-width:0;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">';
+      html += '<strong>' + escapeHtml(j.id) + '</strong>';
+      html += statusBadge[j.status] || '';
+      if (photos.length > 1) html += '<span style="font-size:11px;color:#999;">+' + (photos.length-1) + ' รูป</span>';
+      html += '</div>';
+      html += '<div style="font-size:13px; color:#666; margin-bottom:2px;">';
+      html += '👤 ' + escapeHtml(j.customer_name || '-');
+      if (j.customer_phone) html += ' · 📞 ' + escapeHtml(j.customer_phone);
+      html += '</div>';
+      html += '<div style="font-size:13px; margin-bottom:2px;">';
+      var dev = j.device || {};
+      html += '🏍️ ' + escapeHtml((dev.brand||'') + ' ' + (dev.model||'')) || '-';
+      html += '</div>';
+      html += '<div style="font-size:12px; color:' + (fixerCode ? '#0a8855' : '#dc2626') + ';">';
+      html += '🔧 ' + escapeHtml(fixerLabel);
+      html += '</div>';
+      html += '</div>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    console.error('loadActiveJobsList:', e);
+  }
+}
+
 async function loadTechApprovalList() {
   try {
     var r = await fetch('/api/tech-jobs/pending-approval');
