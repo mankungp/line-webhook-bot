@@ -736,7 +736,10 @@
         <div style="font-size:13px; opacity:.85; margin-top:4px;">${jobCount ? `จาก ${jobCount} งานที่อนุมัติแล้ว` : 'ยังไม่มีงานที่อนุมัติเดือนนี้'}</div>
       </div>
 
-      <button class="btn btn-primary" id="btnNew" style="margin-bottom:14px">➕ รับเครื่องใหม่</button>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <button class="btn btn-primary" id="btnNew" style="flex:2;margin:0">➕ รับเครื่องใหม่</button>
+        <button class="btn btn-secondary" id="btnClockOut" style="flex:1;margin:0;background:#ef4444;color:white;border-color:#ef4444">🚪 ออกงาน</button>
+      </div>
 
       <div class="section-title">📥 งานรอรับซ่อม <span class="count">${pending.length}</span></div>
       <div id="pendList">${pending.length ? pending.map(jobCardHtml).join('') : '<div class="card muted center">ไม่มีงานรอรับ</div>'}</div>
@@ -745,6 +748,11 @@
       <div id="myList">${mine.length ? mine.map(jobCardHtml).join('') : '<div class="card muted center">ยังไม่มีงานของคุณ</div>'}</div>
     `;
     $('btnNew').addEventListener('click', () => navigate('new'));
+    $('btnClockOut').addEventListener('click', () => {
+      if (confirm('✅ ยืนยันลงเวลาออกงาน?\n\n(จะพาไปหน้าสแกน QR ลงเวลา)')) {
+        location.href = '/attendance/scan?type=check_out';
+      }
+    });
     $$('#myList .job-card, #pendList .job-card').forEach(el => {
       el.addEventListener('click', () => navigate('detail', { jobId: el.dataset.id }));
     });

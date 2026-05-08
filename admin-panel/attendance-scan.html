@@ -486,6 +486,10 @@
       const name = (r.body && (r.body.name || r.body.emp_name)) || (state.user && (state.user.displayName || state.user.name)) || '';
       const t = (r.body && r.body.time) || fmtTime();
       const typeLabel = state.selectedType === 'check_in' ? 'เข้างาน' : 'ออกงาน';
+      const isTechnician = state.user && (state.user.role === 'technician' || state.user.role === 'owner');
+      const isCheckIn = state.selectedType === 'check_in';
+      const showTechRedirect = isTechnician && isCheckIn;
+
       setHTML(`
         <div class="center">
           <div class="success-icon">✅</div>
@@ -494,9 +498,28 @@
           <div class="name">${escapeHtml(name)}</div>
           <p class="muted">ขอบคุณครับ ขอให้เป็นวันที่ดี 🌿</p>
         </div>
+        ${showTechRedirect ? '<button class="btn btn-primary" id="btnGoTech" type="button">🔧 ไปหน้ารับงาน (<span id="countdown">3</span>)</button>' : ''}
         <button class="btn btn-ghost" id="btnClose" type="button">ปิดหน้านี้</button>
       `);
       $('btnClose').addEventListener('click', () => { try { window.close(); } catch(_){} });
+
+      if (showTechRedirect) {
+        let countdown = 3;
+        const countdownEl = $('countdown');
+        const goBtn = $('btnGoTech');
+        const timer = setInterval(() => {
+          countdown--;
+          if (countdownEl) countdownEl.textContent = countdown;
+          if (countdown <= 0) {
+            clearInterval(timer);
+            location.href = '/tech';
+          }
+        }, 1000);
+        goBtn.addEventListener('click', () => {
+          clearInterval(timer);
+          location.href = '/tech';
+        });
+      }
       return;
     }
 
