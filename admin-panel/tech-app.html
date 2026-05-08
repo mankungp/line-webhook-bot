@@ -769,13 +769,16 @@
     ov.id = 'actionMenuOverlay';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9000;';
     const menu = document.createElement('div');
-    menu.style.cssText = 'position:fixed;top:60px;right:14px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:180px;z-index:9001;overflow:hidden;';
+    menu.style.cssText = 'position:fixed;top:60px;right:14px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:200px;z-index:9001;overflow:hidden;';
     menu.innerHTML = `
-      <button id="miClockOut" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:#dc2626;">
+      <button id="miClockOut" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:#dc2626;border-bottom:1px solid #f3f4f6;">
         🚪 ลงเวลาออกงาน
       </button>
+      <button id="miLogout" style="width:100%;padding:14px 16px;border:none;background:transparent;text-align:left;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:10px;color:#666;">
+        🔓 ออกจากระบบ (logout)
+      </button>
     `;
-    ov.addEventListener('click', () => ov.remove());
+    ov.addEventListener('click', () => { ov.remove(); menu.remove(); });
     document.body.appendChild(ov);
     document.body.appendChild(menu);
     document.getElementById('miClockOut').addEventListener('click', (e) => {
@@ -785,10 +788,17 @@
         location.href = '/attendance/scan?type=check_out';
       }
     });
-    // ปิด menu พร้อม overlay
-    setTimeout(() => {
-      ov.addEventListener('click', () => menu.remove());
-    }, 50);
+    document.getElementById('miLogout').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      ov.remove(); menu.remove();
+      if (!confirm('🔓 ออกจากระบบ?\n(ต้อง LINE login ใหม่ครั้งหน้า)')) return;
+      try {
+        await fetch('/auth/logout', { method:'POST', credentials:'include' });
+      } catch(_){}
+      // clear local cache
+      try { sessionStorage.clear(); localStorage.clear(); } catch(_){}
+      location.href = '/admin/login';
+    });
   }
 
   function jobCardHtml(j) {
@@ -1510,6 +1520,18 @@
       return;
     }
     state.me = t.body || {};
+
+    // 2.5) ตรวจว่าช่าง check_in วันนี้แล้วหรือยัง — ถ้ายังไม่ → บังคับไปหน้า attendance scan
+    if (state.user && state.user.role === 'technician') {
+      try {
+        const sumRes = await api('/api/tech/today-summary');
+        if (sumRes.ok && sumRes.body && !sumRes.body.first_in) {
+          // ยังไม่ได้ลงเวลาเข้างานวันนี้
+          location.href = '/attendance/scan?type=check_in';
+          return;
+        }
+      } catch (_) { /* ignore — ไปต่อ dashboard */ }
+    }
 
     // 3) dashboard
     navigate('dashboard');
