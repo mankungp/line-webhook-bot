@@ -431,14 +431,21 @@
     const displayName = (state.user && (state.user.displayName || state.user.name)) || 'พนักงาน';
 
     // ลองดึง next_action จาก backend (technician เท่านั้น)
+    // - ถ้า request OK → ใช้ next_action ถ้ามี, ไม่งั้น default 'check_in' (เช่น owner ที่ไม่ผูก employee)
+    // - ถ้า request fail (network error / 401) → fallback 2 ปุ่ม (nextAction = null)
     let nextAction = null;
+    let summaryOk = false;
     try {
       const sum = await api('/api/tech/today-summary');
+      summaryOk = true;
       if (sum && sum.ok && (sum.next_action === 'check_in' || sum.next_action === 'check_out')) {
         nextAction = sum.next_action;
+      } else {
+        // request OK แต่ไม่มี next_action (owner/admin ที่ไม่ link employee) → default check_in
+        nextAction = 'check_in';
       }
     } catch (_) {
-      // fallback → 2 ปุ่ม
+      // fallback → 2 ปุ่ม (network error / exception)
     }
 
     const headerHtml = `
