@@ -426,13 +426,13 @@
       if (el) el.textContent = fmtTime();
     }, 1000);
 
-    $('btnIn').addEventListener('click', () => { state.selectedType = 'in'; showCamera(); });
-    $('btnOut').addEventListener('click', () => { state.selectedType = 'out'; showCamera(); });
+    $('btnIn').addEventListener('click', () => { state.selectedType = 'check_in'; showCamera(); });
+    $('btnOut').addEventListener('click', () => { state.selectedType = 'check_out'; showCamera(); });
   }
 
   async function showCamera() {
     setHTML(`
-      <h3 style="margin-top:0">${state.selectedType === 'in' ? '✅ เข้างาน' : '🚪 ออกงาน'} — ถ่ายเซลฟี่</h3>
+      <h3 style="margin-top:0">${state.selectedType === 'check_in' ? '✅ เข้างาน' : '🚪 ออกงาน'} — ถ่ายเซลฟี่</h3>
       <div class="video-wrap"><video id="vid" playsinline muted autoplay></video></div>
       <button class="btn btn-primary" id="btnSnap">📸 ถ่ายรูป</button>
       <button class="btn btn-ghost" id="btnCancel" type="button">ยกเลิก</button>
@@ -485,7 +485,7 @@
       state.selfieDataUrl = null;
       const name = (r.body && (r.body.name || r.body.emp_name)) || (state.user && (state.user.displayName || state.user.name)) || '';
       const t = (r.body && r.body.time) || fmtTime();
-      const typeLabel = state.selectedType === 'in' ? 'เข้างาน' : 'ออกงาน';
+      const typeLabel = state.selectedType === 'check_in' ? 'เข้างาน' : 'ออกงาน';
       setHTML(`
         <div class="center">
           <div class="success-icon">✅</div>
