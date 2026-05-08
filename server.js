@@ -534,43 +534,143 @@ async function pushFlexToLine(toUserId, altText, flexContents) {
 function buildTechJobApproveFlex(job) {
   var amt = (job.amount || 0).toLocaleString();
   var comm = (job.commission_amount || 0).toLocaleString();
-  return {
-    type: 'bubble',
+  var partsTotal = (job.parts_total || 0).toLocaleString();
+  var labor = (job.labor_charge || 0).toLocaleString();
+  var rate = job.commission_rate != null ? job.commission_rate : 0;
+
+  // Build base URL สำหรับรูป (LINE บังคับ HTTPS)
+  var baseUrl = process.env.RENDER_BASE_URL || 'https://line-webhook-bot-yniv.onrender.com';
+
+  // เลือกรูปหลักมาแสดง (max 1 รูปใน hero)
+  var photos = Array.isArray(job.photos) ? job.photos : [];
+  var heroPhoto = null;
+  if (photos.length > 0) {
+    var rawUrl = photos[0].url || '';
+    if (rawUrl.indexOf('http') === 0) heroPhoto = rawUrl;
+    else if (rawUrl.indexOf('/') === 0) heroPhoto = baseUrl + rawUrl;
+  }
+
+  // ช่างซ่อม (fixed_by) — ถ้าไม่มี fallback received_by
+  var fixerName = job.fixed_by_name || job.fixed_by || '-';
+  var receiverName = job.received_by_name || job.received_by || '-';
+  var delivererName = job.delivered_by_name || job.delivered_by || '-';
+
+  // Parts list (max 5 รายการ กันยาวเกิน)
+  var parts = Array.isArray(job.parts_used) ? job.parts_used : [];
+  var partsContents = [];
+  if (parts.length > 0) {
+    partsContents.push({
+      type: 'text', text: '🔩 อะไหล่ (' + parts.length + ')',
+      size: 'sm', weight: 'bold', color: '#0a8855', margin: 'md'
+    });
+    var displayParts = parts.slice(0, 5);
+    displayParts.forEach(function(p) {
+      partsContents.push({
+        type: 'box', layout: 'horizontal', margin: 'xs', contents: [
+          { type: 'text', text: '• ' + (p.name_tech || p.name || p.sku || '-'),
+            size: 'xs', color: '#555555', flex: 5, wrap: true },
+          { type: 'text', text: '×' + (p.qty || 1),
+            size: 'xs', color: '#999999', flex: 1, align: 'center' },
+          { type: 'text', text: '฿' + (Number(p.total) || 0).toLocaleString(),
+            size: 'xs', color: '#333333', flex: 2, align: 'end' }
+        ]
+      });
+    });
+    if (parts.length > 5) {
+      partsContents.push({
+        type: 'text', text: '… และอีก ' + (parts.length - 5) + ' รายการ',
+        size: 'xs', color: '#999999', margin: 'xs', align: 'end'
+      });
+    }
+  }
+
+  var bubble = {
+    type: 'bubble', size: 'mega',
     body: {
-      type: 'box',
-      layout: 'vertical',
+      type: 'box', layout: 'vertical', spacing: 'sm',
       contents: [
-        { type: 'text', text: '🔧 งานซ่อมเสร็จ', weight: 'bold', size: 'lg', color: '#e67e22' },
-        { type: 'text', text: job.id, size: 'sm', color: '#999999', margin: 'sm' },
+        { type: 'text', text: '🔧 งานซ่อมเสร็จ — รออนุมัติ', weight: 'bold', size: 'lg', color: '#e67e22' },
+        { type: 'text', text: job.id, size: 'xs', color: '#999999' },
         { type: 'separator', margin: 'md' },
-        { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: [
-          { type: 'text', text: '👤 ' + (job.customer_name || '-'), size: 'sm' },
-          { type: 'text', text: '📞 ' + (job.customer_phone || '-'), size: 'sm', color: '#666666' },
-          { type: 'text', text: '🏍️ ' + ((job.device && job.device.brand) || '') + ' ' + ((job.device && job.device.model) || ''), size: 'sm' }
+
+        // ลูกค้า + เครื่อง
+        { type: 'box', layout: 'vertical', margin: 'md', spacing: 'xs', contents: [
+          { type: 'text', text: '👤 ' + (job.customer_name || '-'), size: 'sm', weight: 'bold' },
+          { type: 'text', text: '📞 ' + (job.customer_phone || '-'), size: 'xs', color: '#666666' },
+          { type: 'text', text: '🏍️ ' + ((job.device && job.device.brand) || '') + ' ' + ((job.device && job.device.model) || ''),
+            size: 'sm', wrap: true },
+          (job.device && job.device.problem_description ?
+            { type: 'text', text: 'อาการ: ' + job.device.problem_description, size: 'xs', color: '#666666', wrap: true }
+            : { type: 'filler' })
         ]},
+
         { type: 'separator', margin: 'md' },
-        { type: 'box', layout: 'horizontal', margin: 'md', contents: [
-          { type: 'text', text: 'รวม', flex: 1, color: '#999999', size: 'sm' },
-          { type: 'text', text: '฿' + amt, flex: 2, weight: 'bold', align: 'end' }
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: 'คอม', flex: 1, color: '#999999', size: 'sm' },
-          { type: 'text', text: '฿' + comm, flex: 2, weight: 'bold', color: '#0a8855', align: 'end' }
+
+        // ผู้รับผิดชอบ
+        { type: 'text', text: '👨‍🔧 ผู้รับผิดชอบ', size: 'sm', weight: 'bold', color: '#0a8855', margin: 'md' },
+        { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
+          { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+            { type: 'text', text: 'รับเครื่อง', size: 'xs', color: '#999999', flex: 2 },
+            { type: 'text', text: receiverName, size: 'xs', color: '#333333', flex: 5, wrap: true }
+          ]},
+          { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+            { type: 'text', text: '🔧 ช่างที่ซ่อม', size: 'xs', color: '#999999', flex: 2 },
+            { type: 'text', text: fixerName, size: 'xs', color: '#0a8855', weight: 'bold', flex: 5, wrap: true }
+          ]},
+          { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+            { type: 'text', text: 'ส่งงาน', size: 'xs', color: '#999999', flex: 2 },
+            { type: 'text', text: delivererName, size: 'xs', color: '#333333', flex: 5, wrap: true }
+          ]}
         ]}
       ]
     },
     footer: {
-      type: 'box',
-      layout: 'horizontal',
-      spacing: 'sm',
+      type: 'box', layout: 'vertical', spacing: 'sm',
       contents: [
-        { type: 'button', style: 'primary', color: '#27ae60', height: 'sm',
-          action: { type: 'postback', label: '✅ อนุมัติ', data: 'tech_approve:' + job.id, displayText: 'อนุมัติ ' + job.id }},
-        { type: 'button', style: 'secondary', height: 'sm',
-          action: { type: 'postback', label: '❌ Reject', data: 'tech_reject:' + job.id, displayText: 'Reject ' + job.id }}
+        // สรุปเงิน
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: 'อะไหล่', flex: 2, color: '#999999', size: 'sm' },
+          { type: 'text', text: '฿' + partsTotal, flex: 3, align: 'end', size: 'sm' }
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: 'ค่าแรง', flex: 2, color: '#999999', size: 'sm' },
+          { type: 'text', text: '฿' + labor, flex: 3, align: 'end', size: 'sm' }
+        ]},
+        { type: 'separator', margin: 'sm' },
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: 'รวม', flex: 2, color: '#333333', size: 'md', weight: 'bold' },
+          { type: 'text', text: '฿' + amt, flex: 3, align: 'end', size: 'md', weight: 'bold' }
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: 'คอมช่าง (' + rate + '%)', flex: 2, color: '#0a8855', size: 'sm', weight: 'bold' },
+          { type: 'text', text: '฿' + comm, flex: 3, align: 'end', size: 'md', weight: 'bold', color: '#0a8855' }
+        ]},
+        { type: 'separator', margin: 'sm' },
+        { type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'sm', contents: [
+          { type: 'button', style: 'primary', color: '#27ae60', height: 'sm', flex: 1,
+            action: { type: 'postback', label: '✅ อนุมัติ', data: 'tech_approve:' + job.id, displayText: 'อนุมัติ ' + job.id }},
+          { type: 'button', style: 'secondary', height: 'sm', flex: 1,
+            action: { type: 'postback', label: '❌ ไม่อนุมัติ', data: 'tech_reject:' + job.id, displayText: 'Reject ' + job.id }}
+        ]}
       ]
     }
   };
+
+  // ถ้ามีรูป→ใส่ hero
+  if (heroPhoto) {
+    bubble.hero = {
+      type: 'image', url: heroPhoto, size: 'full', aspectRatio: '4:3', aspectMode: 'cover',
+      action: { type: 'uri', uri: heroPhoto }
+    };
+  }
+
+  // ถ้ามีอะไหล่ แทรกก่อน separator
+  if (partsContents.length > 0) {
+    bubble.body.contents.push({ type: 'separator', margin: 'md' });
+    bubble.body.contents.push.apply(bubble.body.contents, partsContents);
+  }
+
+  return bubble;
 }
 
 // ============ BUILD CONTEXT ============
