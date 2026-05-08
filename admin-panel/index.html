@@ -1762,6 +1762,12 @@ input:focus, textarea:focus, select:focus {
           <label>ชื่อสำหรับช่างซ่อม <small style="color:#999;font-weight:normal;">(ไม่บังคับ — ถ้าไม่ใส่จะใช้ชื่อปกติ)</small></label>
           <input type="text" id="pNameTech" placeholder="เช่น เซ็นเซอร์ Hall L40">
         </div>
+        <div class="form-group" style="background:#fffbeb;border:1px solid #fde68a;padding:10px 12px;border-radius:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+            <input type="checkbox" id="pHideFromTech" style="width:18px;height:18px;cursor:pointer;">
+            <span><b>🚫 ซ่อนจากระบบช่างซ่อม</b><br><small style="color:#92400e;font-weight:normal;">ช่างจะไม่เห็นสินค้านี้ตอนเลือกอะไหล่ (ตัวอย่าง: เครื่องตัดหญ้าทั้งเครื่อง)</small></span>
+          </label>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>SKU / รหัสสินค้า</label>
@@ -2243,6 +2249,7 @@ function renderProducts(list) {
     if (p.priceWholesale > 0) html += '<div style="font-size:12px;color:#999;">ส่ง/ช่าง: ' + numFormat(p.priceWholesale) + '</div>';
     if (p.priceVip > 0) html += '<div style="font-size:12px;color:#d4a017;">VIP: ' + numFormat(p.priceVip) + '</div>';
     if (p.repair_price != null && p.repair_price > 0) html += '<div style="font-size:12px;color:#0a8855;">ช่างหน้าร้าน: ' + numFormat(p.repair_price) + '</div>';
+    if (p.hide_from_tech) html += '<div style="display:inline-block;margin-top:4px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;">🚫 ซ่อนจากช่าง</div>';
     html += '<div class="product-stock ' + stockClass + '">' + stockText + '</div>';
     html += '<div class="product-actions">';
     html += '<button class="btn btn-secondary btn-sm" onclick="editProduct(' + p.id + ')">แก้ไข</button>';
@@ -2396,6 +2403,7 @@ function editProduct(id) {
   document.getElementById('pId').value = p.id;
   document.getElementById('pName').value = p.name || '';
   document.getElementById('pNameTech').value = p.name_tech || '';
+  document.getElementById('pHideFromTech').checked = !!p.hide_from_tech;
   document.getElementById('pSku').value = p.sku || '';
   document.getElementById('pCategory').value = p.category || 'other';
   document.getElementById('pDesc').value = p.description || '';
@@ -2449,6 +2457,7 @@ async function saveProduct(e) {
     priceVip: parseFloat(document.getElementById('pPriceVip').value) || 0,
     repair_price: (function(){ var v = document.getElementById('pRepairPrice').value; return v === '' ? null : (parseFloat(v) || 0); })(),
     name_tech: document.getElementById('pNameTech').value || '',
+    hide_from_tech: document.getElementById('pHideFromTech').checked,
     cost: (costVal === '' ? null : (parseFloat(costVal) || 0)),
     stock: parseInt(document.getElementById('pStock').value) || 0,
     unit: document.getElementById('pUnit').value,
