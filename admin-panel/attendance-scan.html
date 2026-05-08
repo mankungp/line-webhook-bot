@@ -515,7 +515,34 @@
       const typeLabel = state.selectedType === 'check_in' ? 'เข้างาน' : 'ออกงาน';
       const isTechnician = state.user && (state.user.role === 'technician' || state.user.role === 'owner');
       const isCheckIn = state.selectedType === 'check_in';
+      const isCheckOut = state.selectedType === 'check_out';
       const showTechRedirect = isTechnician && isCheckIn;
+
+      // ถ้าออกงาน → ดึงสรุปวันนี้
+      let summaryHtml = '';
+      if (isCheckOut && isTechnician) {
+        try {
+          const sumRes = await api('/api/tech/today-summary');
+          if (sumRes.ok && sumRes.body) {
+            const s = sumRes.body;
+            const fmtTime2 = (iso) => iso ? new Date(iso).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '-';
+            summaryHtml = `
+              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;margin:14px 0;text-align:left;">
+                <div style="font-weight:700;color:#0a8855;margin-bottom:10px;font-size:14px;">📊 สรุปวันนี้</div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span style="color:#666">เข้างาน</span><b>${fmtTime2(s.first_in)}</b></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span style="color:#666">ออกงาน</span><b>${fmtTime2(s.last_out)}</b></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span style="color:#666">รวมเวลาทำงาน</span><b>${s.work_hours} ชม. ${s.work_minutes} น.</b></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span style="color:#666">งานซ่อมวันนี้</span><b>${s.jobs_today} งาน</b></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#0a8855;"><span>คอมวันนี้</span><b>฿${(s.commission_today||0).toLocaleString()}</b></div>
+              </div>
+            `;
+          }
+        } catch(_){}
+      }
+
+      const goodbyeMsg = isCheckOut
+        ? '🌙 ลาก่อนครับ ขอบคุณสำหรับวันนี้ 🙏'
+        : 'ขอบคุณครับ ขอให้เป็นวันที่ดี 🌿';
 
       setHTML(`
         <div class="center">
@@ -523,8 +550,9 @@
           <h2 style="margin:6px 0">ลงเวลา${typeLabel}สำเร็จ</h2>
           <div class="clock">${escapeHtml(t)}</div>
           <div class="name">${escapeHtml(name)}</div>
-          <p class="muted">ขอบคุณครับ ขอให้เป็นวันที่ดี 🌿</p>
+          <p class="muted">${goodbyeMsg}</p>
         </div>
+        ${summaryHtml}
         ${showTechRedirect ? '<button class="btn btn-primary" id="btnGoTech" type="button">🔧 ไปหน้ารับงาน (<span id="countdown">3</span>)</button>' : ''}
         <button class="btn btn-ghost" id="btnClose" type="button">ปิดหน้านี้</button>
       `);

@@ -225,6 +225,7 @@ app.get('/attendance/scan', (req, res) => {
 
 // ============ TECH APP PROXIES (Phase A) ============
 app.get('/api/tech/me', forwardWithCookie('GET'));
+app.get('/api/tech/today-summary', forwardWithCookie('GET'));
 app.get('/api/tech/jobs', forwardWithCookie('GET'));
 app.get('/api/tech/jobs/:id', forwardWithCookie('GET'));
 app.post('/api/tech/jobs', forwardWithCookie('POST'));
