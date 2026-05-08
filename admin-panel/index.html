@@ -757,7 +757,7 @@ input:focus, textarea:focus, select:focus {
       <span class="icon">💰</span> <span>เงินเดือน</span>
     </a>
     <a onclick="showPage('tech')" data-page="tech" data-role="owner,manager,technician">
-      <span class="icon">🔧</span> <span>งานช่าง</span>
+      <span class="icon">🔧</span> <span>แอปช่าง</span>
     </a>
     <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read" data-hide-for="technician">
       <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
@@ -1155,7 +1155,7 @@ input:focus, textarea:focus, select:focus {
       <button type="button" class="tab-btn active" data-hrtab="employees" onclick="switchHrTab('employees')">👤 พนักงาน</button>
       <button type="button" class="tab-btn" data-hrtab="attendance" onclick="switchHrTab('attendance')">⏰ ลงเวลา</button>
       <button type="button" class="tab-btn" data-hrtab="advances" onclick="switchHrTab('advances')">💵 เบิกล่วงหน้า</button>
-      <button type="button" class="tab-btn" data-hrtab="jobs" onclick="switchHrTab('jobs')">🔧 งานช่างซ่อม</button>
+      <button type="button" class="tab-btn" data-hrtab="jobs" onclick="switchHrTab('jobs')">📊 บริหารงานช่าง</button>
     </div>
 
     <!-- Tab: Employees -->
@@ -5921,24 +5921,60 @@ function escapeHtmlAdmin(s) {
 }
 
 async function loadTechJobs() {
-  var emp = (document.getElementById('jobEmp')||{}).value;
+  var empFilter = (document.getElementById('jobEmp')||{}).value;
   try {
-    var r = await fetch('/api/tech-jobs' + (emp ? '?empCode=' + emp : ''));
+    var r = await fetch('/api/tech-jobs' + (empFilter ? '?empCode=' + empFilter : ''));
     var d = await r.json();
+    var jobs = d.jobs || [];
+
+    // Client-side filter — รองรับ Tech Jobs v2 (ช่าง = fixed_by) + legacy (emp_code)
+    if (empFilter) {
+      jobs = jobs.filter(function(j) {
+        var who = j.fixed_by || j.received_by || j.delivered_by || j.emp_code;
+        return who === empFilter;
+      });
+    }
+
+    // เรียงล่าสุดขึ้นบน
+    jobs.sort(function(a,b) {
+      var da = (a.updated_at || a.received_at || a.date || '');
+      var db = (b.updated_at || b.received_at || b.date || '');
+      return db.localeCompare(da);
+    });
+
     var html = '';
-    if (!d.jobs || d.jobs.length === 0) {
+    if (jobs.length === 0) {
       html = '<tr><td colspan="8" style="text-align:center;color:#999;padding:16px;">ยังไม่มีงาน</td></tr>';
     } else {
-      d.jobs.forEach(function(j) {
-        var emp = allEmployees.find(function(e){ return e.emp_code === j.emp_code; });
+      var statusLabel = {
+        received: '📥 รับเครื่อง', fixing: '🔧 ซ่อม',
+        done: '✅ ซ่อมเสร็จ', delivered: '🚚 ส่งงาน',
+        approved: '✨ อนุมัติ', cancelled: '❌ ยกเลิก', paid: '💰 จ่ายแล้ว'
+      };
+      jobs.forEach(function(j) {
+        // รองรับทั้ง v2 และ legacy
+        var fixerCode = j.fixed_by || j.emp_code || '-';
+        var emp = allEmployees.find(function(e){ return e.emp_code === fixerCode; });
+        var fixerName = emp ? (emp.nickname || emp.name) : '?';
+
+        // เอาวันจาก received_at ถ้าไม่มี date
+        var date = j.date || (j.received_at ? j.received_at.slice(0,10) : '-');
+        // เอารายละเอียดจาก device.problem_description ถ้าไม่มี description
+        var desc = j.description || (j.device && j.device.problem_description) || '';
+        if ((j.device && (j.device.brand || j.device.model)) && desc) {
+          desc = ((j.device.brand || '') + ' ' + (j.device.model || '')).trim() + ' — ' + desc;
+        }
+
         html += '<tr>';
-        html += '<td>' + escapeHtml(j.date) + '</td>';
-        html += '<td>' + escapeHtml(j.emp_code) + ' ' + escapeHtml(emp ? (emp.nickname || emp.name) : '?') + '</td>';
-        html += '<td>' + escapeHtml(j.description || '') + '</td>';
-        html += '<td>' + escapeHtml(j.customer_name || '') + (j.customer_phone ? '<br/><small>' + escapeHtml(j.customer_phone) + '</small>' : '') + '</td>';
-        html += '<td class="num">฿' + j.amount.toLocaleString() + '</td>';
+        html += '<td>' + escapeHtml(date);
+        if (j.status) html += '<br><small style="color:#666">' + escapeHtml(statusLabel[j.status] || j.status) + '</small>';
+        html += '</td>';
+        html += '<td>' + escapeHtml(fixerCode) + (fixerCode !== '-' ? ' ' + escapeHtml(fixerName) : '') + '</td>';
+        html += '<td>' + escapeHtml(desc) + '<br><small style="color:#999">' + escapeHtml(j.id) + '</small></td>';
+        html += '<td>' + escapeHtml(j.customer_name || '-') + (j.customer_phone ? '<br/><small>' + escapeHtml(j.customer_phone) + '</small>' : '') + '</td>';
+        html += '<td class="num">฿' + (Number(j.amount)||0).toLocaleString() + '</td>';
         html += '<td class="num">' + (j.commission_rate||0) + '%</td>';
-        html += '<td class="num"><strong>฿' + (j.commission_amount||0).toLocaleString() + '</strong></td>';
+        html += '<td class="num"><strong>฿' + (Number(j.commission_amount)||0).toLocaleString() + '</strong></td>';
         html += '<td><button class="btn btn-secondary btn-sm" onclick="editJob(\'' + j.id + '\')">แก้ไข</button></td>';
         html += '</tr>';
       });
