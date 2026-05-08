@@ -725,19 +725,19 @@ input:focus, textarea:focus, select:focus {
     <small>Admin Dashboard</small>
   </div>
   <nav>
-    <a class="active" onclick="showPage('bot')" data-page="bot" data-perm="users:write">
+    <a class="active" onclick="showPage('bot')" data-page="bot" data-perm="users:write" data-hide-for="technician">
       <span class="icon">🤖</span> <span>Bot Control</span>
     </a>
-    <a onclick="showPage('products')" data-page="products" data-perm="products:read">
+    <a onclick="showPage('products')" data-page="products" data-perm="products:read" data-hide-for="technician">
       <span class="icon">📦</span> <span>สินค้า</span>
     </a>
-    <a onclick="showPage('orders')" data-page="orders" data-perm="orders:read">
+    <a onclick="showPage('orders')" data-page="orders" data-perm="orders:read" data-hide-for="technician">
       <span class="icon">🧾</span> <span>ออร์เดอร์</span>
     </a>
-    <a onclick="showPage('members')" data-page="members" data-perm="members:read">
+    <a onclick="showPage('members')" data-page="members" data-perm="members:read" data-hide-for="technician">
       <span class="icon">⭐</span> <span>สมาชิก</span>
     </a>
-    <a onclick="showPage('reports')" data-page="reports" data-perm="reports:read">
+    <a onclick="showPage('reports')" data-page="reports" data-perm="reports:read" data-hide-for="technician">
       <span class="icon">📊</span> <span>รายงาน</span>
     </a>
     <a onclick="showPage('cameras')" data-page="cameras" data-owner-only>
@@ -749,7 +749,10 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('payroll')" data-page="payroll" data-owner-only>
       <span class="icon">💰</span> <span>เงินเดือน</span>
     </a>
-    <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read">
+    <a onclick="showPage('tech')" data-page="tech" data-role="owner,manager,technician">
+      <span class="icon">🔧</span> <span>งานช่าง</span>
+    </a>
+    <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read" data-hide-for="technician">
       <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
     </a>
     <a onclick="showPage('qr-att')" data-page="qr-att" data-owner-only>
@@ -1449,6 +1452,11 @@ input:focus, textarea:focus, select:focus {
     </div>
   </div>
 
+  <!-- ============ TECH JOBS PAGE (iframe to /tech) ============ -->
+  <div id="page-tech" class="page" style="display:none; padding:0;" data-role="owner,manager,technician">
+    <iframe id="techFrame" src="" style="width:100%; height: calc(100vh - 40px); border:0; display:block;" title="ระบบงานช่าง"></iframe>
+  </div>
+
   <!-- ============ MARKETPLACE PAGE ============ -->
   <div id="page-marketplace" class="page" style="display:none;" data-perm="marketplace:read">
     <div class="page-header">
@@ -1967,6 +1975,10 @@ function showPage(page) {
   if (page === 'payroll') initPayrollPage();
   if (page === 'marketplace') loadMarketplace();
   if (page === 'qr-att') loadQrAttendance();
+  if (page === 'tech') {
+    var f = document.getElementById('techFrame');
+    if (f && !f.src) f.src = '/tech';
+  }
   if (page === 'users') loadAdminUsers();
   if (page === 'reports') {
     if (!document.getElementById('rFrom').value) setReportPeriod('today');
@@ -4863,6 +4875,17 @@ function applyRoleVisibility() {
   document.querySelectorAll('[data-owner-only]').forEach(function(el) {
     if (!currentUser || currentUser.role !== 'owner') el.style.display = 'none';
   });
+  // data-hide-for: comma-list of roles ที่ต้องซ่อน (e.g. technician เห็นแค่ tab งานช่าง)
+  document.querySelectorAll('[data-hide-for]').forEach(function(el) {
+    var hideRoles = el.getAttribute('data-hide-for').split(',').map(function(s){ return s.trim(); });
+    if (currentUser && hideRoles.indexOf(currentUser.role) >= 0) el.style.display = 'none';
+  });
+  // technician → default landing = งานช่าง
+  if (currentUser && currentUser.role === 'technician') {
+    setTimeout(function() {
+      try { showPage('tech'); } catch(_){}
+    }, 50);
+  }
 }
 
 // Run auth check on load
