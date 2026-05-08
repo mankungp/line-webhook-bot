@@ -237,6 +237,7 @@ app.get('/api/tech-jobs/pending-approval', forwardWithCookie('GET'));
 app.post('/api/tech-jobs/:id/approve', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/reject', forwardWithCookie('POST'));
 app.post('/api/tech-jobs/:id/return-to-fixing', forwardWithCookie('POST'));
+app.post('/api/tech-jobs/:id/cancel', forwardWithCookie('POST'));
 
 // Static mobile app + PWA assets — no-cache HTML to ensure latest version
 function sendTechApp(req, res) {

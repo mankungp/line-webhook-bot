@@ -5622,7 +5622,7 @@ async function loadTechApprovalList() {
       html += '<button class="btn btn-secondary btn-sm" onclick="editTechJobOwner(\'' + j.id + '\')" style="flex:1; min-width:80px;">✏️ แก้ไข</button>';
       html += '<button class="btn btn-warning btn-sm" onclick="returnToFixing(\'' + j.id + '\')" style="flex:1; min-width:100px; background:#f39c12; color:white;">🔄 ส่งกลับซ่อม</button>';
       html += '<button class="btn btn-secondary btn-sm" onclick="viewTechJob(\'' + j.id + '\')" style="flex:1; min-width:60px;">👁️</button>';
-      html += '<button class="btn btn-danger btn-sm" onclick="rejectTechJob(\'' + j.id + '\')" style="flex:1; min-width:80px;">❌ Reject</button>';
+      html += '<button class="btn btn-danger btn-sm" onclick="openCancelJobModal(\'' + j.id + '\')" style="flex:1; min-width:90px;background:#dc2626;">❌ ยกเลิก</button>';
       html += '</div>';
       html += '</div>';
     });
@@ -5670,6 +5670,74 @@ async function rejectTechJob(id) {
 function viewTechJob(id) {
   // เปิดใน new tab สำหรับดูเต็ม (mobile app เปิดได้)
   window.open('/tech?job=' + encodeURIComponent(id), '_blank');
+}
+
+// ❌ ยกเลิกงานช่างซ่อม (modal เต็ม)
+async function openCancelJobModal(id) {
+  try {
+    var r = await fetch('/api/tech-jobs');
+    var d = await r.json();
+    var arr = d.jobs || d;
+    var j = (Array.isArray(arr) ? arr : []).find(function(x){ return x.id === id; });
+    if (!j) return alert('ไม่พบงาน');
+    document.getElementById('cancelJobId').value = id;
+    var techName = (allEmployees || []).find(function(e){return e.emp_code===j.fixed_by;});
+    var techLabel = techName ? (techName.nickname || techName.name) : (j.fixed_by || '-');
+    document.getElementById('cancelJobInfo').innerHTML =
+      '<b>' + escapeHtml(id) + '</b> · ' + escapeHtml(j.customer_name || '-') + '<br>' +
+      '🏍️ ' + escapeHtml((j.device && j.device.brand) || '') + ' ' + escapeHtml((j.device && j.device.model) || '') + '<br>' +
+      '🔧 ช่าง: ' + escapeHtml(techLabel) + ' · % คอม: ' + (j.commission_rate || 0) + '%<br>' +
+      'อะไหล่: ' + (j.parts_used || []).length + ' รายการ (ยอด ฿' + (j.parts_total||0).toLocaleString() + ')<br>' +
+      'stock_deducted: ' + (j.stock_deducted ? '✅ ตัดไปแล้ว' : '❌ ยังไม่ตัด');
+    document.getElementById('cjReason').value = '';
+    document.getElementById('cjLabor').value = 0;
+    document.getElementById('cjParts').value = 0;
+    document.getElementsByName('cjPartsAction')[0].checked = true; // restore
+    document.getElementsByName('cjCommissionMode')[0].checked = true; // none
+    updateCancelTotal();
+    document.getElementById('cancelJobModal').classList.add('active');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+function closeCancelJobModal() {
+  document.getElementById('cancelJobModal').classList.remove('active');
+}
+
+function updateCancelTotal() {
+  var labor = parseFloat(document.getElementById('cjLabor').value) || 0;
+  var parts = parseFloat(document.getElementById('cjParts').value) || 0;
+  document.getElementById('cjTotalDisplay').textContent = '฿' + (labor+parts).toLocaleString();
+}
+
+async function submitCancelJob() {
+  var id = document.getElementById('cancelJobId').value;
+  var reason = document.getElementById('cjReason').value.trim();
+  if (!reason) return alert('กรุณาระบุเหตุผล');
+  var labor = parseFloat(document.getElementById('cjLabor').value) || 0;
+  var parts = parseFloat(document.getElementById('cjParts').value) || 0;
+  var partsAction = document.querySelector('input[name="cjPartsAction"]:checked').value;
+  var commissionMode = document.querySelector('input[name="cjCommissionMode"]:checked').value;
+
+  if (!confirm('ยืนยันยกเลิกงาน?\nรวมจากลูกค้า: ฿' + (labor+parts).toLocaleString())) return;
+
+  try {
+    var r = await fetch('/api/tech-jobs/' + id + '/cancel', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        reason: reason, charge_labor: labor, charge_parts: parts,
+        parts_action: partsAction, commission_mode: commissionMode
+      })
+    });
+    if (!r.ok) {
+      var d = await r.json().catch(function(){return {};});
+      throw new Error(d.error || ('HTTP '+r.status));
+    }
+    alert('✅ ยกเลิกงานแล้ว');
+    closeCancelJobModal();
+    loadTechApprovalList();
+    if (typeof loadTechJobs === 'function') loadTechJobs();
+  } catch (e) { alert('❌ ' + e.message); }
 }
 
 // ส่งงานกลับไปซ่อมต่อ (revert delivered → fixing)
