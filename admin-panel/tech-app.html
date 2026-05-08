@@ -1252,8 +1252,45 @@
     saveJob({ parts_used: list }).then(() => drawDetail());
   }
 
+  // ---------- LINE in-app browser detection ----------
+  function isLineInAppBrowser() {
+    return /Line\//i.test(navigator.userAgent || '');
+  }
+  function escapeFromLineBrowser() {
+    // LINE จะเด้งออก default browser ถ้าเจอ query param openExternalBrowser=1
+    const url = new URL(location.href);
+    if (!url.searchParams.has('openExternalBrowser')) {
+      url.searchParams.set('openExternalBrowser', '1');
+      location.replace(url.toString());
+      return true;
+    }
+    return false;
+  }
+
+  function showInAppBrowserWarning() {
+    topbar.innerHTML = '';
+    root.innerHTML = `
+      <div class="card center">
+        <div class="big-emoji">⚠️</div>
+        <h3 style="margin:6px 0">ไม่รองรับ LINE in-app browser</h3>
+        <p class="muted" style="margin:8px 0 14px">ระบบช่างต้องเปิดใน Safari / Chrome เพื่อให้ใช้งานสะดวก (ถ่ายรูป + LINE Login)</p>
+        <p style="font-size:14px;color:#3a5547;line-height:1.6">
+          1. กดปุ่ม <b>⋮</b> มุมขวาบน<br>
+          2. เลือก <b>"เปิดใน Browser อื่น"</b> / <b>"Open in browser"</b>
+        </p>
+      </div>`;
+  }
+
   // ---------- Init ----------
   async function init() {
+    // 0) ถ้าอยู่ใน LINE in-app browser → เด้งออก Safari/Chrome
+    if (isLineInAppBrowser()) {
+      if (escapeFromLineBrowser()) return;
+      // ถ้ายังอยู่ in-app browser → แสดงคำแนะนำ
+      showInAppBrowserWarning();
+      return;
+    }
+
     // 1) auth
     const me = await api('/auth/me');
     if (me.status === 401 || !me.ok) {
