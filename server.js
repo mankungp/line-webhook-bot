@@ -205,6 +205,18 @@ app.get('/api/payroll/:id/pdf', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Static images (product photos, snapshots) — proxy through to local-api
+app.get('/images/*', async function(req, res) {
+  try {
+    var url = LOCAL_API_BASE + req.url;  // includes /images/products/xxx.jpg + querystring
+    var r = await fetch(url);
+    if (!r.ok) return res.status(r.status).send('');
+    res.setHeader('Content-Type', r.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (err) { res.status(502).json({ error: err.message }); }
+});
+
 // Attendance (QR check-in)
 app.get('/api/attendance/qr-token', forwardWithCookie('GET'));
 app.get('/api/attendance/qr-token-self', forwardWithCookie('GET'));
