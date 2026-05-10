@@ -1876,6 +1876,12 @@ input:focus, textarea:focus, select:focus {
             </select>
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label>ขนาด / มิติ</label>
+            <input type="text" id="pDimensions" placeholder="เช่น 26 ลิตร, M, 12V, 30x40x10 cm">
+          </div>
+        </div>
       </div>
 
       <!-- TAB 3: ขายช่องทาง -->
@@ -2428,6 +2434,7 @@ function editProduct(id) {
   document.getElementById('pLowStock').value = (p.lowStockThreshold !== undefined && p.lowStockThreshold !== null) ? p.lowStockThreshold : '';
   document.getElementById('pWeight').value = p.weight || '';
   document.getElementById('pWeightUnit').value = p.weightUnit || 'กก.';
+  document.getElementById('pDimensions').value = p.dimensions || '';
   document.getElementById('pTags').value = (p.tags || []).join(', ');
   if (p.imageUrl) {
     var img = document.getElementById('pImagePreview');
@@ -2472,6 +2479,7 @@ async function saveProduct(e) {
     lowStockThreshold: (lowStockVal === '' ? null : (parseInt(lowStockVal) || 0)),
     weight: parseFloat(document.getElementById('pWeight').value) || 0,
     weightUnit: document.getElementById('pWeightUnit').value,
+    dimensions: document.getElementById('pDimensions').value || '',
     tags: tags,
     channels: collectChannels(),
     variants: collectVariants()
