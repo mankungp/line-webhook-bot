@@ -1784,11 +1784,7 @@ input:focus, textarea:focus, select:focus {
           <div class="form-group">
             <label>หมวดหมู่ *</label>
             <select id="pCategory" required>
-              <option value="agricultural">เครื่องเกษตร</option>
-              <option value="motorcycle">อะไหล่มอเตอร์ไซค์</option>
-              <option value="lawnmower">เครื่องตัดหญ้า</option>
-              <option value="pump">เครื่องสูบน้ำ</option>
-              <option value="other">อื่นๆ</option>
+              <!-- populated by loadCategories() -->
             </select>
           </div>
         </div>
@@ -2708,10 +2704,52 @@ async function cancelOrder(id) {
 
 // ============ CUSTOMERS ============
 // ============ HELPERS ============
+// ====== Categories cache (populated by loadCategories()) ======
+var __CATS = [];
 function getCatName(cat) {
-  var names = { agricultural: 'เครื่องเกษตร', motorcycle: 'อะไหล่มอเตอร์ไซค์', lawnmower: 'เครื่องตัดหญ้า', pump: 'เครื่องสูบน้ำ', other: 'อื่นๆ' };
-  return names[cat] || 'อื่นๆ';
+  if (!cat) return 'อื่นๆ';
+  var hit = (__CATS || []).find(function(c) { return String(c.id) === String(cat) || String(c.key||'') === String(cat); });
+  if (hit) return hit.name || cat;
+  // Fallback (legacy hardcoded ids)
+  var legacy = { agricultural: 'เครื่องเกษตร', motorcycle: 'อะไหล่มอเตอร์ไซค์', lawnmower: 'เครื่องตัดหญ้า', pump: 'เครื่งสูบน้ำ', other: 'อื่นๆ' };
+  return legacy[cat] || 'อื่นๆ';
 }
+
+async function loadCategories() {
+  try {
+    var r = await fetch('/api/categories');
+    var arr = await r.json();
+    __CATS = Array.isArray(arr) ? arr.slice() : [];
+    __CATS.sort(function(a, b) { return (a.order || 9999) - (b.order || 9999); });
+
+    // Populate <select id="pCategory"> in product modal
+    var pCat = document.getElementById('pCategory');
+    if (pCat) {
+      var prev = pCat.value;
+      pCat.innerHTML = __CATS.map(function(c) {
+        var key = c.key || c.id;
+        var label = (c.icon ? c.icon + ' ' : '') + (c.name || key);
+        return '<option value="' + escapeHtml(String(key)) + '">' + escapeHtml(label) + '</option>';
+      }).join('');
+      if (prev) pCat.value = prev;
+    }
+    // Populate <select id="pCategoryFilter">
+    var pFilter = document.getElementById('pCategoryFilter');
+    if (pFilter) {
+      var prevF = pFilter.value;
+      pFilter.innerHTML = '<option value="">ทุกหมวดหมู่</option>' + __CATS.map(function(c) {
+        var key = c.key || c.id;
+        var label = (c.icon ? c.icon + ' ' : '') + (c.name || key);
+        return '<option value="' + escapeHtml(String(key)) + '">' + escapeHtml(label) + '</option>';
+      }).join('');
+      if (prevF) pFilter.value = prevF;
+    }
+  } catch (e) {
+    console.error('loadCategories failed:', e);
+  }
+}
+// Initial load
+loadCategories();
 
 function numFormat(num) { return Number(num || 0).toLocaleString('th-TH'); }
 
@@ -3067,15 +3105,19 @@ async function reloadCategoryList() {
       return;
     }
     var html = '';
-    arr.forEach(function(c) {
+    arr.sort(function(a, b) { return (a.order || 9999) - (b.order || 9999); });
+    arr.forEach(function(c, i) {
       var id = c.id || c.key || c.name;
       var name = c.name || c.key || id;
       var key = c.key || c.id || '';
-      html += '<div style="display:flex; gap:6px; padding:6px; border-bottom:1px solid #f0f0f0; align-items:center;">';
+      var safeId = String(id).replace(/\'/g, "\\'");
+      html += '<div style="display:flex; gap:4px; padding:6px; border-bottom:1px solid #f0f0f0; align-items:center;">';
+      html += '<button class="btn btn-secondary btn-sm" onclick="moveCategory(\'' + safeId + '\', -1)" title="ขึ้น" ' + (i === 0 ? 'disabled' : '') + '>⬆️</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="moveCategory(\'' + safeId + '\', 1)"  title="ลง" '  + (i === arr.length-1 ? 'disabled' : '') + '>⬇️</button>';
       html += '<input type="text" value="' + escapeHtml(name) + '" data-id="' + escapeHtml(String(id)) + '" data-field="name" style="flex:2; padding:4px; border:1px solid #ddd; border-radius:4px;">';
       html += '<input type="text" value="' + escapeHtml(key) + '" data-id="' + escapeHtml(String(id)) + '" data-field="key" style="flex:1; padding:4px; border:1px solid #ddd; border-radius:4px;">';
-      html += '<button class="btn btn-secondary btn-sm" onclick="saveCategory(\'' + String(id).replace(/\'/g, "\\'") + '\')">💾</button>';
-      html += '<button class="btn btn-danger btn-sm" onclick="deleteCategory(\'' + String(id).replace(/\'/g, "\\'") + '\')">🗑️</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="saveCategory(\'' + safeId + '\')">💾</button>';
+      html += '<button class="btn btn-danger btn-sm" onclick="deleteCategory(\'' + safeId + '\')">🗑️</button>';
       html += '</div>';
     });
     box.innerHTML = html;
@@ -3139,6 +3181,34 @@ async function deleteCategory(id) {
     if (!r.ok) throw new Error('Delete failed');
     await reloadCategoryList();
     if (typeof loadCategories === 'function') loadCategories();
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+// Move a category up/down by 1 step
+async function moveCategory(id, delta) {
+  try {
+    var r0 = await fetch('/api/categories');
+    var cats = await r0.json();
+    cats.sort(function(a, b) { return (a.order || 9999) - (b.order || 9999); });
+    var idx = cats.findIndex(function(c) { return String(c.id) === String(id); });
+    if (idx < 0) return;
+    var newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= cats.length) return;
+    // Swap
+    var tmp = cats[idx];
+    cats[idx] = cats[newIdx];
+    cats[newIdx] = tmp;
+    var ids = cats.map(function(c) { return c.id; });
+    var r = await fetch('/api/categories/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ids })
+    });
+    if (!r.ok) throw new Error('Reorder failed');
+    await reloadCategoryList();
+    loadCategories();
   } catch (e) {
     alert('❌ ' + e.message);
   }
