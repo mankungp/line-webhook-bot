@@ -2236,22 +2236,57 @@ document.addEventListener('click', function(e) {
 // ============ PRODUCTS ============
 var products = [];
 
-async function loadProducts() {
+// Pagination state สำหรับ products page
+var pProductsState = { page: 1, limit: 200, total: 0, pages: 1, accumulated: [] };
+
+async function loadProducts(opts) {
+  opts = opts || {};
+  var append = opts.append === true;
   var search = encodeURIComponent(document.getElementById('pSearchBox').value);
   var category = document.getElementById('pCategoryFilter').value;
-  var url = '/api/products?limit=200';
+
+  if (!append) pProductsState.page = 1;
+  var url = '/api/products?limit=' + pProductsState.limit + '&page=' + pProductsState.page;
   if (search) url += '&search=' + search;
   if (category) url += '&category=' + category;
 
   try {
     var res = await fetch(url);
     var data = await res.json();
-    products = data.products || [];
+    var batch = data.products || [];
+    pProductsState.total = data.total || batch.length;
+    pProductsState.pages = data.pages || 1;
+
+    if (append) {
+      pProductsState.accumulated = pProductsState.accumulated.concat(batch);
+    } else {
+      pProductsState.accumulated = batch;
+    }
+    products = pProductsState.accumulated;
     renderProducts(products);
-    updateProductStats(products);
+    updateProductStats({ items: products, total: pProductsState.total });
+    renderLoadMoreButton();
   } catch (e) {
     document.getElementById('productGrid').innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อ API ได้ - ตรวจสอบว่า Local API กำลังทำงานอยู่</div>';
   }
+}
+
+function renderLoadMoreButton() {
+  var grid = document.getElementById('productGrid');
+  var existing = document.getElementById('pLoadMoreWrap');
+  if (existing) existing.remove();
+  if (pProductsState.accumulated.length >= pProductsState.total) return;
+  var remaining = pProductsState.total - pProductsState.accumulated.length;
+  var div = document.createElement('div');
+  div.id = 'pLoadMoreWrap';
+  div.style = 'grid-column:1/-1;text-align:center;padding:14px;';
+  div.innerHTML = '<button class="btn btn-primary" onclick="loadMoreProducts()">⬇️ โหลดเพิ่ม (เหลือ ' + remaining + ' จาก ' + pProductsState.total + ')</button>';
+  grid.appendChild(div);
+}
+
+async function loadMoreProducts() {
+  pProductsState.page += 1;
+  await loadProducts({ append: true });
 }
 
 function renderProducts(list) {
@@ -2288,8 +2323,10 @@ function renderProducts(list) {
   grid.innerHTML = html;
 }
 
-function updateProductStats(list) {
-  var total = list.length;
+function updateProductStats(arg) {
+  // รองรับทั้ง array (old) หรือ {items, total} (new)
+  var list = Array.isArray(arg) ? arg : (arg.items || []);
+  var realTotal = Array.isArray(arg) ? list.length : (arg.total || list.length);
   var inStock = 0;
   var agri = 0, moto = 0;
   list.forEach(function(p) {
@@ -2297,10 +2334,10 @@ function updateProductStats(list) {
     if (p.category === 'agricultural') agri++;
     if (p.category === 'motorcycle') moto++;
   });
-  document.getElementById('pstat-total').textContent = total;
-  document.getElementById('pstat-stock').textContent = inStock;
-  document.getElementById('pstat-agri').textContent = agri;
-  document.getElementById('pstat-moto').textContent = moto;
+  document.getElementById('pstat-total').textContent = realTotal;
+  document.getElementById('pstat-stock').textContent = inStock + (list.length < realTotal ? '+' : '');
+  document.getElementById('pstat-agri').textContent = agri + (list.length < realTotal ? '+' : '');
+  document.getElementById('pstat-moto').textContent = moto + (list.length < realTotal ? '+' : '');
 }
 
 // ----- Channels & Variants config -----
