@@ -1510,14 +1510,19 @@ input:focus, textarea:focus, select:focus {
           <h3 style="margin:0;"><span style="color:#FF6B0F;">◆</span> Lazada</h3>
           <span id="lzStatusBadge" class="status-badge" style="font-size:11px;">...</span>
         </div>
-        <div style="font-size:13px; color:#666; margin-bottom:10px;">
-          เชื่อมต่อ Lazada Open Platform — sync order → stock → สร้างบิล
-        </div>
+        <div id="lzSellerInfo" style="font-size:12px; color:#555; margin-bottom:10px;"></div>
         <div id="lzInfo" style="font-size:12px; color:#999; margin-bottom:10px;"></div>
-        <button class="btn btn-primary btn-sm" onclick="openMarketplaceConfig('lazada')">⚙️ ตั้งค่า credentials</button>
-        <button class="btn btn-secondary btn-sm" onclick="syncMarketplace('lazada')" id="lzSyncBtn">🔄 Sync orders</button>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+          <button class="btn btn-primary btn-sm" onclick="lazadaAuthorize()">🔗 เชื่อมต่อ (OAuth)</button>
+          <button class="btn btn-secondary btn-sm" onclick="lazadaSyncProducts()" id="lzSyncProdBtn">📦 Sync products</button>
+          <button class="btn btn-secondary btn-sm" onclick="lazadaSyncOrders()" id="lzSyncOrdBtn">🧾 Sync orders</button>
+          <button class="btn btn-secondary btn-sm" onclick="lazadaShowMatch()">🔍 Match SKU</button>
+          <button class="btn btn-secondary btn-sm" onclick="lazadaRefreshToken()">♻️ Refresh token</button>
+        </div>
+        <div id="lzActionMsg" style="margin-top:6px; font-size:12px;"></div>
         <div style="margin-top:10px; padding:8px; background:#f6f8fa; border-radius:6px; font-size:11px; font-family:monospace;">
-          Webhook URL:<br/><code style="word-break:break-all;">/api/marketplace/lazada/webhook</code>
+          Callback: <code style="word-break:break-all;">/lazada/callback</code><br/>
+          Webhook: <code style="word-break:break-all;">/lazada/webhook</code>
         </div>
       </div>
 
@@ -6267,6 +6272,106 @@ async function loadMarketplace() {
     renderMarketplaceCard('lazada', d.lazada);
     renderMarketplaceCard('tiktok', d.tiktok);
   } catch (e) { console.error('loadMarketplace:', e); }
+  // ดึง detail Lazada เพิ่ม
+  try {
+    var r2 = await fetch('/api/marketplace/lazada/status');
+    if (r2.ok) {
+      var s = await r2.json();
+      var el = document.getElementById('lzSellerInfo');
+      if (el) {
+        if (s.authorized) {
+          var exp = s.access_token_expires_at ? new Date(s.access_token_expires_at).toLocaleString('th-TH') : '-';
+          el.innerHTML = '✅ <b>' + (s.seller_name || 'authorized') + '</b><br/>Token expires: ' + exp;
+        } else {
+          el.innerHTML = '⚠️ ยังไม่ authorize — กด <b>เชื่อมต่อ (OAuth)</b> เพื่อเริ่ม';
+        }
+      }
+    }
+  } catch (e) { console.warn('lazada status:', e); }
+}
+
+// ============ LAZADA ACTIONS ============
+function lzMsg(msg, color) {
+  var el = document.getElementById('lzActionMsg');
+  if (!el) return;
+  el.style.color = color || '#0a8';
+  el.innerHTML = msg;
+}
+
+async function lazadaAuthorize() {
+  // เปิด popup ไป /lazada/auth (ส่งต่อ Render → redirect ไป Lazada พร้อม params)
+  var w = window.open('/lazada/auth', 'lazadaAuth', 'width=600,height=700');
+  lzMsg('🔗 เปิดหน้าต่างหาก popup ถูกบล็อก...', '#666');
+  // poll status ทุก 3 วินาที — ถ้า popup ปิด → ฟลฺ check status
+  var i = setInterval(async function() {
+    if (w && w.closed) {
+      clearInterval(i);
+      lzMsg('🔍 ตรวจสอบสถานะ...', '#666');
+      await loadMarketplace();
+      var r = await fetch('/api/marketplace/lazada/status');
+      var s = await r.json();
+      if (s.authorized) lzMsg('✅ เชื่อมต่อสำเร็จ! Seller: ' + (s.seller_name || ''));
+      else lzMsg('⚠️ ปิด popup แล้วแต่ยังไม่ authorized — ลองใหม่', '#c33');
+    }
+  }, 1000);
+  setTimeout(function() { clearInterval(i); }, 180000);
+}
+
+async function lazadaSyncProducts() {
+  if (!confirm('Sync รายการสินค้าจาก Lazada? (ใช้เวลา ~30-60 วินาที)')) return;
+  var btn = document.getElementById('lzSyncProdBtn');
+  btn.disabled = true; btn.textContent = '⏳ sync...';
+  lzMsg('📦 กำลัง sync products...', '#666');
+  try {
+    var r = await fetch('/api/marketplace/lazada/sync-products', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'failed');
+    lzMsg('✅ Sync สำเร็จ — ' + d.total_rows + ' SKUs (' + d.total_reported + ' products)');
+  } catch (e) { lzMsg('❌ ' + e.message, '#c33'); }
+  finally { btn.disabled = false; btn.textContent = '📦 Sync products'; }
+}
+
+async function lazadaSyncOrders() {
+  var days = prompt('Sync orders ย้อนหลังกี่วัน?', '7');
+  if (!days) return;
+  var btn = document.getElementById('lzSyncOrdBtn');
+  btn.disabled = true; btn.textContent = '⏳ sync...';
+  lzMsg('🧾 ดึงออเดอร์...', '#666');
+  try {
+    var r = await fetch('/api/marketplace/lazada/sync-orders-recent', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ days: Number(days) }) });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'failed');
+    lzMsg('✅ ดึง ' + d.total + ' orders จาก ' + new Date(d.since).toLocaleDateString('th-TH'));
+  } catch (e) { lzMsg('❌ ' + e.message, '#c33'); }
+  finally { btn.disabled = false; btn.textContent = '🧾 Sync orders'; }
+}
+
+async function lazadaShowMatch() {
+  lzMsg('🔍 กำลังตรวจสอบ match...', '#666');
+  try {
+    var r = await fetch('/api/marketplace/lazada/match');
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'failed');
+    var s = d.stats;
+    var html = '<b>Match summary</b><br/>' +
+      'Lazada SKUs: ' + s.total_lazada + ' | ของเรา: ' + s.total_ours + '<br/>' +
+      'Matched: <b>' + s.matched + '</b> | Unmatched Lazada: ' + s.unmatched_lazada + ' | Unmatched Ours: ' + s.unmatched_ours;
+    if (s.matched > 0) {
+      html += '<br/>By type: ' + JSON.stringify(s.by_match_type);
+    }
+    lzMsg(html);
+  } catch (e) { lzMsg('❌ ' + e.message, '#c33'); }
+}
+
+async function lazadaRefreshToken() {
+  lzMsg('♻️ Refresh token...', '#666');
+  try {
+    var r = await fetch('/api/marketplace/lazada/refresh-token', { method: 'POST' });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'failed');
+    lzMsg('✅ Token ต่ออายุแล้ว — หมดอายุ ' + new Date(d.expires_at).toLocaleString('th-TH'));
+    loadMarketplace();
+  } catch (e) { lzMsg('❌ ' + e.message, '#c33'); }
 }
 
 function renderMarketplaceCard(provider, data) {
