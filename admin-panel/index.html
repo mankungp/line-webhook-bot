@@ -2485,10 +2485,17 @@ function editProduct(id) {
   document.getElementById('pUnit').value = p.unit || 'ชิ้น';
   document.getElementById('pLowStock').value = (p.lowStockThreshold !== undefined && p.lowStockThreshold !== null) ? p.lowStockThreshold : '';
   document.getElementById('pWeight').value = p.weight || '';
-  document.getElementById('pWeightUnit').value = p.weightUnit || 'กก.';
-  document.getElementById('pWidth').value  = p.width  || '';
-  document.getElementById('pLength').value = p.length || '';
-  document.getElementById('pHeight').value = p.height || '';
+  // รองรับ weightUnit หลายรูปแบบ (kg/g/กรัม/กก./กริม/กิโล)
+  var wu = String(p.weightUnit || 'กก.').toLowerCase();
+  if (wu === 'kg' || wu.indexOf('กิโล') >= 0 || wu === 'กก.') wu = 'กก.';
+  else if (wu === 'g' || wu.indexOf('กรัม') >= 0 || wu === 'ก.') wu = 'กรัม';
+  else wu = 'กก.';
+  document.getElementById('pWeightUnit').value = wu;
+  // dimensions มีทั้ง flat (p.width/length/height) และ nested (p.dimensions.{width,length,height})
+  var dims = p.dimensions || {};
+  document.getElementById('pWidth').value  = p.width  || (typeof dims === 'object' ? dims.width  : '') || '';
+  document.getElementById('pLength').value = p.length || (typeof dims === 'object' ? dims.length : '') || '';
+  document.getElementById('pHeight').value = p.height || (typeof dims === 'object' ? dims.height : '') || '';
   document.getElementById('pDimensions').value = p.dimensions || '';
   document.getElementById('pTags').value = (p.tags || []).join(', ');
   if (p.imageUrl) {
@@ -2534,6 +2541,11 @@ async function saveProduct(e) {
     lowStockThreshold: (lowStockVal === '' ? null : (parseInt(lowStockVal) || 0)),
     weight: parseFloat(document.getElementById('pWeight').value) || 0,
     weightUnit: document.getElementById('pWeightUnit').value,
+    dimensions: {
+      width:  parseFloat(document.getElementById('pWidth').value)  || 0,
+      length: parseFloat(document.getElementById('pLength').value) || 0,
+      height: parseFloat(document.getElementById('pHeight').value) || 0
+    },
     width:  parseFloat(document.getElementById('pWidth').value)  || 0,
     length: parseFloat(document.getElementById('pLength').value) || 0,
     height: parseFloat(document.getElementById('pHeight').value) || 0,
