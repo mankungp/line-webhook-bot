@@ -1516,7 +1516,6 @@ input:focus, textarea:focus, select:focus {
           <button class="btn btn-primary btn-sm" onclick="lazadaAuthorize()">🔗 เชื่อมต่อ (OAuth)</button>
           <button class="btn btn-secondary btn-sm" onclick="lazadaSyncProducts()" id="lzSyncProdBtn">📦 Sync products</button>
           <button class="btn btn-secondary btn-sm" onclick="lazadaSyncOrders()" id="lzSyncOrdBtn">🧾 Sync orders</button>
-          <button class="btn btn-secondary btn-sm" onclick="lazadaShowMatch()">🔍 Match SKU</button>
           <button class="btn btn-secondary btn-sm" onclick="lazadaRefreshToken()">♻️ Refresh token</button>
         </div>
         <div id="lzActionMsg" style="margin-top:6px; font-size:12px;"></div>
@@ -1555,46 +1554,6 @@ input:focus, textarea:focus, select:focus {
         <div style="padding:10px; background:#fff3cd; border:1px solid #ffe69c; border-radius:6px; font-size:12px; color:#856404;">
           ⚠️ ต้องมี Lazada/TikTok integration ก่อน — จึงจะสมัคร Shopee ได้
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Lazada SKU Mapping Modal -->
-  <div class="modal" id="lazadaMappingModal">
-    <div class="modal-content" style="max-width:1100px; max-height:92vh; overflow:hidden; display:flex; flex-direction:column;">
-      <button class="close-btn" onclick="closeLazadaMapping()">×</button>
-      <h2 style="margin-top:0;">🔗 จับคู่สินค้า Lazada ↔ หน้าร้าน</h2>
-      <div id="lzMapStats" style="font-size:13px;color:#666;margin-bottom:10px;">กำลังโหลด...</div>
-      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-        <button class="btn btn-sm" onclick="lzMapFilter('')" id="lzMapBtnAll">ทั้งหมด</button>
-        <button class="btn btn-sm btn-success" onclick="lzMapFilter('high')" id="lzMapBtnHigh">🟢 High</button>
-        <button class="btn btn-sm" onclick="lzMapFilter('medium')" id="lzMapBtnMedium" style="background:#fef3c7;color:#92400e;">🟡 Medium</button>
-        <button class="btn btn-sm" onclick="lzMapFilter('low')" id="lzMapBtnLow" style="background:#fee2e2;color:#991b1b;">🔴 Low</button>
-        <button class="btn btn-sm" onclick="lzMapFilter('unmatched')" id="lzMapBtnUnmatched" style="background:#e5e7eb;">⚪ Unmatched</button>
-        <button class="btn btn-sm" onclick="lzMapFilter('manual')" id="lzMapBtnManual" style="background:#dbeafe;color:#1e40af;">📝 Manual</button>
-        <span style="flex:1;"></span>
-        <input type="text" id="lzMapSearch" placeholder="🔍 ค้นหา (ชื่อ/SKU)" onkeyup="lzMapRender()" style="padding:6px 10px; border:1px solid #ddd; border-radius:6px; min-width:200px;">
-      </div>
-      <div id="lzMapTable" style="flex:1; overflow-y:auto; border:1px solid #eee; border-radius:8px;">กำลังโหลด...</div>
-      <div style="margin-top:12px; display:flex; gap:10px; justify-content:flex-end; align-items:center;">
-        <span id="lzMapPendingMsg" style="flex:1; font-size:12px; color:#666;"></span>
-        <button class="btn" onclick="closeLazadaMapping()">ปิด</button>
-        <button class="btn btn-primary" onclick="lzMapApplyAll()">✅ บันทึกที่ติ๊ก</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Lazada Search-Our-Product Modal (ระหว่าง mapping flow) -->
-  <div class="modal" id="lzSearchModal">
-    <div class="modal-content" style="max-width:560px;">
-      <button class="close-btn" onclick="closeLzSearch()">×</button>
-      <h3 style="margin-top:0;">🔍 เลือกสินค้าหน้าร้าน</h3>
-      <div style="font-size:13px; color:#666; margin-bottom:8px;" id="lzSearchSubtitle"></div>
-      <input type="text" id="lzSearchQuery" placeholder="พิมพ์ชื่อ หรือ SKU..." onkeyup="lzSearchDo()" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-      <div id="lzSearchResults" style="max-height:50vh; overflow-y:auto; margin-top:10px;"></div>
-      <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
-        <button class="btn btn-danger btn-sm" onclick="lzSearchPick(null)">🚫 ไม่ผูก</button>
-        <button class="btn" onclick="closeLzSearch()">ยกเลิก</button>
       </div>
     </div>
   </div>
@@ -1941,8 +1900,8 @@ input:focus, textarea:focus, select:focus {
 
       <!-- TAB 3: ขายช่องทาง -->
       <div class="tab-pane" data-pane="channels">
-        <div style="font-size:13px;color:#666;margin-bottom:10px;">
-          เปิด/ปิดขายตามช่องทาง — ปล่อยราคาว่างไว้ = ใช้ราคา default
+        <div style="font-size:13px;color:#666;margin-bottom:14px;">
+          ผูกสินค้านี้กับช่องขายแต่ละ platform — ขายช่องไหนตัด stock รวมกัน
         </div>
         <div id="channelsList"></div>
       </div>
@@ -2381,12 +2340,39 @@ function updateProductStats(arg) {
 }
 
 // ----- Channels & Variants config -----
+// Channel definitions — แต่ละ platform มีข้อมูลเฉพาะของตัว (Lazada มี SKU + variant id)
 var CHANNEL_DEFS = [
-  { key: 'shopee_main',  label: '🛒 Shopee Main',  idField: 'shopee_item_id' },
-  { key: 'shopee_sub1',  label: '🛒 Shopee Sub1',  idField: 'shopee_item_id' },
-  { key: 'shopee_sub2',  label: '🛒 Shopee Sub2',  idField: 'shopee_item_id' },
-  { key: 'lazada',       label: '🛍️ Lazada',      idField: 'lazada_sku_id'  },
-  { key: 'tiktok',       label: '🎵 TikTok Shop',  idField: 'tiktok_product_id' }
+  {
+    key: 'lazada', label: '🛍️ Lazada', color: '#FF6B0F',
+    apiReady: true,
+    skuField: 'lazada_sku_seller',
+    placeholder: 'พิมพ์ชื่อสินค้าหรือ SellerSku บน Lazada...',
+    searchEndpoint: '/api/marketplace/lazada/search-sku'
+  },
+  {
+    key: 'shopee_main', label: '🛒 Shopee ร้านหลัก', color: '#EE4D2D',
+    apiReady: false,
+    skuField: 'shopee_item_id',
+    placeholder: 'Shopee Item ID / SKU (รอ API approval)'
+  },
+  {
+    key: 'shopee_sub1', label: '🛒 Shopee ร้านย่อย 1', color: '#EE4D2D',
+    apiReady: false,
+    skuField: 'shopee_item_id',
+    placeholder: 'Shopee Item ID / SKU (รอ API approval)'
+  },
+  {
+    key: 'shopee_sub2', label: '🛒 Shopee ร้านย่อย 2', color: '#EE4D2D',
+    apiReady: false,
+    skuField: 'shopee_item_id',
+    placeholder: 'Shopee Item ID / SKU (รอ API approval)'
+  },
+  {
+    key: 'tiktok', label: '🎵 TikTok Shop', color: '#000000',
+    apiReady: false,
+    skuField: 'tiktok_product_id',
+    placeholder: 'TikTok Product ID / SKU (รอ API approval)'
+  }
 ];
 
 function switchProductTab(tabName) {
@@ -2394,39 +2380,177 @@ function switchProductTab(tabName) {
   document.querySelectorAll('#productModal .tab-pane[data-pane]').forEach(function(p){ p.classList.toggle('active', p.dataset.pane === tabName); });
 }
 
+// State สำหรับ channels tab — เก็บ SKU ต่อ platform
+var channelsState = {};
+var channelSearchTimers = {};
+
 function renderChannelsList(channels) {
   channels = channels || {};
+  channelsState = {};
   var box = document.getElementById('channelsList');
   var html = '';
   CHANNEL_DEFS.forEach(function(c) {
     var ch = channels[c.key] || {};
-    var enabled = ch.enabled ? 'checked' : '';
-    var price = (ch.price !== undefined && ch.price !== null && ch.price !== '') ? ch.price : '';
-    var status = ch.status || 'draft';
-    var statusColor = status === 'live' ? 'on' : (status === 'error' ? 'off' : 'pending');
-    var platformId = ch[c.idField] || '';
-    html += '<div class="channel-row" data-channel-key="' + c.key + '">';
-    html += '<label><input type="checkbox" data-channel="' + c.key + '" ' + enabled + '> ' + escapeHtml(c.label) + '</label>';
-    html += '<input type="number" min="0" step="0.01" placeholder="ราคา (ใช้ default)" data-channel-price="' + c.key + '" value="' + price + '">';
-    html += '<span class="status-badge ' + statusColor + '">' + escapeHtml(status) + '</span>';
-    html += '<span class="channel-id" title="' + escapeHtml(c.idField) + '">' + (platformId ? escapeHtml(String(platformId)) : '—') + '</span>';
-    // hidden field to keep platform id read-only round-trip
-    html += '<input type="hidden" data-channel-platformid="' + c.key + '" value="' + escapeHtml(String(platformId)) + '">';
+    channelsState[c.key] = JSON.parse(JSON.stringify(ch));  // clone
+
+    var linkedSku = ch[c.skuField] || ch.lazada_sku_seller || '';
+    var linkedName = ch.lazada_name || ch.linked_name || '';
+    var enabled = !!ch.enabled;
+
+    html += '<div class="channel-card" data-channel="' + c.key + '" style="border:1px solid #e5e7eb; border-radius:10px; padding:12px; margin-bottom:10px; background:#fafafa;">';
+
+    // Header: platform name + status badge
+    html += '<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">';
+    html += '<div style="font-weight:600; color:' + c.color + '; font-size:14px;">' + escapeHtml(c.label) + '</div>';
+    var badge = enabled ? '<span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:4px;font-size:11px;">🟢 ผูกแล้ว</span>'
+                        : '<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:4px;font-size:11px;">⚪ ยังไม่ผูก</span>';
+    if (!c.apiReady) badge += ' <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;">⏳ รอ API</span>';
+    html += '<div>' + badge + '</div>';
+    html += '</div>';
+
+    // Linked SKU display (if linked)
+    if (linkedSku) {
+      html += '<div data-linked="1" style="background:#fff; border:1px solid #d1fae5; border-radius:6px; padding:8px 10px; margin-bottom:8px;">';
+      html += '<div style="display:flex; align-items:center; gap:8px;">';
+      html += '<div style="flex:1;">';
+      if (linkedName) html += '<div style="font-size:13px; font-weight:500;">' + escapeHtml(linkedName) + '</div>';
+      html += '<div style="font-size:11px; color:#6b7280; font-family:monospace;">' + escapeHtml(String(linkedSku)) + '</div>';
+      if (ch.price !== undefined && ch.price !== null) html += '<div style="font-size:11px; color:#666;">ราคา: ' + ch.price + '฿' + (ch.quantity !== undefined ? ' · stock: ' + ch.quantity : '') + '</div>';
+      html += '</div>';
+      html += '<button type="button" class="btn btn-sm btn-danger" onclick="unlinkChannel(\'' + c.key + '\')" title="ยกเลิกการผูก">✖</button>';
+      html += '</div></div>';
+    }
+
+    // Search input
+    html += '<div style="position:relative;">';
+    html += '<input type="text" id="chSearch-' + c.key + '" placeholder="🔍 ' + escapeHtml(c.placeholder) + '" ';
+    html += 'oninput="channelSearch(\'' + c.key + '\', this.value)" onfocus="channelSearch(\'' + c.key + '\', this.value)" ';
+    html += 'onblur="setTimeout(function() { var r=document.getElementById(\'chResults-' + c.key + '\'); if (r) r.style.display=\'none\'; }, 200)" ';
+    html += 'style="width:100%; padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;"';
+    if (!c.apiReady) html += ' onkeydown="if(event.key===\'Enter\'){event.preventDefault(); setChannelManual(\'' + c.key + '\', this.value)}" title="กด Enter เพื่อบันทึก SKU ตรงๆ"';
+    html += '>';
+    html += '<div id="chResults-' + c.key + '" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:280px; overflow-y:auto; background:#fff; border:1px solid #e5e7eb; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:100; margin-top:4px;"></div>';
+    html += '</div>';
+
+    // Helper text
+    if (!c.apiReady) {
+      html += '<div style="font-size:11px; color:#92400e; margin-top:6px;">💡 ระหว่างรอ API approval — พิมพ์ SKU แล้วกด Enter เพื่อบันทึกไว้ก่อน</div>';
+    }
+
     html += '</div>';
   });
   box.innerHTML = html;
 }
 
+function channelSearch(key, query) {
+  var resultsEl = document.getElementById('chResults-' + key);
+  if (!resultsEl) return;
+  var def = CHANNEL_DEFS.find(function(c) { return c.key === key; });
+  if (!def) return;
+
+  if (!def.apiReady) {
+    // Manual entry only — ไม่มี search
+    resultsEl.style.display = 'none';
+    return;
+  }
+
+  if (!query || query.trim().length < 1) {
+    resultsEl.style.display = 'none';
+    return;
+  }
+
+  clearTimeout(channelSearchTimers[key]);
+  channelSearchTimers[key] = setTimeout(async function() {
+    try {
+      var r = await fetch(def.searchEndpoint + '?q=' + encodeURIComponent(query));
+      var d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || 'search failed');
+      renderChannelResults(key, d.results || []);
+    } catch (e) {
+      resultsEl.innerHTML = '<div style="padding:10px; color:#c33; font-size:12px;">❌ ' + e.message + '</div>';
+      resultsEl.style.display = 'block';
+    }
+  }, 250);
+}
+
+function renderChannelResults(key, results) {
+  var resultsEl = document.getElementById('chResults-' + key);
+  if (!resultsEl) return;
+  if (results.length === 0) {
+    resultsEl.innerHTML = '<div style="padding:10px; color:#999; font-size:12px;">ไม่พบสินค้าตรงกับคำค้น</div>';
+    resultsEl.style.display = 'block';
+    return;
+  }
+  var html = '';
+  results.forEach(function(it) {
+    var bandColor = it.score >= 0.9 ? '#10b981' : (it.score >= 0.6 ? '#f59e0b' : '#9ca3af');
+    html += '<div onmousedown="event.preventDefault(); linkChannelTo(\'' + key + '\', ' + JSON.stringify(it).replace(/"/g,'&quot;') + ')" ';
+    html += 'style="padding:8px 10px; border-bottom:1px solid #f3f4f6; cursor:pointer; display:flex; align-items:center; gap:8px;" ';
+    html += 'onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'\'">';
+    if (it.image) html += '<img src="' + escapeHtml(it.image) + '" style="width:36px;height:36px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'">';
+    html += '<div style="flex:1; min-width:0;">';
+    html += '<div style="font-size:12px; font-weight:500;">' + escapeHtml((it.name || '').slice(0, 80)) + '</div>';
+    html += '<div style="font-size:11px; color:#6b7280;"><code>' + escapeHtml(String(it.sku_seller || it.sku || '-')) + '</code>';
+    if (it.price !== undefined) html += ' · ' + it.price + '฿';
+    if (it.quantity !== undefined) html += ' · stock ' + it.quantity;
+    html += '</div>';
+    html += '</div>';
+    if (it.score !== undefined) html += '<div style="font-size:11px; color:' + bandColor + ';">' + (it.score * 100).toFixed(0) + '%</div>';
+    html += '</div>';
+  });
+  resultsEl.innerHTML = html;
+  resultsEl.style.display = 'block';
+}
+
+function linkChannelTo(key, item) {
+  var def = CHANNEL_DEFS.find(function(c) { return c.key === key; });
+  if (!def) return;
+  // ผูกช่องนี้เข้ากับ item ที่เลือก
+  var entry = channelsState[key] || {};
+  entry.enabled = true;
+  entry[def.skuField] = item.sku_seller || item.sku || item.id;
+  entry.lazada_item_id = item.item_id;
+  entry.lazada_sku_id = item.sku_id;
+  entry.lazada_sku_seller = item.sku_seller;
+  entry.lazada_name = item.name;
+  entry.price = item.price;
+  entry.quantity = item.quantity;
+  entry.status = item.status || 'linked';
+  entry.linked_at = new Date().toISOString();
+  channelsState[key] = entry;
+  // Re-render ฟังก์ชั่นไปยัง channelsList
+  renderChannelsList(channelsState);
+  // Hide search dropdown
+  var r = document.getElementById('chResults-' + key);
+  if (r) r.style.display = 'none';
+}
+
+function setChannelManual(key, value) {
+  var def = CHANNEL_DEFS.find(function(c) { return c.key === key; });
+  if (!def || def.apiReady) return; // only for non-API platforms
+  if (!value || !value.trim()) return;
+  var entry = channelsState[key] || {};
+  entry.enabled = true;
+  entry[def.skuField] = value.trim();
+  entry.status = 'manual';
+  entry.linked_at = new Date().toISOString();
+  channelsState[key] = entry;
+  renderChannelsList(channelsState);
+}
+
+function unlinkChannel(key) {
+  if (!confirm('ยกเลิกการผูกช่องนี้?')) return;
+  var def = CHANNEL_DEFS.find(function(c) { return c.key === key; });
+  if (!def) return;
+  channelsState[key] = { enabled: false, price: null, sync_status: 'draft' };
+  renderChannelsList(channelsState);
+}
+
 function collectChannels() {
+  // ส่งกลับ channelsState — ถูกปรับระหว่าง link/unlink อยู่แล้ว
   var out = {};
   CHANNEL_DEFS.forEach(function(c) {
-    var enabled = !!document.querySelector('#channelsList input[data-channel="' + c.key + '"]:checked');
-    var priceStr = (document.querySelector('#channelsList input[data-channel-price="' + c.key + '"]') || {}).value;
-    var price = (priceStr === '' || priceStr === undefined || priceStr === null) ? null : (parseFloat(priceStr) || 0);
-    var pid = (document.querySelector('#channelsList input[data-channel-platformid="' + c.key + '"]') || {}).value || '';
-    var entry = { enabled: enabled, price: price };
-    if (pid) entry[c.idField] = pid;
-    out[c.key] = entry;
+    out[c.key] = channelsState[c.key] || { enabled: false, price: null, sync_status: 'draft' };
   });
   return out;
 }
@@ -6433,213 +6557,6 @@ async function lazadaSyncOrders() {
     lzMsg('✅ ดึง ' + d.total + ' orders จาก ' + new Date(d.since).toLocaleDateString('th-TH'));
   } catch (e) { lzMsg('❌ ' + e.message, '#c33'); }
   finally { btn.disabled = false; btn.textContent = '🧾 Sync orders'; }
-}
-
-// ============ LAZADA SKU MAPPING ============
-var lzMapState = { rows: [], filter: '', pending: {} };
-
-async function lazadaShowMatch() {
-  document.getElementById('lazadaMappingModal').classList.add('active');
-  document.getElementById('lzMapStats').textContent = 'กำลังโหลด mapping...';
-  document.getElementById('lzMapTable').innerHTML = 'รอสักครู่...';
-  lzMapState.pending = {};
-  try {
-    var r = await fetch('/api/marketplace/lazada/match-detail?limit=99999');
-    var d = await r.json();
-    if (!r.ok || d.error) throw new Error(d.error || 'failed');
-    lzMapState.rows = d.rows;
-    var s = d.stats;
-    document.getElementById('lzMapStats').innerHTML =
-      'Lazada SKUs: <b>' + s.total_lazada + '</b> | ของเรา: <b>' + s.total_ours + '</b> | ' +
-      '🟢 ' + (s.by_band.high||0) + ' | 🟡 ' + (s.by_band.medium||0) + ' | 🔴 ' + (s.by_band.low||0) + ' | ' +
-      '📝 ' + (s.by_band.manual||0) + ' | ⚪ ' + (s.unmatched_lazada||0);
-    lzMapRender();
-  } catch (e) {
-    document.getElementById('lzMapTable').innerHTML = '<div style="padding:20px;color:#c33;">❌ ' + e.message + '</div>';
-  }
-}
-
-function closeLazadaMapping() {
-  document.getElementById('lazadaMappingModal').classList.remove('active');
-}
-
-function lzMapFilter(band) {
-  lzMapState.filter = band;
-  ['','high','medium','low','unmatched','manual'].forEach(function(b) {
-    var id = 'lzMapBtn' + (b ? (b[0].toUpperCase()+b.slice(1)) : 'All');
-    var btn = document.getElementById(id);
-    if (btn) btn.style.outline = (b === band) ? '2px solid #2563eb' : 'none';
-  });
-  lzMapRender();
-}
-
-function lzMapEscape(s) {
-  return String(s == null ? '' : s).replace(/[<>&"']/g, function(c) { return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]; });
-}
-
-function lzMapBandColor(band) {
-  return { high:'#10b981', medium:'#f59e0b', low:'#ef4444', manual:'#3b82f6', unmatched:'#9ca3af' }[band] || '#999';
-}
-
-function lzMapBandIcon(band) {
-  return { high:'🟢', medium:'🟡', low:'🔴', manual:'📝', unmatched:'⚪' }[band] || '•';
-}
-
-function lzMapRender() {
-  var rows = lzMapState.rows;
-  var f = lzMapState.filter;
-  if (f) rows = rows.filter(function(r) { return r.band === f; });
-  var q = (document.getElementById('lzMapSearch').value || '').toLowerCase();
-  if (q) {
-    rows = rows.filter(function(r) {
-      return (r.lazada_name || '').toLowerCase().includes(q) ||
-             (r.lazada_sku_seller || '').toLowerCase().includes(q) ||
-             (r.our_name || '').toLowerCase().includes(q) ||
-             (r.our_sku || '').toLowerCase().includes(q);
-    });
-  }
-
-  var html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
-  html += '<thead style="position:sticky; top:0; background:#f8fafc; z-index:1;">' +
-    '<tr style="border-bottom:2px solid #e2e8f0;">' +
-    '<th style="padding:8px; text-align:left; width:30px;"><input type="checkbox" onchange="lzMapToggleAll(this.checked)" id="lzMapToggleAllChk"></th>' +
-    '<th style="padding:8px; text-align:left; width:40px;"></th>' +
-    '<th style="padding:8px; text-align:left;">Lazada SKU</th>' +
-    '<th style="padding:8px; text-align:center; width:40px;">→</th>' +
-    '<th style="padding:8px; text-align:left;">สินค้าหน้าร้าน</th>' +
-    '<th style="padding:8px; text-align:center; width:80px;">Action</th>' +
-    '</tr></thead><tbody>';
-
-  if (rows.length === 0) html += '<tr><td colspan="6" style="padding:24px; text-align:center; color:#999;">ไม่มีรายการ</td></tr>';
-
-  rows.forEach(function(r, i) {
-    var rowId = r.lazada_sku_seller || r.lazada_sku_id;
-    var pendingChange = lzMapState.pending[rowId];
-    var checked = (r.band === 'high' && !(rowId in lzMapState.pending)) ? 'checked' : (pendingChange !== undefined ? 'checked' : '');
-    var bandColor = lzMapBandColor(r.band);
-    var bandIcon = lzMapBandIcon(r.band);
-    var ourName = pendingChange === null ? '(ไม่ผูก)' : (pendingChange ? '✨ ' + (pendingChange.name || '#' + pendingChange.id) : (r.our_name || '(ยังไม่ได้จับคู่)'));
-    var ourSku = pendingChange === null ? '' : (pendingChange ? pendingChange.sku : (r.our_sku || ''));
-
-    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
-    html += '<td style="padding:8px;"><input type="checkbox" class="lzMapCheck" data-row="' + lzMapEscape(rowId) + '" ' + checked + '></td>';
-    html += '<td style="padding:8px;">' + (r.lazada_image ? '<img src="' + lzMapEscape(r.lazada_image) + '" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'">' : '') + '</td>';
-    html += '<td style="padding:8px;">';
-    html += '<div style="font-weight:500;">' + lzMapEscape(r.lazada_name || '').slice(0,70) + '</div>';
-    html += '<div style="color:#64748b; font-size:11px; font-family:monospace;">' + lzMapEscape(r.lazada_sku_seller || '-') + '</div>';
-    html += '<div style="font-size:11px;"><span style="color:' + bandColor + ';font-weight:600;">' + bandIcon + ' ' + r.band + '</span>';
-    if (r.score) html += ' <span style="color:#999;">(' + (r.score * 100).toFixed(0) + '%)</span>';
-    html += ' · ' + (r.lazada_price || 0) + '฿ · stock ' + (r.lazada_quantity || 0) + '</div>';
-    html += '</td>';
-    html += '<td style="padding:8px; text-align:center;">→</td>';
-    html += '<td style="padding:8px;">';
-    if (pendingChange !== undefined) html += '<span style="background:#fef3c7; padding:1px 6px; border-radius:4px; font-size:10px;">รอ apply</span> ';
-    html += '<div>' + lzMapEscape(ourName).slice(0,60) + '</div>';
-    if (ourSku) html += '<div style="color:#64748b; font-size:11px; font-family:monospace;">' + lzMapEscape(ourSku) + '</div>';
-    html += '</td>';
-    html += '<td style="padding:8px; text-align:center;">';
-    html += '<button class="btn btn-sm" onclick="lzMapChangePicker(' + i + ')" title="เปลี่ยนการจับคู่">⇄</button>';
-    html += '</td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  html += '<div style="padding:8px; color:#666; font-size:12px;">แสดง ' + rows.length + ' / ' + lzMapState.rows.length + ' รายการ</div>';
-  document.getElementById('lzMapTable').innerHTML = html;
-  lzMapUpdatePendingMsg();
-}
-
-function lzMapToggleAll(checked) {
-  document.querySelectorAll('.lzMapCheck').forEach(function(c) { c.checked = checked; });
-}
-
-function lzMapUpdatePendingMsg() {
-  var n = Object.keys(lzMapState.pending).length;
-  var el = document.getElementById('lzMapPendingMsg');
-  if (el) el.textContent = n > 0 ? ('📝 ' + n + ' รายการรอ apply') : '';
-}
-
-var lzSearchTargetIdx = -1;
-function lzMapChangePicker(idx) {
-  lzSearchTargetIdx = idx;
-  var r = lzMapState.rows[idx];
-  document.getElementById('lzSearchSubtitle').textContent = 'Lazada: ' + (r.lazada_name || '').slice(0,60);
-  document.getElementById('lzSearchQuery').value = r.lazada_name || '';
-  document.getElementById('lzSearchModal').classList.add('active');
-  lzSearchDo();
-  setTimeout(function() { document.getElementById('lzSearchQuery').focus(); }, 100);
-}
-
-function closeLzSearch() {
-  document.getElementById('lzSearchModal').classList.remove('active');
-}
-
-var lzSearchTimer = null;
-async function lzSearchDo() {
-  clearTimeout(lzSearchTimer);
-  lzSearchTimer = setTimeout(async function() {
-    var q = document.getElementById('lzSearchQuery').value.trim();
-    if (!q) { document.getElementById('lzSearchResults').innerHTML = '<div style="padding:14px;color:#999;">พิมพ์คำค้นหา...</div>'; return; }
-    document.getElementById('lzSearchResults').innerHTML = '<div style="padding:14px;color:#999;">⏳ กำลังค้นหา...</div>';
-    try {
-      var r = await fetch('/api/marketplace/lazada/search-our-products?q=' + encodeURIComponent(q));
-      var d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'failed');
-      var html = '';
-      if (!d.results || d.results.length === 0) {
-        html = '<div style="padding:14px;color:#999;">ไม่พบ</div>';
-      } else {
-        d.results.forEach(function(p) {
-          html += '<div onclick=\'lzSearchPick(' + JSON.stringify(p) + ')\' style="padding:8px; border-bottom:1px solid #eee; cursor:pointer; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'\'">';
-          if (p.imageUrl) html += '<img src="' + lzMapEscape(p.imageUrl) + '" style="width:36px;height:36px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'">';
-          html += '<div style="flex:1;">';
-          html += '<div style="font-weight:500;">' + lzMapEscape(p.name).slice(0,70) + '</div>';
-          html += '<div style="font-size:11px; color:#64748b;"><code>' + lzMapEscape(p.sku || '-') + '</code> · ' + (p.price || 0) + '฿ · stock ' + (p.stock || 0) + '</div>';
-          html += '</div>';
-          html += '<div style="font-size:11px; color:' + lzMapBandColor(p.band) + ';">' + (p.score*100).toFixed(0) + '%</div>';
-          html += '</div>';
-        });
-      }
-      document.getElementById('lzSearchResults').innerHTML = html;
-    } catch (e) {
-      document.getElementById('lzSearchResults').innerHTML = '<div style="padding:14px;color:#c33;">❌ ' + e.message + '</div>';
-    }
-  }, 250);
-}
-
-function lzSearchPick(product) {
-  if (lzSearchTargetIdx < 0) return;
-  var r = lzMapState.rows[lzSearchTargetIdx];
-  var rowId = r.lazada_sku_seller || r.lazada_sku_id;
-  lzMapState.pending[rowId] = product;
-  closeLzSearch();
-  lzMapRender();
-}
-
-async function lzMapApplyAll() {
-  var items = [];
-  document.querySelectorAll('.lzMapCheck:checked').forEach(function(c) {
-    var rowId = c.dataset.row;
-    var r = lzMapState.rows.find(function(x) { return (x.lazada_sku_seller || x.lazada_sku_id) === rowId; });
-    if (!r) return;
-    var pending = lzMapState.pending[rowId];
-    if (pending === null) {
-      items.push({ lazada_sku_seller: r.lazada_sku_seller, our_product_id: null });
-    } else if (pending) {
-      items.push({ lazada_sku_seller: r.lazada_sku_seller, our_product_id: pending.id });
-    } else if (r.our_id && r.band === 'high') {
-      items.push({ lazada_sku_seller: r.lazada_sku_seller, our_product_id: r.our_id });
-    }
-  });
-  if (items.length === 0) { alert('ยังไม่มีรายการที่ติ๊กเลือก'); return; }
-  if (!confirm('ยืนยันจับคู่ ' + items.length + ' รายการ?')) return;
-  try {
-    var r = await fetch('/api/marketplace/lazada/mappings/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ items: items }) });
-    var d = await r.json();
-    if (!r.ok || d.error) throw new Error(d.error || 'failed');
-    alert('✅ บันทึกแล้ว — added: ' + d.added + ', removed: ' + d.removed + '\n\nMapping รวม: ' + d.total);
-    closeLazadaMapping();
-    loadMarketplace();
-  } catch (e) { alert('❌ ' + e.message); }
 }
 
 async function lazadaRefreshToken() {
