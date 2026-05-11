@@ -1746,6 +1746,87 @@ app.get('/api/stats', async function(req, res) {
   }
 });
 
+// ============ LAZADA OAuth CALLBACK ============
+// Lazada redirects here after seller authorizes the app.
+// We forward the code + state to local-api (Mac) which holds the app_secret
+// and persists the access_token + refresh_token.
+app.get('/lazada/callback', async function(req, res) {
+  var code = req.query.code;
+  var state = req.query.state;
+  var error = req.query.error;
+  var errorDesc = req.query.error_description;
+
+  if (error) {
+    return res.status(400).send('<h2>❌ Lazada authorization failed</h2><p>' + error + ': ' + (errorDesc || '') + '</p>');
+  }
+  if (!code) {
+    return res.status(400).send('<h2>❌ Missing code parameter</h2>');
+  }
+
+  try {
+    if (!ADMIN_TOKEN) {
+      return res.status(500).send('<h2>❌ Server misconfigured: ADMIN_TOKEN not set</h2>');
+    }
+    var r = await fetch(LOCAL_API_BASE + '/api/marketplace/lazada/exchange-code', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Token': ADMIN_TOKEN
+      },
+      body: JSON.stringify({ code: code, state: state, skipStateCheck: true })
+    });
+    var data = await r.json();
+    if (!r.ok || !data.ok) {
+      return res.status(500).send('<h2>❌ Token exchange failed</h2><pre>' + JSON.stringify(data, null, 2) + '</pre>');
+    }
+    var info = data.config || {};
+    res.send(
+      '<html><body style="font-family:sans-serif;padding:30px;max-width:600px;margin:auto">' +
+      '<h2>✅ Lazada เชื่อมต่อสำเร็จแล้ว</h2>' +
+      '<p><b>Seller:</b> ' + (info.seller_name || '-') + ' (id: ' + (info.seller_id || '-') + ')</p>' +
+      '<p><b>Token expires:</b> ' + (info.expires_at ? new Date(info.expires_at).toLocaleString('th-TH') : '-') + '</p>' +
+      '<p>ปิดหน้านี้ได้ ไปได้ที่ <a href="/admin/">Admin Panel</a></p>' +
+      '</body></html>'
+    );
+  } catch (err) {
+    res.status(500).send('<h2>❌ Error</h2><pre>' + err.message + '</pre>');
+  }
+});
+
+// Convenience: กดลิงก์นี้เพื่อสตาร์ต OAuth flow (ต้องล็อกอิน admin)
+app.get('/lazada/auth', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/marketplace/lazada/auth-url', {
+      headers: { 'Cookie': req.headers.cookie || '', 'X-Admin-Token': ADMIN_TOKEN }
+    });
+    var data = await r.json();
+    if (!r.ok || !data.ok) {
+      return res.status(r.status || 500).send('<pre>' + JSON.stringify(data, null, 2) + '</pre>');
+    }
+    res.redirect(data.url);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Webhook proxy (Lazada อาจยิง server.js ได้)
+app.post('/lazada/webhook', express.json({ verify: function(req, res, buf) { req.rawBody = buf.toString('utf8'); }, limit: '2mb' }), async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/marketplace/lazada/webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-lazop-signature': req.headers['x-lazop-signature'] || '',
+        'x-lazop-message-type': req.headers['x-lazop-message-type'] || ''
+      },
+      body: req.rawBody || JSON.stringify(req.body)
+    });
+    res.status(r.status).send(await r.text());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ START ============
 
 app.listen(PORT, function() {
