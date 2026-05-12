@@ -3196,6 +3196,7 @@ function renderOrders(list) {
     html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
     if (o.customerAddress) {
       html += '<button class="btn btn-sm" style="background:#06c755;color:#fff;" onclick="printShippingLabel(' + o.id + ')" title="ใบปะหน้า 4x6″">🚚 ใบปะหน้า</button> ';
+      html += '<button class="btn btn-sm" style="background:#ff6b0f;color:#fff;" onclick="openShipmentPhotoModal(' + o.id + ')" title="อัปรูปใบขนส่ง + ส่ง LINE">📤 ส่งใบขนส่ง</button> ';
     }
     if (o.status !== 'cancelled' && o.status !== 'completed') {
       html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
@@ -3505,6 +3506,136 @@ function openCouriersModal() {
 
 function printShippingLabel(orderId) {
   window.open('/api/orders/' + orderId + '/shipping-label/pdf', '_blank');
+}
+
+// ===== Shipment Photo Modal =====
+async function openShipmentPhotoModal(orderId) {
+  var modal = document.getElementById('shipmentPhotoModal');
+  modal.classList.add('active');
+  document.getElementById('spOrderId').value = orderId;
+  document.getElementById('spPhotos').value = '';
+  document.getElementById('spPhotoPreview').innerHTML = '';
+  document.getElementById('spStatus').innerHTML = '';
+  document.getElementById('spSendLine').checked = true;
+
+  // load order details
+  try {
+    var r = await fetch('/api/orders/' + orderId);
+    var o = await r.json();
+    document.getElementById('spOrderInfo').innerHTML =
+      '<strong>' + escapeHtml(o.orderNo || '-') + '</strong> · ' +
+      escapeHtml(o.customerName || '-') +
+      (o.customerPhone ? ' · ☎ ' + escapeHtml(o.customerPhone) : '') +
+      '<br/>ยอด: ' + (o.total || 0).toLocaleString() + ' บาท · ' + ((o.items||[]).length) + ' รายการ';
+    document.getElementById('spCourier').value = o.courier || '';
+    document.getElementById('spTracking').value = o.trackingNo || '';
+    // สร้างข้อความ default
+    document.getElementById('spMessage').value = buildShipmentDefaultMessage(o);
+  } catch (e) { console.error('load order:', e); }
+
+  // load couriers
+  try {
+    var cr = await fetch('/api/couriers');
+    var cd = await cr.json();
+    var sel = document.getElementById('spCourier');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— ไม่ระบุ —</option>';
+    (cd.couriers || []).filter(function(c){return c.enabled!==false;}).forEach(function(c) {
+      var label = c.name + (c.phone ? ' (' + c.phone + ')' : '');
+      sel.innerHTML += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(label) + '</option>';
+    });
+    if (current) sel.value = current;
+    // update message ตอน courier เปลี่ยน
+    sel.onchange = function() {
+      refreshShipmentDefaultMessage();
+    };
+    document.getElementById('spTracking').oninput = function() {
+      refreshShipmentDefaultMessage();
+    };
+  } catch (e) { console.error('load couriers:', e); }
+}
+
+function closeShipmentPhotoModal() {
+  document.getElementById('shipmentPhotoModal').classList.remove('active');
+}
+
+function previewShipmentPhotos() {
+  var input = document.getElementById('spPhotos');
+  var box = document.getElementById('spPhotoPreview');
+  box.innerHTML = '';
+  for (var i = 0; i < input.files.length; i++) {
+    var url = URL.createObjectURL(input.files[i]);
+    box.innerHTML += '<img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border:1px solid #ddd;border-radius:6px;">';
+  }
+}
+
+function buildShipmentDefaultMessage(order) {
+  var courierId = document.getElementById('spCourier') ? document.getElementById('spCourier').value : (order.courier || '');
+  var tracking = document.getElementById('spTracking') ? document.getElementById('spTracking').value : (order.trackingNo || '');
+  var courierName = '-';
+  var courierPhone = '';
+  var trackingUrl = '';
+  if (window.__COURIERS_LIST && courierId) {
+    var c = window.__COURIERS_LIST.find(function(x) { return x.id === courierId; });
+    if (c) { courierName = c.name; courierPhone = c.phone || ''; trackingUrl = c.tracking_url || ''; }
+  }
+  var msg = '📦 ออเดอร์ของคุณจัดส่งเรียบร้อยแล้ว\n\n';
+  msg += '🔖 เลขที่: ' + (order.orderNo || '-') + '\n';
+  msg += '🚚 ขนส่ง: ' + courierName;
+  if (courierPhone) msg += '\n📞 ติดต่อขนส่ง: ' + courierPhone;
+  if (tracking) msg += '\n🏷️ เลขพัสดุ: ' + tracking;
+  if (trackingUrl && tracking) msg += '\n🔗 ' + trackingUrl;
+  msg += '\n\nขอบคุณที่อุดหนุนร้าน 🙏';
+  return msg;
+}
+
+async function refreshShipmentDefaultMessage() {
+  // ถ้ายังไม่มีรายการขนส่ง cache → fetch
+  if (!window.__COURIERS_LIST || !window.__COURIERS_LIST.length) {
+    try {
+      var r = await fetch('/api/couriers');
+      var d = await r.json();
+      window.__COURIERS_LIST = d.couriers || [];
+    } catch (e) {}
+  }
+  var orderId = document.getElementById('spOrderId').value;
+  try {
+    var or = await fetch('/api/orders/' + orderId);
+    var o = await or.json();
+    document.getElementById('spMessage').value = buildShipmentDefaultMessage(o);
+  } catch (e) {}
+}
+
+async function submitShipmentPhoto() {
+  var orderId = document.getElementById('spOrderId').value;
+  var photos = document.getElementById('spPhotos').files;
+  if (!photos || !photos.length) {
+    document.getElementById('spStatus').innerHTML = '<span style="color:#c00;">⚠️ กรุณาเลือกรูป</span>';
+    return;
+  }
+  var fd = new FormData();
+  for (var i = 0; i < photos.length; i++) fd.append('photos', photos[i]);
+  fd.append('courier', document.getElementById('spCourier').value || '');
+  fd.append('trackingNo', document.getElementById('spTracking').value || '');
+  fd.append('message', document.getElementById('spMessage').value || '');
+  fd.append('sendLine', document.getElementById('spSendLine').checked ? 'true' : 'false');
+
+  document.getElementById('spStatus').innerHTML = '<span style="color:#666;">⏳ กำลัง upload...</span>';
+  try {
+    var r = await fetch('/api/orders/' + orderId + '/shipment-photo', { method: 'POST', body: fd });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    var lineMsg = '';
+    if (d.line) {
+      if (d.line.skipped) lineMsg = '\n(✏️ ไม่มี line_user_id — ไม่ได้ส่ง LINE)';
+      else if (d.line.ok) lineMsg = '\n✅ ส่ง LINE หาลูกค้าแล้ว';
+      else lineMsg = '\n⚠️ ส่ง LINE ผิดพลาด: ' + (d.line.error || d.line.detail || '?');
+    }
+    document.getElementById('spStatus').innerHTML = '<span style="color:#0a8;">✅ อัปโหลด ' + (d.uploaded||[]).length + ' รูปสำเร็จ' + lineMsg + '</span>';
+    setTimeout(function() { closeShipmentPhotoModal(); loadOrders(); }, 1800);
+  } catch (e) {
+    document.getElementById('spStatus').innerHTML = '<span style="color:#c00;">❌ ' + e.message + '</span>';
+  }
 }
 function closeCouriersModal() {
   document.getElementById('couriersModal').classList.remove('active');
@@ -4172,6 +4303,55 @@ setInterval(loadBotCustomers, 30000);
     <div style="display:flex; gap:8px;">
       <button class="btn btn-secondary" style="flex:1;" onclick="closeOrderModal()">ยกเลิก</button>
       <button class="btn btn-primary" style="flex:1;" onclick="submitOrder()">บันทึกออเดอร์</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shipment Photo Modal -->
+<div class="modal" id="shipmentPhotoModal">
+  <div class="modal-content" style="max-width: 560px; max-height:92vh; overflow-y:auto;">
+    <button class="close-btn" onclick="closeShipmentPhotoModal()">×</button>
+    <h2>📤 ส่งใบขนส่งให้ลูกค้า</h2>
+    <input type="hidden" id="spOrderId">
+    <div id="spOrderInfo" style="background:#f8f9fa;border-radius:8px;padding:10px;margin:10px 0;font-size:13px;color:#555;"></div>
+
+    <div style="margin:10px 0;">
+      <label style="font-size:12px;color:#666;">🚚 ขนส่ง (จะแสดงในข้อความ)</label>
+      <select id="spCourier" style="width:100%; padding:7px; border:1px solid #ddd; border-radius:6px;">
+        <option value="">— ไม่ระบุ —</option>
+      </select>
+    </div>
+
+    <div style="margin:10px 0;">
+      <label style="font-size:12px;color:#666;">🏷️ เลขพัสดุ (Tracking)</label>
+      <input type="text" id="spTracking" placeholder="TH1234567890" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;">
+    </div>
+
+    <div style="margin:10px 0;">
+      <label style="font-size:12px;color:#666;">📷 รูปใบขนส่ง (เลือกได้หลายรูป)</label>
+      <input type="file" id="spPhotos" accept="image/*" multiple onchange="previewShipmentPhotos()" style="width:100%;">
+      <div id="spPhotoPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
+    </div>
+
+    <div style="margin:10px 0;">
+      <label style="font-size:12px;color:#666;">✉️ ข้อความที่ส่งให้ลูกค้า (ระบบจะสร้างให้อัตโนมัติ — แก้ไขได้)</label>
+      <textarea id="spMessage" rows="7" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;resize:vertical;font-family:inherit;"></textarea>
+      <div style="font-size:11px;color:#999;margin-top:4px;">ปล่อยว่าง→ ระบบไปข้อความ default ให้เอง</div>
+    </div>
+
+    <div style="margin:10px 0;">
+      <label style="display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="spSendLine" checked>
+        <span>📱 ส่ง LINE หาลูกค้าทันที</span>
+      </label>
+      <div style="font-size:11px;color:#888;margin-top:2px;">(จะส่งได้ถ้าลูกค้ามี line_user_id ผูกไว้)</div>
+    </div>
+
+    <div id="spStatus" style="margin:8px 0;font-size:13px;"></div>
+
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" style="flex:1;" onclick="closeShipmentPhotoModal()">ยกเลิก</button>
+      <button class="btn btn-primary" style="flex:2;background:#ff6b0f;" onclick="submitShipmentPhoto()">📤 อัปโหลด + ส่ง</button>
     </div>
   </div>
 </div>

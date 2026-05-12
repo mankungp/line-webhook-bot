@@ -1415,6 +1415,60 @@ app.post('/api/line/push', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// LINE push multi-message (text + image)
+app.post('/api/line/push-multi', async function(req, res) {
+  try {
+    var token = req.headers['x-admin-token'] || '';
+    if (!ADMIN_TOKEN || token !== ADMIN_TOKEN) return res.status(403).json({ error: 'forbidden' });
+    if (!LINE_CHANNEL_ACCESS_TOKEN) return res.status(503).json({ error: 'LINE token not configured' });
+    var to = req.body && req.body.to;
+    var messages = req.body && req.body.messages;
+    if (!to || !messages || !messages.length) return res.status(400).json({ error: 'to + messages[] required' });
+    var r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN
+      },
+      body: JSON.stringify({ to: to, messages: messages.slice(0, 5) }) // max 5
+    });
+    var ok = r.ok;
+    var detail = await r.text();
+    res.status(ok ? 200 : 502).json({ ok: ok, status: r.status, detail: detail });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Proxy shipment photo upload (Render → Mac via ngrok, pass through binary)
+app.post('/api/orders/:id/shipment-photo', async function(req, res) {
+  try {
+    var https = require('https');
+    var http = require('http');
+    var urlObj = new URL(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/shipment-photo');
+    var isHttps = urlObj.protocol === 'https:';
+    var lib = isHttps ? https : http;
+    var headers = Object.assign({}, req.headers);
+    delete headers.host;
+    headers['X-Admin-Token'] = ADMIN_TOKEN;
+    var options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: headers
+    };
+    var proxyReq = lib.request(options, function(proxyRes) {
+      var body = '';
+      proxyRes.on('data', function(c) { body += c; });
+      proxyRes.on('end', function() {
+        res.status(proxyRes.statusCode);
+        try { res.json(JSON.parse(body)); } catch (e) { res.send(body); }
+      });
+    });
+    proxyReq.on('error', function(e) { res.status(500).json({ error: e.message }); });
+    req.pipe(proxyReq);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Push product to a channel (Lazada/Shopee/TikTok)
 app.post('/api/products/:id/push-to-channel', async function(req, res) {
   try {
