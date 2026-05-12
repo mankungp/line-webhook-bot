@@ -83,11 +83,6 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
   <input type="text" id="searchBox" placeholder="🔍 ค้นหาสินค้า..." oninput="onSearch()">
   <select id="catFilter" onchange="loadProducts()" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
     <option value="">ทุกหมวด</option>
-    <option value="agricultural">เกษตร</option>
-    <option value="motorcycle">มอเตอร์ไซค์</option>
-    <option value="lawnmower">เครื่องตัดหญ้า</option>
-    <option value="pump">ปั๊มน้ำ</option>
-    <option value="other">อื่นๆ</option>
   </select>
 </div>
 
@@ -216,6 +211,23 @@ function loginLine() {
 // ===== Products =====
 async function loadShopInfo() {
   try { var r = await fetch('/api/shop'); SHOP_INFO = await r.json(); } catch (e) {}
+}
+
+async function loadCategories() {
+  try {
+    var r = await fetch('/api/categories');
+    var d = await r.json();
+    var cats = Array.isArray(d) ? d : (d.categories || []);
+    var sel = document.getElementById('catFilter');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">ทุกหมวด</option>';
+    cats.forEach(function(c) {
+      var id = c.id || c.key;
+      var name = c.name || id;
+      sel.innerHTML += '<option value="' + escapeAttr(id) + '">' + escapeHtml(name) + '</option>';
+    });
+    if (current) sel.value = current;
+  } catch (e) { console.error('loadCategories:', e); }
 }
 
 async function loadProducts() {
@@ -605,6 +617,7 @@ function escapeAttr(s) { return escapeHtml(s); }
 // ===== Init =====
 (async function() {
   await loadShopInfo();
+  await loadCategories();
   await loadMe();
   await loadProducts();
   renderCartFab();
