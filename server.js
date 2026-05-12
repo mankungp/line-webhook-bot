@@ -49,6 +49,71 @@ app.get('/admin/login', function(req, res) {
 });
 
 app.use('/admin', express.static(path.join(__dirname, 'admin-panel')));
+
+// Customer storefront
+app.get('/shop', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'shop.html'));
+});
+app.get('/shop/', function(req, res) {
+  res.sendFile(path.join(__dirname, 'admin-panel', 'shop.html'));
+});
+
+// Shop API proxy
+app.post('/api/shop/orders', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/shop/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.cookie || '' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/shop/orders/:id', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/shop/orders/' + req.params.id, {
+      headers: { 'Cookie': req.headers.cookie || '' }
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/shop/orders/:id/qr', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/shop/orders/' + req.params.id + '/qr', {
+      headers: { 'Cookie': req.headers.cookie || '' }
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/shop/orders/:id/slip', async function(req, res) {
+  try {
+    var https = require('https');
+    var http = require('http');
+    var urlObj = new URL(LOCAL_API_BASE + '/api/shop/orders/' + req.params.id + '/slip');
+    var isHttps = urlObj.protocol === 'https:';
+    var lib = isHttps ? https : http;
+    var headers = Object.assign({}, req.headers);
+    delete headers.host;
+    headers['Cookie'] = req.headers.cookie || '';
+    var options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: headers
+    };
+    var proxyReq = lib.request(options, function(proxyRes) {
+      var body = '';
+      proxyRes.on('data', function(c) { body += c; });
+      proxyRes.on('end', function() {
+        res.status(proxyRes.statusCode);
+        try { res.json(JSON.parse(body)); } catch (e) { res.send(body); }
+      });
+    });
+    proxyReq.on('error', function(e) { res.status(500).json({ error: e.message }); });
+    req.pipe(proxyReq);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.get('/', function(req, res) {
   res.send('Kerdkarnkaset is ALIVE!');
 });
