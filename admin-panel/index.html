@@ -864,6 +864,16 @@ input:focus, textarea:focus, select:focus {
           <option value="false">❌ สินค้าหมด</option>
           <option value="low">⚠️ ใกล้หมด (1-5)</option>
         </select>
+        <select id="pChannelFilter" onchange="loadProducts()" title="กรองตามสถานะการเชื่อมต่อช่องทาง">
+          <option value="">ทุกช่องทาง</option>
+          <option value="complete">✅ ครบ 3 ช่อง</option>
+          <option value="incomplete">⚠️ ยังไม่ครบ 3 ช่อง</option>
+          <option value="lazada_only">🛍️ มีแต่ Lazada</option>
+          <option value="missing_shopee">🛍 ขาด Shopee</option>
+          <option value="missing_tiktok">🎵 ขาด TikTok</option>
+          <option value="missing_lazada">📦 ขาด Lazada</option>
+          <option value="no_channel">🚫 ยังไม่มีช่องทาง</option>
+        </select>
       </div>
       <div class="product-grid" id="productGrid">
         <div class="empty-state">กำลังโหลด...</div>
@@ -2298,12 +2308,15 @@ async function loadProducts(opts) {
   var category = document.getElementById('pCategoryFilter').value;
   var stockEl = document.getElementById('pStockFilter');
   var stockFilter = stockEl ? stockEl.value : '';
+  var chEl = document.getElementById('pChannelFilter');
+  var channelFilter = chEl ? chEl.value : '';
 
   if (!append) pProductsState.page = 1;
   var url = '/api/products?limit=' + pProductsState.limit + '&page=' + pProductsState.page;
   if (search) url += '&search=' + search;
   if (category) url += '&category=' + category;
   if (stockFilter) url += '&inStock=' + stockFilter;
+  if (channelFilter) url += '&channelStatus=' + channelFilter;
 
   try {
     var res = await fetch(url);
@@ -2370,12 +2383,71 @@ function renderProducts(list) {
     if (p.repair_price != null && p.repair_price > 0) html += '<div style="font-size:12px;color:#0a8855;">ช่างหน้าร้าน: ' + numFormat(p.repair_price) + '</div>';
     if (p.hide_from_tech) html += '<div style="display:inline-block;margin-top:4px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;">🚫 ซ่อนจากช่าง</div>';
     html += '<div class="product-stock ' + stockClass + '">' + stockText + '</div>';
+    // ช่องทางที่เชื่อม (badge แถวเล็ก)
+    html += renderChannelBadges(p);
     html += '<div class="product-actions">';
     html += '<button class="btn btn-secondary btn-sm" onclick="editProduct(' + p.id + ')">แก้ไข</button>';
+    var cs = p.channelStatus || {};
+    if (!cs.complete) {
+      html += '<button class="btn btn-sm" style="background:#ff9800;color:#fff;" onclick="openPushChannelModal(' + p.id + ')" title="ผลักไปช่องที่ยังไม่มี">📤 Push</button>';
+    }
     html += '<button class="btn btn-danger btn-sm" onclick="deleteProduct(' + p.id + ')">ลบ</button>';
     html += '</div></div>';
   });
   grid.innerHTML = html;
+}
+
+// ===== Channel badges + Push modal =====
+function renderChannelBadges(p) {
+  var cs = p.channelStatus || { lazada: false, shopee: false, tiktok: false };
+  var pill = function(on, label) {
+    return '<span style="display:inline-block;padding:2px 8px;margin:2px 2px 0 0;border-radius:10px;font-size:11px;'
+      + (on ? 'background:#0a8;color:#fff;' : 'background:#eee;color:#999;text-decoration:line-through;')
+      + '">' + label + '</span>';
+  };
+  return '<div style="margin:6px 0;">'
+    + pill(cs.lazada, '📦 Lazada')
+    + pill(cs.shopee, '🛍 Shopee')
+    + pill(cs.tiktok, '🎵 TikTok')
+    + '</div>';
+}
+
+async function openPushChannelModal(productId) {
+  var p = (products || []).find(function(x) { return x.id == productId; });
+  if (!p) { alert('ไม่พบสินค้า'); return; }
+  var cs = p.channelStatus || {};
+  var opts = [];
+  if (!cs.lazada) opts.push({ key:'lazada', label:'📦 Lazada', ready:true });
+  if (!cs.shopee) opts.push({ key:'shopee', label:'🛍 Shopee (รอ API approval)', ready:false });
+  if (!cs.tiktok) opts.push({ key:'tiktok', label:'🎵 TikTok (รอ API approval)', ready:false });
+  if (opts.length === 0) { alert('สินค้านี้อยู่ครบ 3 ช่องทางแล้ว'); return; }
+  var choice = prompt('เลือกช่องทางที่ต้องการผลักสินค้า "' + p.name + '" ไป:\n\n' + opts.map(function(o,i){ return (i+1)+'. '+o.label+(o.ready?'':' [⏳ ยังไม่พร้อม]'); }).join('\n') + '\n\nพิมพ์เลขตัวเลือก (1-' + opts.length + '):');
+  if (!choice) return;
+  var idx = parseInt(choice) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= opts.length) { alert('เลขไม่ถูกต้อง'); return; }
+  var ch = opts[idx];
+  if (!ch.ready) {
+    alert('⏳ ช่องทาง ' + ch.label + ' ยังไม่พร้อม— รอ API approval จาก platform ก่อน');
+    return;
+  }
+  try {
+    var r = await fetch('/api/products/' + productId + '/push-to-channel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: ch.key })
+    });
+    var data = await r.json();
+    if (!r.ok) {
+      var msg = data.error || ('HTTP ' + r.status);
+      if (data.suggestion) msg += '\n\n💡 ' + data.suggestion;
+      alert('❌ ' + msg);
+      return;
+    }
+    alert('✅ Push สำเร็จ: ' + JSON.stringify(data));
+    loadProducts();
+  } catch (e) {
+    alert('❌ ผิดพลาด: ' + e.message);
+  }
 }
 
 function updateProductStats(arg) {
