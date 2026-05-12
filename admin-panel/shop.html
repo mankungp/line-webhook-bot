@@ -404,12 +404,18 @@ async function loadCategories() {
   } catch (e) { console.error('loadCategories:', e); }
 }
 
-async function loadProducts() {
+async function loadProducts(append) {
+  if (PROD_LOADING) return;
+  PROD_LOADING = true;
   var grid = document.getElementById('productGrid');
-  grid.innerHTML = '<div class="spinner"></div>';
   var search = document.getElementById('searchBox').value.trim();
   var cat = document.getElementById('catFilter').value;
-  var url = '/api/products?limit=100';
+  if (!append) {
+    grid.innerHTML = '<div class="spinner"></div>';
+    PROD_PAGE = 1;
+    PRODUCTS = [];
+  }
+  var url = '/api/products?limit=' + PROD_PAGE_SIZE + '&page=' + PROD_PAGE;
   if (search) {
     var tokens = search.split(/\s+/).filter(Boolean);
     url += '&search=' + encodeURIComponent(tokens[0]);
@@ -417,22 +423,31 @@ async function loadProducts() {
   if (cat) url += '&category=' + encodeURIComponent(cat);
   try {
     var r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
-    PRODUCTS = (d.products || []).filter(function(p) { return (p.stock || 0) > 0; });
-    // multi-token AND
+    PROD_TOTAL = d.total || 0;
+    var batch = (d.products || []).filter(function(p) { return (p.stock || 0) > 0; });
     if (search) {
-      var tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
-      if (tokens.length > 1) {
-        PRODUCTS = PRODUCTS.filter(function(p) {
+      var ts = search.toLowerCase().split(/\s+/).filter(Boolean);
+      if (ts.length > 1) {
+        batch = batch.filter(function(p) {
           var hay = ((p.name||'') + ' ' + (p.sku||'') + ' ' + ((p.tags||[]).join(' '))).toLowerCase();
-          return tokens.every(function(t) { return hay.indexOf(t) >= 0; });
+          return ts.every(function(t) { return hay.indexOf(t) >= 0; });
         });
       }
     }
+    PRODUCTS = append ? PRODUCTS.concat(batch) : batch;
     renderProducts();
   } catch (e) {
-    grid.innerHTML = '<div class="empty-state">❌ โหลดสินค้าไม่ได้</div>';
+    console.error('loadProducts:', e);
+    if (!append) grid.innerHTML = '<div class="empty-state">❌ โหลดสินค้าไม่ได้: ' + e.message + '</div>';
   }
+  PROD_LOADING = false;
+}
+
+async function loadMoreProducts() {
+  PROD_PAGE += 1;
+  await loadProducts(true);
 }
 
 function pickPrice(p) {
