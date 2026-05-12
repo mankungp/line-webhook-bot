@@ -471,7 +471,30 @@ function renderProducts() {
     html += '<div class="stock ' + stockCls + '">คงเหลือ ' + stock + ' ' + escapeHtml(p.unit || 'ชิ้น') + '</div>';
     html += '</div>';
   });
+  // Load more / footer status
+  if (PRODUCTS.length < PROD_TOTAL) {
+    var remaining = PROD_TOTAL - PRODUCTS.length;
+    html += '<div style="grid-column:1/-1;text-align:center;padding:14px;">' +
+      '<button class="btn-primary" style="width:auto;padding:10px 24px;" onclick="loadMoreProducts()">⬇️ โหลดเพิ่ม (เหลือ ' + remaining + ' จาก ' + PROD_TOTAL + ')</button></div>';
+  } else if (PRODUCTS.length > 0) {
+    html += '<div style="grid-column:1/-1;text-align:center;padding:14px;color:#999;font-size:13px;">— ครบหมด ' + PROD_TOTAL + ' รายการ —</div>';
+  }
   grid.innerHTML = html;
+  setupInfiniteScroll();
+}
+
+var __scrollAttached = false;
+function setupInfiniteScroll() {
+  if (__scrollAttached) return;
+  __scrollAttached = true;
+  window.addEventListener('scroll', function() {
+    if (PROD_LOADING) return;
+    if (PRODUCTS.length >= PROD_TOTAL) return;
+    if (document.getElementById('tabShop').style.display === 'none') return;
+    var scrolled = window.scrollY + window.innerHeight;
+    var height = document.documentElement.scrollHeight;
+    if (scrolled > height * 0.85) loadMoreProducts();
+  });
 }
 
 function onSearch() {
