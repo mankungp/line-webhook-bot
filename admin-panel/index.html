@@ -1897,9 +1897,10 @@ input:focus, textarea:focus, select:focus {
           <textarea id="pDesc" style="height:70px;resize:vertical;"></textarea>
         </div>
         <div class="form-group">
-          <label>รูปสินค้า</label>
-          <input type="file" id="pImage" accept="image/*">
-          <img id="pImagePreview" style="display:none;width:200px;margin-top:10px;border-radius:8px;">
+          <label>รูปสินค้า (เพิ่มได้หลายรูป)</label>
+          <input type="file" id="pImage" accept="image/*" multiple>
+          <div style="font-size:11px;color:#999;margin-top:4px;">เลือกได้หลายไฟล์พร้อมกัน · กด“⭐”เพื่อตั้งรูปหลัก · “🗑️”ลบ</div>
+          <div id="pImageGallery" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;"></div>
         </div>
         <div class="form-group">
           <label>Tags (คั่นด้วย ,)</label>
@@ -2772,7 +2773,7 @@ function openProductModal() {
   document.getElementById('productModal').classList.add('active');
   document.getElementById('pForm').reset();
   document.getElementById('pId').value = '';
-  document.getElementById('pImagePreview').style.display = 'none';
+  renderImageGallery(null, [], '');
   document.getElementById('pModalTitle').textContent = 'เพิ่มสินค้าใหม่';
   switchProductTab('general');
   renderChannelsList({});
@@ -2817,13 +2818,7 @@ function editProduct(id) {
   document.getElementById('pHeight').value = p.height || (typeof dims === 'object' ? dims.height : '') || '';
   document.getElementById('pDimensions').value = p.dimensions || '';
   document.getElementById('pTags').value = (p.tags || []).join(', ');
-  if (p.imageUrl) {
-    var img = document.getElementById('pImagePreview');
-    img.src = p.imageUrl;
-    img.style.display = 'block';
-  } else {
-    document.getElementById('pImagePreview').style.display = 'none';
-  }
+  renderImageGallery(p.id, p.images || (p.imageUrl ? [p.imageUrl] : []), p.imageUrl || '');
   switchProductTab('general');
   renderChannelsList(p.channels || {});
   renderVariants(p.variants || []);
@@ -2832,6 +2827,61 @@ function editProduct(id) {
 
 function closeProductModal() {
   document.getElementById('productModal').classList.remove('active');
+}
+
+// ===== Image Gallery (multi-image) =====
+function renderImageGallery(productId, images, mainUrl) {
+  var gallery = document.getElementById('pImageGallery');
+  if (!gallery) return;
+  images = images || [];
+  if (!images.length) {
+    gallery.innerHTML = '<div style="color:#999;font-size:12px;padding:8px;">ยังไม่มีรูป เลือกไฟล์ด้านบนเพื่ออัปโหลด</div>';
+    return;
+  }
+  var html = '';
+  images.forEach(function(url) {
+    var isMain = url === mainUrl;
+    html += '<div style="position:relative;width:100px;height:100px;border:'+ (isMain?'3px solid #f0a500':'1px solid #ddd') +';border-radius:8px;overflow:hidden;">' +
+      '<img src="' + escapeHtml(url) + '" style="width:100%;height:100%;object-fit:cover;display:block;">' +
+      (productId ? (
+        '<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);display:flex;justify-content:space-between;padding:2px;">' +
+          '<button type="button" onclick="setMainImage(' + productId + ',\'' + url + '\')" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;" title="ตั้งเป็นรูปหลัก">' + (isMain?'⭐':'☆') + '</button>' +
+          '<button type="button" onclick="deleteProductImage(' + productId + ',\'' + url + '\')" style="background:none;border:none;color:#fff;cursor:pointer;font-size:13px;" title="ลบ">🗑️</button>' +
+        '</div>'
+      ) : '') +
+      '</div>';
+  });
+  gallery.innerHTML = html;
+}
+
+async function setMainImage(productId, url) {
+  try {
+    var r = await fetch('/api/products/' + productId + '/image/main', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: url })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    // reload product
+    var pr = await fetch('/api/products/' + productId);
+    var p = await pr.json();
+    renderImageGallery(p.id, p.images || [], p.imageUrl || '');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function deleteProductImage(productId, url) {
+  if (!confirm('ลบรูปนี้?')) return;
+  try {
+    var r = await fetch('/api/products/' + productId + '/image', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: url })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    renderImageGallery(productId, d.images || [], d.imageUrl || '');
+  } catch (e) { alert('❌ ' + e.message); }
 }
 
 async function saveProduct(e) {
@@ -2886,9 +2936,11 @@ async function saveProduct(e) {
     if (result && result.error) { alert('❌ ' + result.error); return; }
     var imgInput = document.getElementById('pImage');
     var savedId = result && (result.id || (result.product && result.product.id));
-    if (imgInput.files && imgInput.files[0] && savedId) {
+    if (imgInput.files && imgInput.files.length && savedId) {
       var formData = new FormData();
-      formData.append('image', imgInput.files[0]);
+      for (var i = 0; i < imgInput.files.length; i++) {
+        formData.append('images', imgInput.files[i]);
+      }
       await fetch('/api/products/' + savedId + '/image', { method: 'POST', body: formData });
     }
     closeProductModal();

@@ -1489,6 +1489,29 @@ app.post('/api/products/:id/image', async function(req, res) {
   }
 });
 
+// Delete image from array + set main image
+app.delete('/api/products/:id/image', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/' + req.params.id + '/image', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/products/:id/image/main', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/' + req.params.id + '/image/main', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ ORDERS PROXY ============
 app.get('/api/orders', async function(req, res) {
   try {
