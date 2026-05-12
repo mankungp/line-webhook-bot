@@ -195,6 +195,10 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 <script>
 var ME = null;
 var PRODUCTS = [];
+var PROD_PAGE = 1;
+var PROD_PAGE_SIZE = 50;
+var PROD_LOADING = false;
+var PROD_TOTAL = 0;
 var CART = JSON.parse(localStorage.getItem('shop_cart') || '[]');
 var COURIERS = [];
 var SHOP_INFO = null;
