@@ -2564,17 +2564,32 @@ function renderChannelsList(channels) {
     html += '<div>' + badge + '</div>';
     html += '</div>';
 
-    // Linked SKU display (if linked)
+    // Linked SKU display (if linked) + ปรับราคาได้ตรงนี่
     if (linkedSku) {
+      var curPrice = (ch.price !== undefined && ch.price !== null) ? ch.price : '';
+      var curQty = ch.quantity;
       html += '<div data-linked="1" style="background:#fff; border:1px solid #d1fae5; border-radius:6px; padding:8px 10px; margin-bottom:8px;">';
-      html += '<div style="display:flex; align-items:center; gap:8px;">';
-      html += '<div style="flex:1;">';
-      if (linkedName) html += '<div style="font-size:13px; font-weight:500;">' + escapeHtml(linkedName) + '</div>';
+      html += '<div style="display:flex; align-items:flex-start; gap:8px;">';
+      html += '<div style="flex:1; min-width:0;">';
+      if (linkedName) html += '<div style="font-size:13px; font-weight:500; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(linkedName) + '</div>';
       html += '<div style="font-size:11px; color:#6b7280; font-family:monospace;">' + escapeHtml(String(linkedSku)) + '</div>';
-      if (ch.price !== undefined && ch.price !== null) html += '<div style="font-size:11px; color:#666;">ราคา: ' + ch.price + '฿' + (ch.quantity !== undefined ? ' · stock: ' + ch.quantity : '') + '</div>';
+      if (curQty !== undefined) html += '<div style="font-size:11px; color:#666;margin-top:2px;">Stock: ' + curQty + '</div>';
       html += '</div>';
       html += '<button type="button" class="btn btn-sm btn-danger" onclick="unlinkChannel(\'' + c.key + '\')" title="ยกเลิกการผูก">✖</button>';
-      html += '</div></div>';
+      html += '</div>';
+      // ช่องแก้ราคา + ปุ่ม push
+      html += '<div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
+      html += '<label style="font-size:12px;color:#666;white-space:nowrap;">ราคา ' + escapeHtml(c.label.replace(/^[^\s]+\s+/, '')) + ':</label>';
+      html += '<input type="number" min="0" step="0.01" value="' + escapeHtml(String(curPrice)) + '" id="chPrice-' + c.key + '" ';
+      html += 'onchange="updateChannelPrice(\'' + c.key + '\', this.value)" ';
+      html += 'style="width:100px;padding:4px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;" placeholder="บาท">';
+      if (c.apiReady) {
+        html += '<button type="button" onclick="pushChannelPrice(\'' + c.key + '\')" style="background:' + c.color + ';color:#fff;border:none;padding:5px 12px;border-radius:5px;font-size:12px;cursor:pointer;" title="ส่งราคาไป ' + escapeHtml(c.label) + ' ทันที">📤 ส่งราคา</button>';
+      } else {
+        html += '<span style="font-size:11px;color:#999;">(รอ API ที่พร้อม)</span>';
+      }
+      html += '</div>';
+      html += '</div>';
     }
 
     // Search input
@@ -2700,6 +2715,44 @@ function unlinkChannel(key) {
   if (!def) return;
   channelsState[key] = { enabled: false, price: null, sync_status: 'draft' };
   renderChannelsList(channelsState);
+}
+
+// อัปเดตราคา channel ใน state (ยังไม่ push — รอ save หรือ push ปุ่ม manual)
+function updateChannelPrice(key, value) {
+  if (!channelsState[key]) channelsState[key] = {};
+  var price = parseFloat(value);
+  channelsState[key].price = isNaN(price) ? null : price;
+}
+
+// ส่งราคาไป platform ทันที (ตอนนี้รองรับ Lazada)
+async function pushChannelPrice(key) {
+  var def = CHANNEL_DEFS.find(function(c) { return c.key === key; });
+  if (!def) return;
+  var input = document.getElementById('chPrice-' + key);
+  var price = parseFloat(input && input.value);
+  if (isNaN(price) || price <= 0) { alert('ระบุราคาให้ถูกต้อง'); return; }
+  var productId = document.getElementById('pId').value;
+  if (!productId) { alert('บันทึกสินค้าก่อน แล้วค่อยส่งราคา'); return; }
+  if (!confirm('ส่งราคา ' + price.toLocaleString() + ' บาท ไป ' + def.label + ' ทันที?')) return;
+
+  channelsState[key].price = price;
+  // call backend route push (สำหรับ Lazada — platform อื่นยังไม่พร้อม)
+  if (key === 'lazada') {
+    try {
+      var skuSeller = channelsState[key].lazada_sku_seller || '';
+      var skuId = channelsState[key].lazada_sku_id || '';
+      var r = await fetch('/api/marketplace/lazada/push-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku_id: skuId, sku_seller: skuSeller, price: price })
+      });
+      var d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      alert('✅ ส่งราคา ' + def.label + ' สำเร็จ\nราคา: ' + price.toLocaleString() + ' บาท');
+    } catch (e) { alert('❌ ส่งพลาด: ' + e.message); }
+  } else {
+    alert('⏳ ' + def.label + ' API ยังไม่พร้อม — บันทึกราคาไว้ในระบบจะได้ตอน save');
+  }
 }
 
 function collectChannels() {
