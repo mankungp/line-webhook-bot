@@ -1621,6 +1621,51 @@ app.get('/api/orders/:id/invoice/pdf', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/orders/:id/shipping-label/pdf', async function(req, res) {
+  try {
+    var url = LOCAL_API_BASE + '/api/orders/' + req.params.id + '/shipping-label/pdf';
+    var r = await fetch(url);
+    if (!r.ok) return res.status(r.status).send(await r.text());
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', r.headers.get('content-disposition') || 'inline');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Couriers proxy
+app.get('/api/couriers', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/couriers');
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/couriers', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/couriers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/couriers/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/couriers/' + req.params.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/couriers/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/couriers/' + req.params.id, { method: 'DELETE' });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ CUSTOMERS PROXY ============
 app.get('/api/customers', async function(req, res) {
   try {

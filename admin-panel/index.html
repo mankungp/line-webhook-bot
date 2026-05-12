@@ -3193,6 +3193,9 @@ function renderOrders(list) {
     // ปุ่มพิมพ์แสดงทุกสถานะ (รวม cancelled เผื่อดูประวัติ/พิมพ์ซ้ำ)
     html += '<button class="btn btn-secondary btn-sm" onclick="openOrderVideos(' + o.id + ')">🎥 วิดีโอ</button> ';
     html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
+    if (o.customerAddress) {
+      html += '<button class="btn btn-sm" style="background:#06c755;color:#fff;" onclick="printShippingLabel(' + o.id + ')" title="ใบปะหน้า 4x6″">🚚 ใบปะหน้า</button> ';
+    }
     if (o.status !== 'cancelled' && o.status !== 'completed') {
       html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
     }
@@ -3467,8 +3470,100 @@ function openOrderModal() {
   document.getElementById('oShipping').value = '0';
   document.getElementById('oSource').value = 'manual';
   document.getElementById('oNotes').value = '';
+  var tr = document.getElementById('oTracking'); if (tr) tr.value = '';
   document.getElementById('oStatus').textContent = '';
+  loadCouriersForOrder();
   renderOrderItems();
+}
+
+// ===== Couriers =====
+var __COURIERS_CACHE = [];
+async function loadCouriersForOrder() {
+  try {
+    var r = await fetch('/api/couriers');
+    var d = await r.json();
+    __COURIERS_CACHE = d.couriers || [];
+    var sel = document.getElementById('oCourier');
+    if (!sel) return;
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— ไม่ระบุ —</option>';
+    __COURIERS_CACHE.filter(function(c) { return c.enabled !== false; }).forEach(function(c) {
+      sel.innerHTML += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + (c.phone ? ' (' + escapeHtml(c.phone) + ')' : '') + '</option>';
+    });
+    if (current) sel.value = current;
+  } catch (e) { console.error('loadCouriers:', e); }
+}
+
+function openCouriersModal() {
+  document.getElementById('couriersModal').classList.add('active');
+  renderCouriersList();
+}
+
+function printShippingLabel(orderId) {
+  window.open('/api/orders/' + orderId + '/shipping-label/pdf', '_blank');
+}
+function closeCouriersModal() {
+  document.getElementById('couriersModal').classList.remove('active');
+  loadCouriersForOrder();
+}
+
+async function renderCouriersList() {
+  var box = document.getElementById('couriersList');
+  try {
+    var r = await fetch('/api/couriers');
+    var d = await r.json();
+    var arr = d.couriers || [];
+    if (!arr.length) { box.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">ยังไม่มีขนส่ง</div>'; return; }
+    var html = '';
+    arr.forEach(function(c) {
+      html += '<div style="border:1px solid #eee;padding:8px;margin-bottom:6px;border-radius:6px;display:flex;align-items:center;gap:6px;">';
+      html += '<input type="checkbox" ' + (c.enabled !== false ? 'checked' : '') + ' onchange="toggleCourier(\'' + c.id + '\', this.checked)">';
+      html += '<div style="flex:1;"><strong>' + escapeHtml(c.name) + '</strong>';
+      if (c.phone) html += ' <small style="color:#666;">' + escapeHtml(c.phone) + '</small>';
+      html += '</div>';
+      html += '<button class="btn btn-danger btn-sm" onclick="deleteCourier(\'' + c.id + '\')">🗑️</button>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = '<div style="color:#c00;">err: ' + e.message + '</div>'; }
+}
+
+async function addCourier() {
+  var name = document.getElementById('newCourierName').value.trim();
+  if (!name) { alert('ระบุชื่อขนส่ง'); return; }
+  var phone = document.getElementById('newCourierPhone').value.trim();
+  var url = document.getElementById('newCourierUrl').value.trim();
+  try {
+    var r = await fetch('/api/couriers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, phone: phone, tracking_url: url, enabled: true })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    document.getElementById('newCourierName').value = '';
+    document.getElementById('newCourierPhone').value = '';
+    document.getElementById('newCourierUrl').value = '';
+    renderCouriersList();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function toggleCourier(id, enabled) {
+  try {
+    await fetch('/api/couriers/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: enabled })
+    });
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function deleteCourier(id) {
+  if (!confirm('ลบขนส่งนี้?')) return;
+  try {
+    await fetch('/api/couriers/' + id, { method: 'DELETE' });
+    renderCouriersList();
+  } catch (e) { alert('❌ ' + e.message); }
 }
 
 function closeOrderModal() {
@@ -3692,7 +3787,9 @@ async function submitOrder() {
     discount: discount,
     shippingFee: shipping,
     total: subtotal - discount + shipping,
-    notes: document.getElementById('oNotes').value.trim()
+    notes: document.getElementById('oNotes').value.trim(),
+    courier: (document.getElementById('oCourier') && document.getElementById('oCourier').value) || '',
+    trackingNo: (document.getElementById('oTracking') && document.getElementById('oTracking').value.trim()) || ''
   };
 
   document.getElementById('oStatus').innerHTML = '⏳ กำลังบันทึก...';
@@ -4002,6 +4099,21 @@ setInterval(loadBotCustomers, 30000);
       </div>
 
       <div style="margin-top:8px;">
+        <label style="font-size:12px; color:#666;">🚚 ขนส่งภายนอก</label>
+        <div style="display:flex; gap:6px;">
+          <select id="oCourier" style="flex:1; padding:6px; border-radius:6px; border:1px solid #ddd;">
+            <option value="">— ไม่ระบุ —</option>
+          </select>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="openCouriersModal()" title="จัดการขนส่ง">⚙️</button>
+        </div>
+      </div>
+
+      <div style="margin-top:8px;">
+        <label style="font-size:12px; color:#666;">เลขพัสดุ (Tracking) — ถ้ามี</label>
+        <input type="text" id="oTracking" style="width:100%; padding:6px; border-radius:6px; border:1px solid #ddd;" placeholder="TH1234567890">
+      </div>
+
+      <div style="margin-top:8px;">
         <label style="font-size:12px; color:#666;">หมายเหตุ</label>
         <textarea id="oNotes" rows="2" style="width:100%; padding:6px; border-radius:6px; border:1px solid #ddd; resize:vertical;"></textarea>
       </div>
@@ -4012,6 +4124,28 @@ setInterval(loadBotCustomers, 30000);
     <div style="display:flex; gap:8px;">
       <button class="btn btn-secondary" style="flex:1;" onclick="closeOrderModal()">ยกเลิก</button>
       <button class="btn btn-primary" style="flex:1;" onclick="submitOrder()">บันทึกออเดอร์</button>
+    </div>
+  </div>
+</div>
+
+<!-- Couriers Modal -->
+<div class="modal" id="couriersModal">
+  <div class="modal-content" style="max-width: 520px;">
+    <button class="close-btn" onclick="closeCouriersModal()">×</button>
+    <h2>🚚 จัดการขนส่ง</h2>
+    <p style="color:#666;font-size:13px;">รายชื่อขนส่งที่ร้านใช้ประจำ — จะอยู่ใน dropdown ตอนคีย์ออเดอร์</p>
+
+    <div style="border:1px solid #eee;padding:12px;border-radius:8px;margin:12px 0;background:#fafafa;">
+      <h3 style="margin:0 0 8px;font-size:14px;">➕ เพิ่มขนส่งใหม่</h3>
+      <input type="text" id="newCourierName" placeholder="ชื่อขนส่ง *" style="width:100%; padding:6px; margin:4px 0; border:1px solid #ddd; border-radius:6px;">
+      <input type="text" id="newCourierPhone" placeholder="เบอร์โทรติดต่อ" style="width:100%; padding:6px; margin:4px 0; border:1px solid #ddd; border-radius:6px;">
+      <input type="text" id="newCourierUrl" placeholder="Tracking URL (ถ้ามี)" style="width:100%; padding:6px; margin:4px 0; border:1px solid #ddd; border-radius:6px;">
+      <button class="btn btn-primary btn-sm" onclick="addCourier()" style="margin-top:6px;">เพิ่ม</button>
+    </div>
+
+    <h3 style="margin:0 0 8px;font-size:14px;">รายชื่อขนส่ง</h3>
+    <div id="couriersList" style="max-height:300px;overflow-y:auto;">
+      <div style="text-align:center;color:#999;padding:20px;">⏳ กำลังโหลด...</div>
     </div>
   </div>
 </div>
