@@ -915,6 +915,7 @@ input:focus, textarea:focus, select:focus {
       <div class="toolbar">
         <button class="btn btn-success" onclick="openPosModal()" style="background:#0a8;color:white;">⚡ คีย์บิลด่วน</button>
         <button class="btn btn-primary" onclick="openOrderModal()">+ คีย์ออเดอร์</button>
+        <button class="btn btn-secondary" onclick="openCouriersModal()" title="จัดการขนส่ง">🚚 ขนส่ง</button>
         <button class="btn btn-secondary" onclick="loadOrders()">รีเฟรช</button>
         <button class="btn btn-secondary" onclick="syncLazadaOrders()" id="lzSyncOrdBtn">🔄 Sync Lazada (7 วัน)</button>
         <select id="oStatusFilter" onchange="loadOrders()">
@@ -3488,7 +3489,10 @@ async function loadCouriersForOrder() {
     var current = sel.value;
     sel.innerHTML = '<option value="">— ไม่ระบุ —</option>';
     __COURIERS_CACHE.filter(function(c) { return c.enabled !== false; }).forEach(function(c) {
-      sel.innerHTML += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + (c.phone ? ' (' + escapeHtml(c.phone) + ')' : '') + '</option>';
+      var label = escapeHtml(c.name);
+      if (c.service_area) label += ' — ' + escapeHtml(c.service_area);
+      if (c.phone) label += ' (' + escapeHtml(c.phone) + ')';
+      sel.innerHTML += '<option value="' + escapeHtml(c.id) + '">' + label + '</option>';
     });
     if (current) sel.value = current;
   } catch (e) { console.error('loadCouriers:', e); }
@@ -3507,46 +3511,90 @@ function closeCouriersModal() {
   loadCouriersForOrder();
 }
 
+var __COURIERS_LIST = [];
 async function renderCouriersList() {
   var box = document.getElementById('couriersList');
   try {
     var r = await fetch('/api/couriers');
     var d = await r.json();
-    var arr = d.couriers || [];
-    if (!arr.length) { box.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">ยังไม่มีขนส่ง</div>'; return; }
+    __COURIERS_LIST = d.couriers || [];
+    if (!__COURIERS_LIST.length) { box.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">ยังไม่มีขนส่ง</div>'; return; }
     var html = '';
-    arr.forEach(function(c) {
-      html += '<div style="border:1px solid #eee;padding:8px;margin-bottom:6px;border-radius:6px;display:flex;align-items:center;gap:6px;">';
-      html += '<input type="checkbox" ' + (c.enabled !== false ? 'checked' : '') + ' onchange="toggleCourier(\'' + c.id + '\', this.checked)">';
-      html += '<div style="flex:1;"><strong>' + escapeHtml(c.name) + '</strong>';
-      if (c.phone) html += ' <small style="color:#666;">' + escapeHtml(c.phone) + '</small>';
+    __COURIERS_LIST.forEach(function(c) {
+      html += '<div style="border:1px solid #eee;padding:10px;margin-bottom:8px;border-radius:8px;background:#fff;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;">';
+      html += '<input type="checkbox" ' + (c.enabled !== false ? 'checked' : '') + ' onchange="toggleCourier(\'' + c.id + '\', this.checked)" style="width:16px;height:16px;">';
+      html += '<div style="flex:1;"><strong style="font-size:14px;">' + escapeHtml(c.name) + '</strong>';
+      if (c.phone) html += ' <small style="color:#666;">☎ ' + escapeHtml(c.phone) + '</small>';
       html += '</div>';
-      html += '<button class="btn btn-danger btn-sm" onclick="deleteCourier(\'' + c.id + '\')">🗑️</button>';
+      html += '<button class="btn btn-secondary btn-sm" onclick="editCourier(\'' + c.id + '\')" title="แก้ไข">✏️</button> ';
+      html += '<button class="btn btn-danger btn-sm" onclick="deleteCourier(\'' + c.id + '\')" title="ลบ">🗑️</button>';
+      html += '</div>';
+      if (c.service_area) html += '<div style="font-size:12px;color:#555;margin-top:4px;">📍 ' + escapeHtml(c.service_area) + '</div>';
+      if (c.notes) html += '<div style="font-size:11px;color:#888;margin-top:2px;white-space:pre-wrap;">📌 ' + escapeHtml(c.notes) + '</div>';
+      if (c.tracking_url) html += '<div style="font-size:11px;color:#0066cc;margin-top:2px;">🔗 <a href="' + escapeHtml(c.tracking_url) + '" target="_blank" style="color:#0066cc;">' + escapeHtml(c.tracking_url) + '</a></div>';
       html += '</div>';
     });
     box.innerHTML = html;
   } catch (e) { box.innerHTML = '<div style="color:#c00;">err: ' + e.message + '</div>'; }
 }
 
-async function addCourier() {
+function resetCourierForm() {
+  document.getElementById('courierFormId').value = '';
+  document.getElementById('newCourierName').value = '';
+  document.getElementById('newCourierPhone').value = '';
+  document.getElementById('newCourierUrl').value = '';
+  document.getElementById('newCourierArea').value = '';
+  document.getElementById('newCourierNotes').value = '';
+  document.getElementById('courierFormTitle').textContent = '➕ เพิ่มขนส่งใหม่';
+  document.getElementById('courierFormSaveBtn').textContent = 'เพิ่ม';
+  document.getElementById('courierFormCancelBtn').style.display = 'none';
+}
+
+function editCourier(id) {
+  var c = (__COURIERS_LIST || []).find(function(x) { return x.id === id; });
+  if (!c) return;
+  document.getElementById('courierFormId').value = c.id;
+  document.getElementById('newCourierName').value = c.name || '';
+  document.getElementById('newCourierPhone').value = c.phone || '';
+  document.getElementById('newCourierUrl').value = c.tracking_url || '';
+  document.getElementById('newCourierArea').value = c.service_area || '';
+  document.getElementById('newCourierNotes').value = c.notes || '';
+  document.getElementById('courierFormTitle').textContent = '✏️ แก้ไขขนส่ง';
+  document.getElementById('courierFormSaveBtn').textContent = 'บันทึกการแก้ไข';
+  document.getElementById('courierFormCancelBtn').style.display = 'inline-block';
+  // scroll to top of modal
+  var modal = document.getElementById('couriersModal').querySelector('.modal-content');
+  if (modal) modal.scrollTop = 0;
+}
+
+async function saveCourierForm() {
   var name = document.getElementById('newCourierName').value.trim();
   if (!name) { alert('ระบุชื่อขนส่ง'); return; }
-  var phone = document.getElementById('newCourierPhone').value.trim();
-  var url = document.getElementById('newCourierUrl').value.trim();
+  var body = {
+    name: name,
+    phone: document.getElementById('newCourierPhone').value.trim(),
+    tracking_url: document.getElementById('newCourierUrl').value.trim(),
+    service_area: document.getElementById('newCourierArea').value.trim(),
+    notes: document.getElementById('newCourierNotes').value.trim()
+  };
+  var editId = document.getElementById('courierFormId').value;
   try {
-    var r = await fetch('/api/couriers', {
-      method: 'POST',
+    var url = '/api/couriers' + (editId ? '/' + encodeURIComponent(editId) : '');
+    var r = await fetch(url, {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, phone: phone, tracking_url: url, enabled: true })
+      body: JSON.stringify(body)
     });
     var d = await r.json();
     if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
-    document.getElementById('newCourierName').value = '';
-    document.getElementById('newCourierPhone').value = '';
-    document.getElementById('newCourierUrl').value = '';
+    resetCourierForm();
     renderCouriersList();
   } catch (e) { alert('❌ ' + e.message); }
 }
+
+// backward compat
+function addCourier() { return saveCourierForm(); }
 
 async function toggleCourier(id, enabled) {
   try {
@@ -4130,21 +4178,45 @@ setInterval(loadBotCustomers, 30000);
 
 <!-- Couriers Modal -->
 <div class="modal" id="couriersModal">
-  <div class="modal-content" style="max-width: 520px;">
+  <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y:auto;">
     <button class="close-btn" onclick="closeCouriersModal()">×</button>
     <h2>🚚 จัดการขนส่ง</h2>
     <p style="color:#666;font-size:13px;">รายชื่อขนส่งที่ร้านใช้ประจำ — จะอยู่ใน dropdown ตอนคีย์ออเดอร์</p>
 
+    <!-- Add/Edit Form -->
     <div style="border:1px solid #eee;padding:12px;border-radius:8px;margin:12px 0;background:#fafafa;">
-      <h3 style="margin:0 0 8px;font-size:14px;">➕ เพิ่มขนส่งใหม่</h3>
-      <input type="text" id="newCourierName" placeholder="ชื่อขนส่ง *" style="width:100%; padding:6px; margin:4px 0; border:1px solid #ddd; border-radius:6px;">
-      <input type="text" id="newCourierPhone" placeholder="เบอร์โทรติดต่อ" style="width:100%; padding:6px; margin:4px 0; border:1px solid #ddd; border-radius:6px;">
-      <input type="text" id="newCourierUrl" placeholder="Tracking URL (ถ้ามี)" style="width:100%; padding:6px; margin:4px 0; border:1px solid #ddd; border-radius:6px;">
-      <button class="btn btn-primary btn-sm" onclick="addCourier()" style="margin-top:6px;">เพิ่ม</button>
+      <h3 id="courierFormTitle" style="margin:0 0 8px;font-size:14px;">➕ เพิ่มขนส่งใหม่</h3>
+      <input type="hidden" id="courierFormId" value="">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div style="grid-column:span 2;">
+          <label style="font-size:11px;color:#666;">ชื่อขนส่ง *</label>
+          <input type="text" id="newCourierName" placeholder="เช่น Kerry / J&T / ขนส่งฟรี" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#666;">เบอร์โทรติดต่อ</label>
+          <input type="text" id="newCourierPhone" placeholder="081-xxx-xxxx" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#666;">Tracking URL</label>
+          <input type="text" id="newCourierUrl" placeholder="https://..." style="width:100%; padding:6px; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div style="grid-column:span 2;">
+          <label style="font-size:11px;color:#666;">📍 พื้นที่บริการ</label>
+          <input type="text" id="newCourierArea" placeholder="เช่น อ.โพนทอง จ.ร้อยเอ็ด / ไปได้ทั่วประเทศ" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:6px;">
+        </div>
+        <div style="grid-column:span 2;">
+          <label style="font-size:11px;color:#666;">📌 หมายเหตุอื่นๆ</label>
+          <textarea id="newCourierNotes" rows="2" placeholder="เช่น รอบเข้า-ออก จันทร์-ศุกร์ / ส่งไม่เกิน 5kg" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:6px; resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;">
+        <button class="btn btn-primary btn-sm" id="courierFormSaveBtn" onclick="saveCourierForm()">เพิ่ม</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetCourierForm()" style="display:none;" id="courierFormCancelBtn">ยกเลิกแก้ไข</button>
+      </div>
     </div>
 
     <h3 style="margin:0 0 8px;font-size:14px;">รายชื่อขนส่ง</h3>
-    <div id="couriersList" style="max-height:300px;overflow-y:auto;">
+    <div id="couriersList" style="max-height:340px;overflow-y:auto;">
       <div style="text-align:center;color:#999;padding:20px;">⏳ กำลังโหลด...</div>
     </div>
   </div>
