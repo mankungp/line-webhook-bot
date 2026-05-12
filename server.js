@@ -1434,6 +1434,24 @@ app.get('/api/products/channel-summary', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Notifications settings
+app.get('/api/settings/notifications', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/settings/notifications');
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/settings/notifications', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/settings/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/products/:id/image', async function(req, res) {
   // Multipart upload - pass through as binary (ใส่ admin token ไปด้วย)
   try {
