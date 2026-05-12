@@ -1392,6 +1392,29 @@ app.delete('/api/products/:id', async function(req, res) {
   }
 });
 
+// LINE push proxy — สำหรับ local-api/services อื่นที่ไม่มี LINE token (ผ่าน admin-token)
+app.post('/api/line/push', async function(req, res) {
+  try {
+    var token = req.headers['x-admin-token'] || '';
+    if (!ADMIN_TOKEN || token !== ADMIN_TOKEN) return res.status(403).json({ error: 'forbidden' });
+    if (!LINE_CHANNEL_ACCESS_TOKEN) return res.status(503).json({ error: 'LINE token not configured' });
+    var to = req.body && req.body.to;
+    var text = req.body && req.body.text;
+    if (!to || !text) return res.status(400).json({ error: 'to + text required' });
+    var r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN
+      },
+      body: JSON.stringify({ to: to, messages: [{ type: 'text', text: text }] })
+    });
+    var ok = r.ok;
+    var detail = await r.text();
+    res.status(ok ? 200 : 502).json({ ok: ok, status: r.status, detail: detail });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Push product to a channel (Lazada/Shopee/TikTok)
 app.post('/api/products/:id/push-to-channel', async function(req, res) {
   try {
