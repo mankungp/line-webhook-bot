@@ -858,6 +858,12 @@ input:focus, textarea:focus, select:focus {
           <option value="pump">เครื่องสูบน้ำ</option>
           <option value="other">อื่นๆ</option>
         </select>
+        <select id="pStockFilter" onchange="loadProducts()">
+          <option value="">สต็อกทั้งหมด</option>
+          <option value="true">✅ มีสินค้า</option>
+          <option value="false">❌ สินค้าหมด</option>
+          <option value="low">⚠️ ใกล้หมด (1-5)</option>
+        </select>
       </div>
       <div class="product-grid" id="productGrid">
         <div class="empty-state">กำลังโหลด...</div>
@@ -2243,11 +2249,14 @@ async function loadProducts(opts) {
   var append = opts.append === true;
   var search = encodeURIComponent(document.getElementById('pSearchBox').value);
   var category = document.getElementById('pCategoryFilter').value;
+  var stockEl = document.getElementById('pStockFilter');
+  var stockFilter = stockEl ? stockEl.value : '';
 
   if (!append) pProductsState.page = 1;
   var url = '/api/products?limit=' + pProductsState.limit + '&page=' + pProductsState.page;
   if (search) url += '&search=' + search;
   if (category) url += '&category=' + category;
+  if (stockFilter) url += '&inStock=' + stockFilter;
 
   try {
     var res = await fetch(url);
