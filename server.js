@@ -301,6 +301,7 @@ app.get('/api/marketplace/lazada/search-our-products', forwardWithCookie('GET'))
 app.get('/api/marketplace/lazada/search-sku', forwardWithCookie('GET'));
 app.get('/api/marketplace/lazada/match-detail', forwardWithCookie('GET'));
 app.post('/api/marketplace/lazada/sync-orders-recent', forwardWithCookie('POST'));
+app.post('/api/marketplace/lazada/import-orders', forwardWithCookie('POST'));
 app.post('/api/marketplace/lazada/push-stock', forwardWithCookie('POST'));
 app.post('/api/marketplace/lazada/import', forwardWithCookie('POST'));
 app.get('/api/marketplace/tiktok/config', forwardWithCookie('GET'));
