@@ -69,6 +69,15 @@ app.post('/api/shop/orders', async function(req, res) {
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+app.get('/api/shop/my-orders', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/shop/my-orders', {
+      headers: { 'Cookie': req.headers.cookie || '' }
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/shop/orders/:id', async function(req, res) {
   try {
     var r = await fetch(LOCAL_API_BASE + '/api/shop/orders/' + req.params.id, {

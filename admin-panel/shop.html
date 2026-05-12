@@ -73,12 +73,20 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 <body>
 
 <div class="topbar">
-  <h1>🌾 เกิดการเกษตร</h1>
+  <h1 onclick="showTab('shop')" style="cursor:pointer;">🌾 เกิดการเกษตร</h1>
   <div id="userArea">
     <a class="login-btn" href="#" onclick="loginLine();return false;">Login ด้วย LINE</a>
   </div>
 </div>
 
+<!-- Tab Bar -->
+<div id="tabBar" style="background:#fff;border-bottom:1px solid #eee;display:flex;">
+  <button id="tabShopBtn" onclick="showTab('shop')" style="flex:1;padding:12px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;border-bottom:3px solid #0a8;color:#0a8;">🛍️ สินค้า</button>
+  <button id="tabOrdersBtn" onclick="showTab('orders')" style="flex:1;padding:12px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;border-bottom:3px solid transparent;color:#666;">📆 ออเดอร์ของฉัน <span id="orderBadge" style="background:#c00;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;display:none;margin-left:4px;">0</span></button>
+</div>
+
+<!-- Tab: Shop -->
+<div id="tabShop">
 <div class="toolbar">
   <input type="text" id="searchBox" placeholder="🔍 ค้นหาสินค้า..." oninput="onSearch()">
   <select id="catFilter" onchange="loadProducts()" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
@@ -88,6 +96,22 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 
 <div class="grid" id="productGrid">
   <div class="spinner"></div>
+</div>
+</div>
+
+<!-- Tab: Orders -->
+<div id="tabOrders" style="display:none;padding:12px;">
+  <div id="ordersBody">
+    <div class="empty-state">⏳ กำลังโหลด...</div>
+  </div>
+</div>
+
+<!-- Order Detail Modal -->
+<div class="modal" id="orderDetailModal">
+  <div class="modal-content" style="max-width: 520px; margin: 0 auto;">
+    <button class="close-btn" onclick="closeOrderDetail()">×</button>
+    <div id="orderDetailBody"></div>
+  </div>
 </div>
 
 <div class="cart-fab hidden" id="cartFab" onclick="openCartModal()">
@@ -175,6 +199,156 @@ var CART = JSON.parse(localStorage.getItem('shop_cart') || '[]');
 var COURIERS = [];
 var SHOP_INFO = null;
 var SEARCH_TIMER = null;
+
+// ===== Tab navigation =====
+function showTab(name) {
+  document.getElementById('tabShop').style.display = name === 'shop' ? 'block' : 'none';
+  document.getElementById('tabOrders').style.display = name === 'orders' ? 'block' : 'none';
+  document.getElementById('tabShopBtn').style.borderBottomColor = name === 'shop' ? '#0a8' : 'transparent';
+  document.getElementById('tabShopBtn').style.color = name === 'shop' ? '#0a8' : '#666';
+  document.getElementById('tabOrdersBtn').style.borderBottomColor = name === 'orders' ? '#0a8' : 'transparent';
+  document.getElementById('tabOrdersBtn').style.color = name === 'orders' ? '#0a8' : '#666';
+  if (name === 'orders') loadMyOrders();
+}
+
+// ===== My Orders =====
+var MY_ORDERS = [];
+async function loadMyOrders() {
+  var box = document.getElementById('ordersBody');
+  if (!ME) {
+    box.innerHTML = '<div class="empty-state">⚠️ กรุณา login ด้วย LINE เพื่อดูออเดอร์ของคุณ<br/><br/><a class="login-btn" style="display:inline-block;" href="#" onclick="loginLine();return false;">Login ด้วย LINE</a></div>';
+    return;
+  }
+  box.innerHTML = '<div class="spinner"></div>';
+  try {
+    var r = await fetch('/api/shop/my-orders');
+    var d = await r.json();
+    MY_ORDERS = d.orders || [];
+    renderMyOrders();
+  } catch (e) { box.innerHTML = '<div class="empty-state">❌ โหลดไม่ได้: ' + e.message + '</div>'; }
+}
+
+function statusBadge(o) {
+  var st = o.status || 'pending';
+  var ps = o.paymentStatus || 'unpaid';
+  if (st === 'cancelled') return { color:'#999', icon:'❌', label:'ยกเลิก' };
+  if (st === 'completed') return { color:'#0a8', icon:'✅', label:'เสร็จสิ้น' };
+  if (st === 'shipped') return { color:'#06c755', icon:'🚚', label:'ส่งแล้ว' };
+  if (st === 'packed') return { color:'#0066cc', icon:'📦', label:'พร้อมส่ง' };
+  if (st === 'packing' || st === 'paid' || st === 'confirmed') {
+    if (ps === 'paid') return { color:'#3a86ff', icon:'⏳', label:'กำลังจัดสินค้า' };
+    return { color:'#3a86ff', icon:'⏳', label:'ยืนยันแล้ว' };
+  }
+  if (ps === 'paid') return { color:'#0a8', icon:'✅', label:'ชำระแล้ว รอตรวจ' };
+  return { color:'#f59e0b', icon:'⏳', label:'รอชำระเงิน' };
+}
+
+function renderMyOrders() {
+  var box = document.getElementById('ordersBody');
+  var badge = document.getElementById('orderBadge');
+  // นับออเดอร์รอดำเนินการ → badge
+  var pendingCount = MY_ORDERS.filter(function(o) {
+    return o.status !== 'completed' && o.status !== 'cancelled';
+  }).length;
+  if (pendingCount > 0) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; }
+  else { badge.style.display = 'none'; }
+
+  if (!MY_ORDERS.length) {
+    box.innerHTML = '<div class="empty-state">📦 ยังไม่มีออเดอร์<br/><button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 24px;" onclick="showTab(\'shop\')">🛍️ ช้อปปิ้ง</button></div>';
+    return;
+  }
+  var html = '';
+  MY_ORDERS.forEach(function(o) {
+    var sb = statusBadge(o);
+    var dt = o.createdAt ? new Date(o.createdAt) : null;
+    var dateStr = dt ? dt.toLocaleDateString('th-TH') + ' ' + dt.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) : '-';
+    var itemSummary = (o.items || []).slice(0, 2).map(function(it) { return it.name + ' x' + it.quantity; }).join(', ');
+    if ((o.items || []).length > 2) itemSummary += ' ...';
+    html += '<div onclick="openOrderDetail(' + o.id + ')" style="background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);cursor:pointer;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
+    html += '<div style="flex:1;"><div style="font-weight:700;">' + escapeHtml(o.orderNo || '-') + '</div>';
+    html += '<div style="font-size:12px;color:#999;">' + dateStr + '</div></div>';
+    html += '<span style="background:' + sb.color + ';color:#fff;padding:3px 10px;border-radius:12px;font-size:11px;white-space:nowrap;">' + sb.icon + ' ' + sb.label + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:13px;color:#555;margin:8px 0 4px;">' + escapeHtml(itemSummary) + '</div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;">';
+    html += '<span style="color:#999;">' + (o.items || []).length + ' รายการ' + (o.courier ? ' · ' + escapeHtml(o.courier) : '') + '</span>';
+    html += '<span style="font-weight:700;color:#c00;">' + (o.total || 0).toLocaleString() + ' ฿</span>';
+    html += '</div>';
+    if (o.trackingNo) html += '<div style="font-size:11px;color:#06c755;margin-top:4px;font-family:monospace;">🏷️ ' + escapeHtml(o.trackingNo) + '</div>';
+    html += '</div>';
+  });
+  box.innerHTML = html;
+}
+
+function openOrderDetail(id) {
+  var o = MY_ORDERS.find(function(x) { return x.id == id; });
+  if (!o) return;
+  var sb = statusBadge(o);
+  var body = document.getElementById('orderDetailBody');
+  var dt = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH') : '-';
+  var html = '<h2>' + escapeHtml(o.orderNo || '-') + '</h2>';
+  html += '<div style="font-size:12px;color:#999;margin-bottom:8px;">' + dt + '</div>';
+  html += '<div style="text-align:center;margin:14px 0;"><span style="background:' + sb.color + ';color:#fff;padding:8px 20px;border-radius:20px;font-size:14px;font-weight:600;">' + sb.icon + ' ' + sb.label + '</span></div>';
+
+  // Timeline
+  html += '<div style="background:#f8f9fa;border-radius:8px;padding:12px;margin:10px 0;font-size:13px;">';
+  html += '<div>📍 <strong>ผู้รับ:</strong> ' + escapeHtml(o.customerName || '-') + '</div>';
+  if (o.customerPhone) html += '<div style="margin-top:4px;">☎ ' + escapeHtml(o.customerPhone) + '</div>';
+  if (o.customerAddress) html += '<div style="margin-top:4px;color:#555;">' + escapeHtml(o.customerAddress) + '</div>';
+  html += '</div>';
+
+  // Items
+  html += '<h3 style="font-size:14px;margin:14px 0 6px;">🛍️ รายการ</h3>';
+  (o.items || []).forEach(function(it) {
+    html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:13px;">';
+    html += '<span style="flex:1;">' + escapeHtml(it.name) + ' × ' + it.quantity + '</span>';
+    html += '<span style="font-weight:600;">' + (it.price * it.quantity).toLocaleString() + ' ฿</span>';
+    html += '</div>';
+  });
+
+  // Summary
+  html += '<div style="margin-top:10px;font-size:13px;">';
+  html += '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>สินค้า:</span><span>' + (o.subtotal || 0).toLocaleString() + ' ฿</span></div>';
+  if (o.shippingFee) html += '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span>ค่าส่ง:</span><span>' + o.shippingFee.toLocaleString() + ' ฿</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:18px;font-weight:700;color:#c00;border-top:2px solid #eee;margin-top:6px;"><span>รวม:</span><span>' + (o.total || 0).toLocaleString() + ' ฿</span></div>';
+  html += '</div>';
+
+  // Payment
+  html += '<h3 style="font-size:14px;margin:14px 0 6px;">💳 การชำระเงิน</h3>';
+  html += '<div style="background:#f8f9fa;border-radius:8px;padding:10px;font-size:13px;">';
+  html += '<div>วิธี: ' + (o.paymentMethod === 'qr' ? 'QR PromptPay' : 'โอนเงิน') + '</div>';
+  var pscolor = o.paymentStatus === 'paid' ? '#0a8' : '#f59e0b';
+  html += '<div>สถานะ: <span style="color:' + pscolor + ';font-weight:600;">' + (o.paymentStatus === 'paid' ? '✅ ชำระแล้ว' : '⏳ รอชำระ') + '</span></div>';
+  if (o.paymentSlip) html += '<div style="margin-top:6px;">🖼️ สลิป: <a href="' + escapeAttr(o.paymentSlip) + '" target="_blank" style="color:#0066cc;">ดูสลิป</a></div>';
+  if (o.paymentVerifyNote) html += '<div style="color:#f80;margin-top:4px;font-size:12px;">⚠️ ' + escapeHtml(o.paymentVerifyNote) + '</div>';
+  html += '</div>';
+
+  // Shipping
+  if (o.courier || o.trackingNo) {
+    html += '<h3 style="font-size:14px;margin:14px 0 6px;">🚚 การจัดส่ง</h3>';
+    html += '<div style="background:#f8f9fa;border-radius:8px;padding:10px;font-size:13px;">';
+    if (o.courier) html += '<div>ขนส่ง: ' + escapeHtml(o.courier) + '</div>';
+    if (o.trackingNo) html += '<div>เลขพัสดุ: <span style="font-family:monospace;font-weight:600;color:#06c755;">' + escapeHtml(o.trackingNo) + '</span></div>';
+    if (o.shippedAt) html += '<div style="color:#999;font-size:11px;margin-top:4px;">ส่ง: ' + new Date(o.shippedAt).toLocaleString('th-TH') + '</div>';
+    html += '</div>';
+  }
+  if (o.shipmentPhotos && o.shipmentPhotos.length) {
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">';
+    o.shipmentPhotos.forEach(function(p) {
+      html += '<a href="' + escapeAttr(p.url) + '" target="_blank"><img src="' + escapeAttr(p.url) + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #ddd;"></a>';
+    });
+    html += '</div>';
+  }
+
+  // QR Re-show if QR + unpaid
+  if (o.paymentMethod === 'qr' && o.paymentStatus !== 'paid') {
+    html += '<button class="btn-primary" style="margin-top:14px;" onclick="closeOrderDetail();openPayment(MY_ORDERS.find(function(x){return x.id==' + o.id + '}));">💳 ชำระเงิน</button>';
+  }
+  body.innerHTML = html;
+  document.getElementById('orderDetailModal').classList.add('active');
+}
+function closeOrderDetail() { document.getElementById('orderDetailModal').classList.remove('active'); }
 
 // ===== Auth =====
 async function loadMe() {
@@ -621,6 +795,8 @@ function escapeAttr(s) { return escapeHtml(s); }
   await loadMe();
   await loadProducts();
   renderCartFab();
+  // ถ้า login → prefetch ออเดอร์ไว้สำหรับ badge
+  if (ME) loadMyOrders();
 })();
 </script>
 
