@@ -1654,6 +1654,35 @@ input:focus, textarea:focus, select:focus {
 </div>
 
 <!-- Manual Attendance Modal -->
+<!-- ============ EDIT CUSTOMER MODAL (สำหรับ Lazada/Shopee/TikTok ที่ลูกค้าส่งชื่อที่อยู่มาตอนหลัง) ============ -->
+<div class="modal" id="editCustomerModal">
+  <div class="modal-content" style="max-width:500px;">
+    <button class="close-btn" onclick="closeEditCustomerModal()">×</button>
+    <h2>✏️ แก้ไขชื่อที่อยู่ลูกค้า</h2>
+    <div style="font-size:12px; color:#856404; background:#fff3cd; padding:8px; border-radius:6px; margin-bottom:12px;">
+      ⚠️ ใช้เมื่อลูกค้าขอใบกำกับภาษี และส่งชื่อ/ที่อยู่จริงมา (Lazada ปกปิดข้อมูลลูกค้า)
+    </div>
+    <input type="hidden" id="ecOrderId">
+    <div><label>ชื่อลูกค้า / สถานจัดตั้ง *</label>
+      <input type="text" id="ecCustomerName" style="width:100%; padding:8px;" placeholder="ชื่อ-นามสกุล หรือชื่อบริษัท">
+    </div>
+    <div style="margin-top:10px;"><label>เลขผู้เสียภาษี (Tax ID)</label>
+      <input type="text" id="ecTaxId" style="width:100%; padding:8px;" placeholder="13 หลัก — สำหรับใบกำกับภาษีเต็มรูปแบบ">
+    </div>
+    <div style="margin-top:10px;"><label>เบอร์โทร *</label>
+      <input type="text" id="ecCustomerPhone" style="width:100%; padding:8px;">
+    </div>
+    <div style="margin-top:10px;"><label>ที่อยู่ *</label>
+      <textarea id="ecCustomerAddress" rows="4" style="width:100%; padding:8px;" placeholder="บ้านเลขที่ หมู่ ต.อ. จ. รหัสไปรษณีย์"></textarea>
+    </div>
+    <div id="ecStatus" style="margin-top:10px;"></div>
+    <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeEditCustomerModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveEditCustomer()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="manualAttModal">
   <div class="modal-content" style="max-width:420px;">
     <button class="close-btn" onclick="closeManualAttModal()">×</button>
@@ -2951,6 +2980,12 @@ function renderOrders(list) {
     if (o.status === 'confirmed') {
       html += '<button class="btn btn-primary btn-sm" onclick="markPaid(' + o.id + ')">จ่ายแล้ว</button> ';
     }
+    // ปุ่มแก้ไขลูกค้า — แสดงเฉพาะ marketplace orders ที่ต้องออกใบกำกับภาษี
+    var srcLow = (o.source || 'manual');
+    var isMarketplace = (srcLow === 'lazada' || srcLow === 'tiktok' || srcLow.indexOf('shopee') === 0);
+    if (isMarketplace) {
+      html += '<button class="btn btn-secondary btn-sm" onclick="openEditCustomerModal(' + o.id + ')" style="background:#fff3e0;color:#e65100;">✏️ แก้ลูกค้า</button> ';
+    }
     // ปุ่มพิมพ์แสดงทุกสถานะ (รวม cancelled เผื่อดูประวัติ/พิมพ์ซ้ำ)
     html += '<button class="btn btn-secondary btn-sm" onclick="openOrderVideos(' + o.id + ')">🎥 วิดีโอ</button> ';
     html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
@@ -3000,6 +3035,59 @@ async function cancelOrder(id) {
     await fetch('/api/orders/' + id + '/cancel', { method: 'POST' });
     loadOrders();
   } catch (e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+// ============ EDIT MARKETPLACE CUSTOMER ============
+async function openEditCustomerModal(orderId) {
+  var o = (orders || []).find(function(x) { return x.id == orderId; });
+  if (!o) {
+    try {
+      var r = await fetch('/api/orders/' + orderId);
+      if (r.ok) o = await r.json();
+    } catch (e) {}
+  }
+  if (!o) { alert('ไม่พบออร์เดอร์'); return; }
+  document.getElementById('ecOrderId').value = o.id;
+  document.getElementById('ecCustomerName').value = o.customerName || '';
+  document.getElementById('ecTaxId').value = o.taxId || o.customerTaxId || '';
+  document.getElementById('ecCustomerPhone').value = o.customerPhone || '';
+  document.getElementById('ecCustomerAddress').value = o.customerAddress || '';
+  document.getElementById('ecStatus').innerHTML = '';
+  document.getElementById('editCustomerModal').classList.add('show');
+}
+
+function closeEditCustomerModal() {
+  document.getElementById('editCustomerModal').classList.remove('show');
+}
+
+async function saveEditCustomer() {
+  var id = document.getElementById('ecOrderId').value;
+  var body = {
+    customerName: document.getElementById('ecCustomerName').value.trim(),
+    customerPhone: document.getElementById('ecCustomerPhone').value.trim(),
+    customerAddress: document.getElementById('ecCustomerAddress').value.trim(),
+    taxId: document.getElementById('ecTaxId').value.trim()
+  };
+  if (!body.customerName) {
+    document.getElementById('ecStatus').innerHTML = '<span style="color:#c00;">⚠️ ต้องระบุชื่อลูกค้า</span>';
+    return;
+  }
+  document.getElementById('ecStatus').innerHTML = '<span style="color:#666;">⏳ กำลังบันทึก...</span>';
+  try {
+    var r = await fetch('/api/orders/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      var err = await r.json().catch(function() { return {}; });
+      throw new Error(err.error || 'HTTP ' + r.status);
+    }
+    closeEditCustomerModal();
+    loadOrders();
+  } catch (e) {
+    document.getElementById('ecStatus').innerHTML = '<span style="color:#c00;">❌ ' + e.message + '</span>';
+  }
 }
 
 // ============ CUSTOMERS ============
