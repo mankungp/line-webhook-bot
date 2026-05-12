@@ -1872,6 +1872,14 @@ app.get('/lazada/auth', async function(req, res) {
 });
 
 // Webhook proxy (Lazada อาจยิง server.js ได้)
+// GET handler — สำหรับ Lazada "Verify" probe (บางระบบ probe ด้วย GET + challenge)
+app.get('/lazada/webhook', function(req, res) {
+  // ถ้า Lazada ส่ง echo parameter มา — ตอบกลับ
+  var challenge = req.query.challenge || req.query.echostr || req.query.echo;
+  if (challenge) return res.send(challenge);
+  res.status(200).json({ ok: true, ready: true, endpoint: 'lazada-webhook', method: 'expects POST with x-lazop-signature' });
+});
+
 app.post('/lazada/webhook', express.json({ verify: function(req, res, buf) { req.rawBody = buf.toString('utf8'); }, limit: '2mb' }), async function(req, res) {
   try {
     var r = await fetch(LOCAL_API_BASE + '/api/marketplace/lazada/webhook', {
