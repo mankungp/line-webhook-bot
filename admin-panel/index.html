@@ -3053,11 +3053,11 @@ async function openEditCustomerModal(orderId) {
   document.getElementById('ecCustomerPhone').value = o.customerPhone || '';
   document.getElementById('ecCustomerAddress').value = o.customerAddress || '';
   document.getElementById('ecStatus').innerHTML = '';
-  document.getElementById('editCustomerModal').classList.add('show');
+  document.getElementById('editCustomerModal').classList.add('active');
 }
 
 function closeEditCustomerModal() {
-  document.getElementById('editCustomerModal').classList.remove('show');
+  document.getElementById('editCustomerModal').classList.remove('active');
 }
 
 async function saveEditCustomer() {
