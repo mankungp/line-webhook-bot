@@ -444,7 +444,7 @@ async function loadProducts(append) {
     PROD_RAW_FETCHED = 0;
     PROD_HAS_MORE = false;
   }
-  var url = '/api/products?limit=' + PROD_PAGE_SIZE + '&page=' + PROD_PAGE;
+  var url = '/api/products?inStock=true&limit=' + PROD_PAGE_SIZE + '&page=' + PROD_PAGE;
   if (search) {
     var tokens = search.split(/\s+/).filter(Boolean);
     url += '&search=' + encodeURIComponent(tokens[0]);
@@ -461,7 +461,8 @@ async function loadProducts(append) {
     PROD_HAS_MORE = (typeof d.pages === 'number')
       ? (PROD_PAGE < d.pages)
       : (PROD_RAW_FETCHED < PROD_TOTAL);
-    var batch = raw.filter(function(p) { return (p.stock || 0) > 0; });
+    // backend filter inStock แล้ว — ไม่ต้อง filter ซ้ำ
+    var batch = raw;
     if (search) {
       var ts = search.toLowerCase().split(/\s+/).filter(Boolean);
       if (ts.length > 1) {
