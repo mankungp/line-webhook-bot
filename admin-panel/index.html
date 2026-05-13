@@ -3505,7 +3505,13 @@ function openCouriersModal() {
 }
 
 function printShippingLabel(orderId) {
-  window.open('/api/orders/' + orderId + '/shipping-label/pdf', '_blank');
+  // ถามจำนวนพัสดุ — ถ้าสินค้าชิ้นเดียว ไม่ต้องถาม
+  var input = prompt('จำนวนพัสดุสำหรับออเดอร์นี้? (1-99)', '1');
+  if (input === null) return;
+  var n = parseInt(input, 10);
+  if (isNaN(n) || n < 1) n = 1;
+  if (n > 99) n = 99;
+  window.open('/api/orders/' + orderId + '/shipping-label/pdf?count=' + n, '_blank');
 }
 
 // ===== Shipment Photo Modal =====
