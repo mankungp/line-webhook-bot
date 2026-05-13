@@ -48,14 +48,20 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 .close-btn:hover, .close-btn:active { background: #e0e0e0; color: #000; }
 .modal-content { position: relative; }
 
-.cart-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eee; align-items: center; }
-.cart-item img { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; background: #f0f0f0; }
-.cart-item .info { flex: 1; }
-.cart-item .info .name { font-size: 13px; font-weight: 500; }
-.cart-item .info .price { font-size: 14px; color: #c00; }
-.qty-ctrl { display: flex; gap: 6px; align-items: center; }
-.qty-ctrl button { width: 28px; height: 28px; border: 1px solid #ddd; border-radius: 4px; background: #fff; font-size: 16px; cursor: pointer; }
-.qty-ctrl input { width: 42px; text-align: center; padding: 4px; border: 1px solid #ddd; border-radius: 4px; }
+.cart-item { display: grid; grid-template-columns: 60px 1fr auto; gap: 10px; padding: 12px 0; border-bottom: 1px solid #eee; align-items: center; }
+.cart-item img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; background: #f0f0f0; }
+.cart-item .info { min-width: 0; }
+.cart-item .info .name { font-size: 13px; font-weight: 500; line-height: 1.3; margin-bottom: 4px; word-break: break-word; }
+.cart-item .info .price { font-size: 13px; color: #666; }
+.cart-item .info .subtotal { font-size: 15px; color: #c00; font-weight: 700; margin-top: 2px; }
+.cart-item .actions { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.cart-item .del-btn { background: none; border: none; color: #c00; cursor: pointer; font-size: 18px; padding: 4px; }
+.qty-ctrl { display: flex; gap: 4px; align-items: center; background: #f5f5f5; border-radius: 6px; padding: 2px; }
+.qty-ctrl button { width: 28px; height: 28px; border: none; border-radius: 4px; background: #fff; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.qty-ctrl button:disabled { opacity: 0.4; cursor: not-allowed; }
+.qty-ctrl input { width: 44px; height: 28px; text-align: center; padding: 0; border: none; background: transparent; font-size: 14px; font-weight: 600; -moz-appearance: textfield; }
+.qty-ctrl input::-webkit-outer-spin-button, .qty-ctrl input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cart-stock-warn { font-size: 11px; color: #f80; margin-top: 2px; }
 
 .summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
 .summary-row.total { font-size: 18px; font-weight: 700; padding-top: 10px; border-top: 2px solid #0a8; margin-top: 6px; }
@@ -656,8 +662,35 @@ function addToCartWithQty(productId, max) {
 function changeQty(productId, delta) {
   var it = CART.find(function(x) { return x.productId == productId; });
   if (!it) return;
-  it.quantity = Math.max(0, (it.quantity || 0) + delta);
+  var stock = it.stock || 0;
+  var newQty = (it.quantity || 0) + delta;
+  if (stock > 0 && newQty > stock) {
+    alert('⚠️ มีสินค้าในสต็อกแค่ ' + stock + ' ชิ้น');
+    newQty = stock;
+  }
+  it.quantity = Math.max(0, newQty);
   if (it.quantity === 0) CART = CART.filter(function(x) { return x.productId != productId; });
+  saveCart();
+  renderCartItems();
+  renderCartFab();
+}
+
+function setQty(productId, val) {
+  var it = CART.find(function(x) { return x.productId == productId; });
+  if (!it) return;
+  var stock = it.stock || 0;
+  var v = parseInt(val, 10);
+  if (isNaN(v) || v < 0) v = 0;
+  if (stock > 0 && v > stock) v = stock;
+  it.quantity = v;
+  if (v === 0) CART = CART.filter(function(x) { return x.productId != productId; });
+  saveCart();
+  renderCartItems();
+  renderCartFab();
+}
+
+function removeFromCart(productId) {
+  CART = CART.filter(function(x) { return x.productId != productId; });
   saveCart();
   renderCartItems();
   renderCartFab();
@@ -698,20 +731,33 @@ function renderCartItems() {
   document.getElementById('checkoutBtn').disabled = false;
   var html = '';
   CART.forEach(function(it) {
+    var subtotal = it.price * it.quantity;
+    var stock = it.stock || 0;
+    var atMax = stock > 0 && it.quantity >= stock;
     html += '<div class="cart-item">';
     if (it.imageUrl) html += '<img src="' + escapeAttr(it.imageUrl) + '">';
-    else html += '<div class="img" style="width:50px;height:50px;border-radius:6px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:24px;">📦</div>';
-    html += '<div class="info"><div class="name">' + escapeHtml(it.name) + '</div>';
-    html += '<div class="price">' + it.price.toLocaleString() + ' ฿ × ' + it.quantity + '</div></div>';
+    else html += '<div style="width:60px;height:60px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:28px;">📦</div>';
+    html += '<div class="info">';
+    html += '<div class="name">' + escapeHtml(it.name) + '</div>';
+    html += '<div class="price">' + it.price.toLocaleString() + ' ฿ / ชิ้น</div>';
+    html += '<div class="subtotal">' + subtotal.toLocaleString() + ' ฿</div>';
+    if (atMax) html += '<div class="cart-stock-warn">⚠️ ถึงสต็อกสูงสุด</div>';
+    html += '</div>';
+    html += '<div class="actions">';
+    html += '<button class="del-btn" onclick="removeFromCart(' + it.productId + ')" title="ลบ">🗑️</button>';
     html += '<div class="qty-ctrl">';
     html += '<button onclick="changeQty(' + it.productId + ',-1)">−</button>';
-    html += '<span style="min-width:24px;text-align:center;">' + it.quantity + '</span>';
-    html += '<button onclick="changeQty(' + it.productId + ',1)">+</button>';
-    html += '</div></div>';
+    html += '<input type="number" min="0" value="' + it.quantity + '" onchange="setQty(' + it.productId + ', this.value)" onclick="this.select()">';
+    html += '<button ' + (atMax ? 'disabled' : '') + ' onclick="changeQty(' + it.productId + ',1)">+</button>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
   });
   box.innerHTML = html;
+  var totalQty = cartCount();
   document.getElementById('cartSummary').innerHTML =
-    '<div class="summary-row total"><span>รวม:</span><span>' + cartTotal().toLocaleString() + ' ฿</span></div>';
+    '<div class="summary-row"><span>รวมจำนวน:</span><span>' + totalQty + ' ชิ้น</span></div>' +
+    '<div class="summary-row total"><span>ยอดรวม:</span><span>' + cartTotal().toLocaleString() + ' ฿</span></div>';
 }
 
 // ===== Checkout =====
