@@ -17,8 +17,13 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 .user-pill img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; }
 .user-pill .tier-badge { background: #fff; color: #0a8; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 .login-btn { background: #06c755; color: #fff; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; }
-.toolbar { background: #fff; padding: 10px 16px; border-bottom: 1px solid #eee; display: flex; gap: 8px; }
-.toolbar input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.toolbar { background: #fff; padding: 10px 16px; border-bottom: 1px solid #eee; display: flex; gap: 8px; flex-wrap: wrap; }
+.toolbar input { flex: 1; min-width: 180px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.toolbar select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: #fff; }
+.cat-chips { background: #fff; padding: 8px 16px 6px; display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid #eee; }
+.cat-chips::-webkit-scrollbar { display: none; }
+.cat-chip { flex-shrink: 0; padding: 5px 12px; border-radius: 14px; border: 1px solid #ddd; background: #fff; color: #666; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.cat-chip.active { border-color: #0a8; background: #0a8; color: #fff; font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
 @media (min-width: 600px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 900px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -120,10 +125,18 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 <div id="tabShop">
 <div class="toolbar">
   <input type="text" id="searchBox" placeholder="🔍 ค้นหาสินค้า..." oninput="onSearch()">
-  <select id="catFilter" onchange="loadProducts()" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
+  <select id="sortBy" onchange="applySortAndRender()" title="จัดเรียง">
+    <option value="default">มาตรฐาน</option>
+    <option value="price-asc">💰 ราคาต่ำ→สูง</option>
+    <option value="price-desc">💰 ราคาสูง→ต่ำ</option>
+    <option value="name-asc">🔤 ชื่อ A→Z</option>
+    <option value="stock-desc">📦 สต็อกมากสุด</option>
+  </select>
+  <select id="catFilter" onchange="onCatChange()">
     <option value="">ทุกหมวด</option>
   </select>
 </div>
+<div class="cat-chips" id="catChips"></div>
 
 <div class="grid" id="productGrid">
   <div class="spinner"></div>
@@ -534,6 +547,46 @@ function fillCategorySelect(cats) {
     sel.innerHTML += '<option value="' + escapeAttr(id) + '">' + escapeHtml(name) + '</option>';
   });
   if (current) sel.value = current;
+  // chips top categories (max 8)
+  var box = document.getElementById('catChips');
+  if (box) {
+    var html = '<button class="cat-chip ' + (!current ? 'active' : '') + '" onclick="pickCat(\'\')">ทั้งหมด</button>';
+    cats.slice(0, 10).forEach(function(c) {
+      var id = c.id || c.key;
+      var name = c.name || id;
+      html += '<button class="cat-chip ' + (current === id ? 'active' : '') + '" onclick="pickCat(\''+ escapeAttr(id) +'\')">' + escapeHtml(name) + '</button>';
+    });
+    box.innerHTML = html;
+  }
+}
+
+function pickCat(id) {
+  var sel = document.getElementById('catFilter');
+  if (sel) sel.value = id;
+  // update chip active state
+  document.querySelectorAll('.cat-chip').forEach(function(b) { b.classList.remove('active'); });
+  event.currentTarget.classList.add('active');
+  loadProducts();
+}
+
+function onCatChange() {
+  // sync chip state with select
+  var v = document.getElementById('catFilter').value;
+  document.querySelectorAll('.cat-chip').forEach(function(b) {
+    var label = b.textContent;
+    b.classList.toggle('active', (v === '' && label === 'ทั้งหมด'));
+  });
+  loadProducts();
+}
+
+function applySortAndRender() {
+  var s = document.getElementById('sortBy').value;
+  if (s === 'price-asc') PRODUCTS.sort(function(a, b) { return (pickPrice(a) || 0) - (pickPrice(b) || 0); });
+  else if (s === 'price-desc') PRODUCTS.sort(function(a, b) { return (pickPrice(b) || 0) - (pickPrice(a) || 0); });
+  else if (s === 'name-asc') PRODUCTS.sort(function(a, b) { return (a.name || '').localeCompare(b.name || '', 'th'); });
+  else if (s === 'stock-desc') PRODUCTS.sort(function(a, b) { return (b.stock || 0) - (a.stock || 0); });
+  // 'default' = keep order from API
+  renderProducts();
 }
 
 async function loadProducts(append) {
@@ -578,6 +631,14 @@ async function loadProducts(append) {
       }
     }
     PRODUCTS = append ? PRODUCTS.concat(batch) : batch;
+    // apply sort if not default
+    var sortVal = (document.getElementById('sortBy') || {}).value;
+    if (sortVal && sortVal !== 'default') {
+      if (sortVal === 'price-asc') PRODUCTS.sort(function(a, b) { return (pickPrice(a) || 0) - (pickPrice(b) || 0); });
+      else if (sortVal === 'price-desc') PRODUCTS.sort(function(a, b) { return (pickPrice(b) || 0) - (pickPrice(a) || 0); });
+      else if (sortVal === 'name-asc') PRODUCTS.sort(function(a, b) { return (a.name || '').localeCompare(b.name || '', 'th'); });
+      else if (sortVal === 'stock-desc') PRODUCTS.sort(function(a, b) { return (b.stock || 0) - (a.stock || 0); });
+    }
     var __sy = append ? window.scrollY : 0;
     renderProducts();
     if (append) window.scrollTo(0, __sy);
