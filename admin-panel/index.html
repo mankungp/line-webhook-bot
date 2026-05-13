@@ -3325,6 +3325,10 @@ function renderOrders(list) {
       html += '<button class="btn btn-sm" style="background:#06c755;color:#fff;" onclick="printShippingLabel(' + o.id + ')" title="ใบปะหน้า 4x6″">🚚 ใบปะหน้า</button> ';
       html += '<button class="btn btn-sm" style="background:#ff6b0f;color:#fff;" onclick="openShipmentPhotoModal(' + o.id + ')" title="อัปรูปใบขนส่ง + ส่ง LINE">📤 ส่งใบขนส่ง</button> ';
     }
+    // ✏️ ปุ่มย้อนไปร่าง — สำหรับออเดอร์ที่ตัด stock ไปแล้วแต่ยังไม่ส่ง
+    if (!isDraft && o.stockDeducted && o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'shipped') {
+      html += '<button class="btn btn-sm" style="background:#ff9800;color:#fff;" onclick="revertOrderToDraft(' + o.id + ')" title="คืน stock + กลับไปร่าง แก้ไขได้">⏪ ย้อนไปร่าง</button> ';
+    }
     if (o.status !== 'cancelled' && o.status !== 'completed') {
       html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
     }
@@ -3362,6 +3366,30 @@ async function confirmDraftOrder(id) {
   if (!confirm('ยืนยันร่างนี้? → ระบบจะตัด stock ตามรายการ + เปลี่ยน status ไป pending')) return;
   try {
     var r = await fetch('/api/orders/' + id + '/confirm-draft', { method: 'POST' });
+    if (!r.ok) {
+      var err = await r.json().catch(function(){return{};});
+      alert('❌ ' + (err.error || ('HTTP ' + r.status)));
+      return;
+    }
+    loadOrders();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function revertOrderToDraft(id) {
+  var o = (orders || []).find(function(x) { return x.id == id; });
+  var warn = '';
+  if (o) {
+    if (o.paymentStatus === 'paid') warn = '\n\n⚠️ ออเดอร์นี้ชำระเงินแล้ว — ถ้าย้อน สถานะจะกลับเป็น unpaid';
+    if (o.status === 'packed') warn = '\n\n⚠️ จัดของไปแล้ว';
+  }
+  var reason = prompt('⏪ ย้อนออเดอร์ไปร่าง?\n\n→ ระบบจะคืน stock\n→ เปลี่ยน status ไป draft (แก้รายการได้)' + warn + '\n\nระบุเหตุผล (optional):', '');
+  if (reason === null) return;
+  try {
+    var r = await fetch('/api/orders/' + id + '/revert-to-draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason })
+    });
     if (!r.ok) {
       var err = await r.json().catch(function(){return{};});
       alert('❌ ' + (err.error || ('HTTP ' + r.status)));

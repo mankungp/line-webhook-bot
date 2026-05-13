@@ -1716,6 +1716,21 @@ app.post('/api/orders/:id/confirm-draft', async function(req, res) {
   }
 });
 
+// revert-to-draft — ย้อนออเดอร์กลับไป draft (คืน stock)
+app.post('/api/orders/:id/revert-to-draft', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/revert-to-draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    if (!r.ok) return res.status(r.status).json(await r.json());
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE order (draft only)
 app.delete('/api/orders/:id', async function(req, res) {
   try {
