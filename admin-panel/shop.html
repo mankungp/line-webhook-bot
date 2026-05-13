@@ -592,8 +592,17 @@ function openProductDetail(id) {
     html += '<div style="font-size:13px;color:#c00;font-weight:600;">❌ สินค้าหมด (รอเติมสต็อก)</div>';
     html += '<button class="btn-primary" style="margin-top:14px;" disabled>❌ สินค้าหมด</button>';
   } else {
-    html += '<div style="font-size:13px;color:#666;">คงเหลือ ' + pStock + ' ' + escapeHtml(p.unit || 'ชิ้น') + '</div>';
-    html += '<button class="btn-primary" style="margin-top:14px;" onclick="addToCart(' + p.id + ');closeProductModal();">🛒 เพิ่มเข้าตะกร้า</button>';
+    var unit = escapeHtml(p.unit || 'ชิ้น');
+    html += '<div style="font-size:13px;color:#666;">คงเหลือ ' + pStock + ' ' + unit + '</div>';
+    // ตัวเลือกจำนวน
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;background:#f5f5f5;padding:8px;border-radius:8px;">' +
+      '<span style="font-size:14px;color:#555;flex:1;">จำนวน:</span>' +
+      '<button onclick="detailQtyChange(-1,' + pStock + ')" style="width:36px;height:36px;border:1px solid #ddd;background:#fff;border-radius:6px;font-size:18px;font-weight:600;cursor:pointer;">−</button>' +
+      '<input type="number" id="detailQty" value="1" min="1" max="' + pStock + '" oninput="detailQtyValidate(' + pStock + ')" style="width:60px;height:36px;text-align:center;border:1px solid #ddd;border-radius:6px;font-size:16px;font-weight:600;">' +
+      '<button onclick="detailQtyChange(1,' + pStock + ')" style="width:36px;height:36px;border:1px solid #ddd;background:#fff;border-radius:6px;font-size:18px;font-weight:600;cursor:pointer;">+</button>' +
+      '<span style="font-size:13px;color:#999;margin-left:4px;">' + unit + '</span>' +
+    '</div>';
+    html += '<button class="btn-primary" style="margin-top:12px;" onclick="addToCartWithQty(' + p.id + ',' + pStock + ');">🛒 เพิ่มเข้าตะกร้า</button>';
   }
   body.innerHTML = html;
   document.getElementById('productModal').classList.add('active');
@@ -601,16 +610,47 @@ function openProductDetail(id) {
 function closeProductModal() { document.getElementById('productModal').classList.remove('active'); }
 
 // ===== Cart =====
-function addToCart(productId) {
+function addToCart(productId, qty) {
   var p = PRODUCTS.find(function(x) { return x.id == productId; });
   if (!p) return;
   if ((p.stock || 0) <= 0) { alert('❌ สินค้าหมด ยังไม่สามารถสั่งซื้อได้'); return; }
+  var addQty = Math.max(1, parseInt(qty, 10) || 1);
   var price = pickPrice(p);
   var existing = CART.find(function(x) { return x.productId == productId; });
-  if (existing) { existing.quantity += 1; }
-  else { CART.push({ productId: p.id, name: p.name, sku: p.sku, price: price, quantity: 1, imageUrl: p.imageUrl, stock: p.stock }); }
+  var newTotal = (existing ? existing.quantity : 0) + addQty;
+  if (newTotal > (p.stock || 0)) {
+    alert('⚠️ ผสมตะกร้าเกินสต็อก — มีได้แค่ ' + (p.stock || 0) + ' ชิ้น');
+    addQty = (p.stock || 0) - (existing ? existing.quantity : 0);
+    if (addQty <= 0) return;
+  }
+  if (existing) { existing.quantity += addQty; }
+  else { CART.push({ productId: p.id, name: p.name, sku: p.sku, price: price, quantity: addQty, imageUrl: p.imageUrl, stock: p.stock }); }
   saveCart();
   renderCartFab();
+}
+
+function detailQtyChange(delta, max) {
+  var el = document.getElementById('detailQty');
+  if (!el) return;
+  var v = parseInt(el.value, 10) || 1;
+  v = Math.max(1, Math.min(max, v + delta));
+  el.value = v;
+}
+
+function detailQtyValidate(max) {
+  var el = document.getElementById('detailQty');
+  if (!el) return;
+  var v = parseInt(el.value, 10);
+  if (isNaN(v) || v < 1) { el.value = 1; return; }
+  if (v > max) el.value = max;
+}
+
+function addToCartWithQty(productId, max) {
+  var el = document.getElementById('detailQty');
+  var qty = el ? (parseInt(el.value, 10) || 1) : 1;
+  qty = Math.max(1, Math.min(max, qty));
+  addToCart(productId, qty);
+  closeProductModal();
 }
 
 function changeQty(productId, delta) {
