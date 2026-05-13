@@ -443,7 +443,9 @@ async function loadProducts(append) {
       }
     }
     PRODUCTS = append ? PRODUCTS.concat(batch) : batch;
+    var __sy = append ? window.scrollY : 0;
     renderProducts();
+    if (append) window.scrollTo(0, __sy);
   } catch (e) {
     console.error('loadProducts:', e);
     if (!append) grid.innerHTML = '<div class="empty-state">❌ โหลดสินค้าไม่ได้: ' + e.message + '</div>';
