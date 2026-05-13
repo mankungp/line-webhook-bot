@@ -30,7 +30,11 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 .product-card .price { font-size: 16px; font-weight: 700; color: #c00; margin-top: 4px; }
 .product-card .stock { font-size: 11px; color: #666; }
 .product-card .stock.low { color: #f80; }
-.product-card .stock.out { color: #c00; }
+.product-card .stock.out { color: #c00; font-weight: 600; }
+.product-card.out-of-stock { position: relative; }
+.product-card.out-of-stock img, .product-card.out-of-stock .placeholder { opacity: 0.45; filter: grayscale(0.5); }
+.product-card.out-of-stock .name, .product-card.out-of-stock .price { opacity: 0.6; }
+.out-badge { position: absolute; top: 12px; left: 12px; background: #c00; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 2; }
 .tier-mark { display: inline-block; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px; }
 
 .cart-fab { position: fixed; bottom: 16px; left: 16px; right: 16px; background: #ff6b0f; color: #fff; padding: 14px 18px; border-radius: 999px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 16px rgba(255,107,15,0.4); cursor: pointer; font-weight: 600; z-index: 90; }
@@ -444,7 +448,7 @@ async function loadProducts(append) {
     PROD_RAW_FETCHED = 0;
     PROD_HAS_MORE = false;
   }
-  var url = '/api/products?inStock=true&limit=' + PROD_PAGE_SIZE + '&page=' + PROD_PAGE;
+  var url = '/api/products?limit=' + PROD_PAGE_SIZE + '&page=' + PROD_PAGE;
   if (search) {
     var tokens = search.split(/\s+/).filter(Boolean);
     url += '&search=' + encodeURIComponent(tokens[0]);
@@ -518,8 +522,11 @@ function renderProducts() {
   PRODUCTS.forEach(function(p) {
     var price = pickPrice(p);
     var stock = p.stock || 0;
-    var stockCls = stock <= 5 ? 'low' : '';
-    html += '<div class="product-card" onclick="openProductDetail(' + p.id + ')">';
+    var isOut = stock <= 0;
+    var stockCls = isOut ? 'out' : (stock <= 5 ? 'low' : '');
+    var cardCls = 'product-card' + (isOut ? ' out-of-stock' : '');
+    html += '<div class="' + cardCls + '" onclick="openProductDetail(' + p.id + ')">';
+    if (isOut) html += '<span class="out-badge">สินค้าหมด</span>';
     if (p.imageUrl) {
       html += '<img src="' + escapeAttr(p.imageUrl) + '" onerror="this.outerHTML=&quot;<div class=\\&quot;placeholder\\&quot;>📦</div>&quot;">';
     } else {
@@ -527,7 +534,8 @@ function renderProducts() {
     }
     html += '<div class="name">' + escapeHtml(p.name || '') + '</div>';
     html += '<div class="price">' + price.toLocaleString() + ' ฿' + tierLabel() + '</div>';
-    html += '<div class="stock ' + stockCls + '">คงเหลือ ' + stock + ' ' + escapeHtml(p.unit || 'ชิ้น') + '</div>';
+    var stockText = isOut ? '❌ สินค้าหมด' : ('คงเหลือ ' + stock + ' ' + escapeHtml(p.unit || 'ชิ้น'));
+    html += '<div class="stock ' + stockCls + '">' + stockText + '</div>';
     html += '</div>';
   });
   // Load more / footer status
@@ -579,8 +587,14 @@ function openProductDetail(id) {
   if (p.sku) html += '<div style="font-size:12px;color:#999;">SKU: ' + escapeHtml(p.sku) + '</div>';
   html += '<div style="font-size:28px;color:#c00;font-weight:700;margin:10px 0;">' + price.toLocaleString() + ' ฿' + tierLabel() + '</div>';
   if (p.description) html += '<div style="font-size:14px;color:#555;margin:10px 0;white-space:pre-wrap;">' + escapeHtml(p.description) + '</div>';
-  html += '<div style="font-size:13px;color:#666;">คงเหลือ ' + (p.stock || 0) + ' ' + escapeHtml(p.unit || 'ชิ้น') + '</div>';
-  html += '<button class="btn-primary" style="margin-top:14px;" onclick="addToCart(' + p.id + ');closeProductModal();">🛒 เพิ่มเข้าตะกร้า</button>';
+  var pStock = p.stock || 0;
+  if (pStock <= 0) {
+    html += '<div style="font-size:13px;color:#c00;font-weight:600;">❌ สินค้าหมด (รอเติมสต็อก)</div>';
+    html += '<button class="btn-primary" style="margin-top:14px;" disabled>❌ สินค้าหมด</button>';
+  } else {
+    html += '<div style="font-size:13px;color:#666;">คงเหลือ ' + pStock + ' ' + escapeHtml(p.unit || 'ชิ้น') + '</div>';
+    html += '<button class="btn-primary" style="margin-top:14px;" onclick="addToCart(' + p.id + ');closeProductModal();">🛒 เพิ่มเข้าตะกร้า</button>';
+  }
   body.innerHTML = html;
   document.getElementById('productModal').classList.add('active');
 }
@@ -590,6 +604,7 @@ function closeProductModal() { document.getElementById('productModal').classList
 function addToCart(productId) {
   var p = PRODUCTS.find(function(x) { return x.id == productId; });
   if (!p) return;
+  if ((p.stock || 0) <= 0) { alert('❌ สินค้าหมด ยังไม่สามารถสั่งซื้อได้'); return; }
   var price = pickPrice(p);
   var existing = CART.find(function(x) { return x.productId == productId; });
   if (existing) { existing.quantity += 1; }
