@@ -16,7 +16,7 @@ const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const LOCAL_API_BASE = process.env.LOCAL_API_BASE || 'https://rephrase-depict-rubber.ngrok-free.dev';
+const LOCAL_API_BASE = process.env.LOCAL_API_BASE || 'https://api.kerdkankaset.com';
 const ADMIN_USER_ID = process.env.ADMIN_USER_ID || 'Ud75471b7c313436141ce8d09f23472ef';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 
