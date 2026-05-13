@@ -1693,6 +1693,43 @@ input:focus, textarea:focus, select:focus {
 
 <!-- Manual Attendance Modal -->
 <!-- ============ EDIT CUSTOMER MODAL (สำหรับ Lazada/Shopee/TikTok ที่ลูกค้าส่งชื่อที่อยู่มาตอนหลัง) ============ -->
+<!-- ========== EDIT DRAFT ITEMS MODAL (แก้ items ของ draft เท่านั้น) ========== -->
+<div class="modal" id="editDraftItemsModal">
+  <div class="modal-content" style="max-width:720px;">
+    <button class="close-btn" onclick="closeEditDraftItems()">×</button>
+    <h2 style="margin-bottom:6px;">✏️ แก้รายการสินค้าในร่าง</h2>
+    <div id="edOrderInfo" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
+    <input type="hidden" id="edOrderId">
+
+    <div style="font-size:12px;color:#1565c0;background:#e3f2fd;padding:8px;border-radius:6px;margin-bottom:10px;">
+      ℹ️ ยังไม่ได้ตัด stock — แก้ไขได้ตามสบาย แล้วค่อยกด "บันทึก"
+    </div>
+
+    <h3 style="font-size:14px;margin:8px 0 6px;">🛍️ รายการ</h3>
+    <div id="edItemsBody" style="max-height:300px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;"></div>
+
+    <h3 style="font-size:14px;margin:14px 0 6px;">➕ เพิ่มสินค้า</h3>
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="edSearch" placeholder="พิมพ์ชื่อ / SKU / barcode" oninput="edSearchProducts()" style="flex:1;padding:8px;">
+      <button class="btn btn-secondary" onclick="document.getElementById('edSearch').value='';edSearchProducts()">✕</button>
+    </div>
+    <div id="edSearchResults" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:4px;margin-top:6px;display:none;"></div>
+
+    <div style="margin-top:14px;padding:10px;background:#f8f9fa;border-radius:6px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;"><span>Subtotal:</span><span id="edSubtotal">0</span></div>
+      <div style="display:flex;justify-content:space-between;color:#c00;"><span>- ส่วนลด:</span><span id="edDiscount">0</span></div>
+      <div style="display:flex;justify-content:space-between;color:#0a8;"><span>+ ค่าส่ง:</span><span id="edShipping">0</span></div>
+      <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;padding-top:6px;border-top:1px solid #ddd;margin-top:4px;"><span>ยอดรวม:</span><span id="edTotal" style="color:#c00;">0</span></div>
+    </div>
+
+    <div id="edStatus" style="margin-top:10px;"></div>
+    <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeEditDraftItems()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveEditDraftItems()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== EDIT ORDER MODAL (แก้ไขออเดอร์ทั่วไป) ========== -->
 <div class="modal" id="editOrderModal">
   <div class="modal-content" style="max-width:640px;">
@@ -3248,7 +3285,8 @@ function renderOrders(list) {
     var dateStr = date.toLocaleDateString('th-TH') + ' ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
     var itemCount = (o.items || []).length;
     var statusClass = 'order-status-' + (o.status || 'pending');
-    var statusText = { pending: 'รอดำเนินการ', confirmed: 'ยืนยันแล้ว', paid: 'ชำระแล้ว', shipped: 'จัดส่งแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
+    var statusText = { draft: '📝 ร่าง', pending: 'รอดำเนินการ', confirmed: 'ยืนยันแล้ว', paid: 'ชำระแล้ว', shipped: 'จัดส่งแล้ว', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก' };
+    var isDraft = o.status === 'draft';
     var invoiceBadge = o.invoiceNo ? '<br/><small style="color:#0a0;">📋 ' + escapeHtml(o.invoiceNo) + '</small>' : '';
     var extIdBadge = o.sourceOrderId ? '<br/><small style="color:#888;font-family:monospace;">#' + escapeHtml(String(o.sourceOrderId)) + '</small>' : '';
     html += '<tr>';
@@ -3260,7 +3298,11 @@ function renderOrders(list) {
     html += '<td><span class="' + statusClass + '" style="font-weight:600;">' + (statusText[o.status] || o.status) + '</span></td>';
     html += '<td style="font-size:12px;color:#999;">' + dateStr + '</td>';
     html += '<td>';
-    if (o.status === 'pending') {
+    if (isDraft) {
+      html += '<button class="btn btn-sm" style="background:#0a8;color:#fff;" onclick="confirmDraftOrder(' + o.id + ')" title="ยืนยันร่าง → ตัด stock">✅ ยืนยัน</button> ';
+      html += '<button class="btn btn-sm" style="background:#2196f3;color:#fff;" onclick="openEditDraftItems(' + o.id + ')" title="แก้รายการสินค้า">✏️ แก้รายการ</button> ';
+      html += '<button class="btn btn-danger btn-sm" onclick="deleteDraftOrder(' + o.id + ')" title="ลบร่าง">🗑️ ลบ</button> ';
+    } else if (o.status === 'pending') {
       html += '<button class="btn btn-secondary btn-sm" onclick="confirmOrder(' + o.id + ')">ยืนยัน</button> ';
     }
     if (o.status === 'confirmed') {
@@ -3316,6 +3358,32 @@ async function confirmOrder(id) {
   } catch (e) { alert('เกิดข้อผิดพลาด'); }
 }
 
+async function confirmDraftOrder(id) {
+  if (!confirm('ยืนยันร่างนี้? → ระบบจะตัด stock ตามรายการ + เปลี่ยน status ไป pending')) return;
+  try {
+    var r = await fetch('/api/orders/' + id + '/confirm-draft', { method: 'POST' });
+    if (!r.ok) {
+      var err = await r.json().catch(function(){return{};});
+      alert('❌ ' + (err.error || ('HTTP ' + r.status)));
+      return;
+    }
+    loadOrders();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function deleteDraftOrder(id) {
+  if (!confirm('ลบร่างนี้? ⚠️ ลบถาวร — ไม่สามารถกู้คืนได้')) return;
+  try {
+    var r = await fetch('/api/orders/' + id, { method: 'DELETE' });
+    if (!r.ok) {
+      var err = await r.json().catch(function(){return{};});
+      alert('❌ ' + (err.error || ('HTTP ' + r.status)));
+      return;
+    }
+    loadOrders();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
 async function markPaid(id) {
   try {
     await fetch('/api/orders/' + id + '/paid', { method: 'POST' });
@@ -3329,6 +3397,174 @@ async function cancelOrder(id) {
     await fetch('/api/orders/' + id + '/cancel', { method: 'POST' });
     loadOrders();
   } catch (e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+// ============ EDIT DRAFT ITEMS (แก้ items ของ draft) ============
+var __edOrder = null;
+var __edItems = [];
+var __edSearchTimer = null;
+
+async function openEditDraftItems(orderId) {
+  var o = (orders || []).find(function(x) { return x.id == orderId; });
+  if (!o) {
+    try { var r = await fetch('/api/orders/' + orderId); if (r.ok) o = await r.json(); } catch(e){}
+  }
+  if (!o) { alert('ไม่พบออเดอร์'); return; }
+  if (o.status !== 'draft') { alert('ออเดอร์นี้ไม่ใช่ร่าง — แก้ items ไม่ได้'); return; }
+  __edOrder = o;
+  __edItems = (o.items || []).map(function(it) { return {
+    productId: it.productId, name: it.name, sku: it.sku || '',
+    quantity: parseInt(it.quantity, 10) || 1,
+    price: parseFloat(it.price) || 0
+  }; });
+  document.getElementById('edOrderId').value = o.id;
+  document.getElementById('edOrderInfo').textContent = (o.orderNo || '-') + ' · ลูกค้า: ' + (o.customerName || '-');
+  document.getElementById('edStatus').innerHTML = '';
+  document.getElementById('edSearch').value = '';
+  document.getElementById('edSearchResults').style.display = 'none';
+  renderEdItems();
+  document.getElementById('editDraftItemsModal').classList.add('active');
+}
+
+function renderEdItems() {
+  var box = document.getElementById('edItemsBody');
+  if (!__edItems.length) {
+    box.innerHTML = '<div style="color:#999;text-align:center;padding:20px;">ยังไม่มีรายการ</div>';
+  } else {
+    var html = '';
+    __edItems.forEach(function(it, idx) {
+      var line = it.quantity * it.price;
+      html += '<div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #eee;">';
+      html += '<div><div style="font-weight:500;font-size:13px;">' + escapeHtml(it.name) + '</div>';
+      if (it.sku) html += '<div style="font-size:11px;color:#999;">SKU: ' + escapeHtml(it.sku) + '</div>';
+      html += '</div>';
+      html += '<div style="display:flex;align-items:center;gap:4px;background:#f5f5f5;border-radius:4px;padding:2px;">';
+      html += '<button onclick="edChangeQty(' + idx + ',-1)" style="width:26px;height:26px;border:none;background:#fff;border-radius:3px;cursor:pointer;font-weight:600;">−</button>';
+      html += '<input type="number" value="' + it.quantity + '" min="1" onchange="edSetQty(' + idx + ',this.value)" style="width:48px;height:26px;text-align:center;border:none;background:transparent;font-weight:600;">';
+      html += '<button onclick="edChangeQty(' + idx + ',1)" style="width:26px;height:26px;border:none;background:#fff;border-radius:3px;cursor:pointer;font-weight:600;">+</button>';
+      html += '</div>';
+      html += '<input type="number" value="' + it.price + '" step="0.01" onchange="edSetPrice(' + idx + ',this.value)" style="width:80px;padding:4px;text-align:right;" title="ราคา/หน่วย">';
+      html += '<div style="min-width:80px;text-align:right;font-weight:600;color:#c00;">' + line.toLocaleString() + '</div>';
+      html += '<button class="btn btn-danger btn-sm" onclick="edRemoveItem(' + idx + ')" title="ลบ">🗑️</button>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  }
+  edUpdateTotals();
+}
+
+function edChangeQty(idx, delta) {
+  var it = __edItems[idx];
+  if (!it) return;
+  it.quantity = Math.max(1, it.quantity + delta);
+  renderEdItems();
+}
+
+function edSetQty(idx, val) {
+  var it = __edItems[idx];
+  if (!it) return;
+  var v = parseInt(val, 10);
+  if (isNaN(v) || v < 1) v = 1;
+  it.quantity = v;
+  renderEdItems();
+}
+
+function edSetPrice(idx, val) {
+  var it = __edItems[idx];
+  if (!it) return;
+  var v = parseFloat(val);
+  if (isNaN(v) || v < 0) v = 0;
+  it.price = v;
+  renderEdItems();
+}
+
+function edRemoveItem(idx) {
+  __edItems.splice(idx, 1);
+  renderEdItems();
+}
+
+function edUpdateTotals() {
+  var sub = __edItems.reduce(function(s, it){ return s + (it.quantity * it.price); }, 0);
+  var disc = parseFloat((__edOrder && __edOrder.discount) || 0);
+  var ship = parseFloat((__edOrder && __edOrder.shippingFee) || 0);
+  var total = Math.max(0, sub - disc + ship);
+  document.getElementById('edSubtotal').textContent = sub.toLocaleString() + ' บ.';
+  document.getElementById('edDiscount').textContent = disc.toLocaleString() + ' บ.';
+  document.getElementById('edShipping').textContent = ship.toLocaleString() + ' บ.';
+  document.getElementById('edTotal').textContent = total.toLocaleString() + ' บ.';
+}
+
+function edSearchProducts() {
+  clearTimeout(__edSearchTimer);
+  __edSearchTimer = setTimeout(_edDoSearch, 300);
+}
+
+async function _edDoSearch() {
+  var q = document.getElementById('edSearch').value.trim();
+  var box = document.getElementById('edSearchResults');
+  if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="padding:8px;color:#999;">⏳ ค้นหา...</div>';
+  try {
+    var r = await fetch('/api/products?inStock=true&limit=15&search=' + encodeURIComponent(q));
+    var d = await r.json();
+    var list = d.products || [];
+    if (!list.length) { box.innerHTML = '<div style="padding:8px;color:#999;">ไม่พบ</div>'; return; }
+    var html = '';
+    list.forEach(function(p) {
+      var stock = p.stock || 0;
+      html += '<div onclick="edAddProduct(' + p.id + ', \'' + escapeAttr(p.name) + '\', \'' + escapeAttr(p.sku||'') + '\', ' + (p.price||0) + ')" style="padding:8px;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
+      html += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;">' + escapeHtml(p.name) + '</div>';
+      if (p.sku) html += '<div style="font-size:11px;color:#999;">SKU: ' + escapeHtml(p.sku) + '</div>';
+      html += '</div>';
+      html += '<div style="text-align:right;font-size:12px;"><div style="font-weight:600;color:#c00;">' + (p.price||0).toLocaleString() + ' บ.</div><div style="color:' + (stock <= 5 ? '#f80' : '#666') + ';">stock: ' + stock + '</div></div>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div style="padding:8px;color:#c00;">❌ ' + e.message + '</div>';
+  }
+}
+
+function edAddProduct(productId, name, sku, price) {
+  // ถ้ามีอยู่แล้ว → เพิ่มจำนวนแทน
+  var existing = __edItems.find(function(it){ return it.productId == productId; });
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    __edItems.push({ productId: productId, name: name, sku: sku, quantity: 1, price: price });
+  }
+  document.getElementById('edSearch').value = '';
+  document.getElementById('edSearchResults').style.display = 'none';
+  renderEdItems();
+}
+
+function closeEditDraftItems() {
+  document.getElementById('editDraftItemsModal').classList.remove('active');
+}
+
+async function saveEditDraftItems() {
+  if (!__edItems.length) {
+    document.getElementById('edStatus').innerHTML = '<span style="color:#c00;">⚠️ ต้องมีอย่างน้อย 1 รายการ</span>';
+    return;
+  }
+  var id = document.getElementById('edOrderId').value;
+  document.getElementById('edStatus').innerHTML = '<span style="color:#666;">⏳ กำลังบันทึก...</span>';
+  try {
+    var r = await fetch('/api/orders/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: __edItems })
+    });
+    if (!r.ok) {
+      var err = await r.json().catch(function(){return{};});
+      throw new Error(err.error || 'HTTP ' + r.status);
+    }
+    document.getElementById('edStatus').innerHTML = '<span style="color:#0a8;">✅ บันทึกสำเร็จ</span>';
+    setTimeout(function(){ closeEditDraftItems(); loadOrders(); }, 600);
+  } catch (e) {
+    document.getElementById('edStatus').innerHTML = '<span style="color:#c00;">❌ ' + e.message + '</span>';
+  }
 }
 
 // ============ EDIT ORDER (แก้ไขออเดอร์ทั้งหมด) ============
@@ -4177,7 +4413,9 @@ function updateOrderTotal() {
   document.getElementById('oTotal').textContent = numFormat(total) + ' บาท';
 }
 
-async function submitOrder() {
+async function submitOrder(opts) {
+  opts = opts || {};
+  var asDraft = opts.draft !== false; // default = draft
   if (orderItems.length === 0) {
     document.getElementById('oStatus').innerHTML = '<span style="color:#d33;">⚠️ กรุณาเลือกสินค้าอย่างน้อย 1 รายการ</span>';
     return;
@@ -4206,10 +4444,11 @@ async function submitOrder() {
     total: subtotal - discount + shipping,
     notes: document.getElementById('oNotes').value.trim(),
     courier: (document.getElementById('oCourier') && document.getElementById('oCourier').value) || '',
-    trackingNo: (document.getElementById('oTracking') && document.getElementById('oTracking').value.trim()) || ''
+    trackingNo: (document.getElementById('oTracking') && document.getElementById('oTracking').value.trim()) || '',
+    draft: asDraft
   };
 
-  document.getElementById('oStatus').innerHTML = '⏳ กำลังบันทึก...';
+  document.getElementById('oStatus').innerHTML = asDraft ? '⏳ กำลังบันทึกร่าง...' : '⏳ กำลังยืนยัน+ตัดสต็อก...';
 
   try {
     var r = await fetch('/api/orders', {
@@ -4224,7 +4463,10 @@ async function submitOrder() {
       return;
     }
 
-    document.getElementById('oStatus').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว: <code>' + (result.orderNo || '') + '</code></span>';
+    var msg = asDraft
+      ? '✅ บันทึกร่างแล้ว: <code>' + (result.orderNo || '') + '</code> — ยังไม่ตัด stock'
+      : '✅ ยืนยันออเดอร์แล้ว: <code>' + (result.orderNo || '') + '</code>';
+    document.getElementById('oStatus').innerHTML = '<span style="color:#0a0;">' + msg + '</span>';
     setTimeout(function() {
       closeOrderModal();
       if (typeof loadOrders === 'function') loadOrders();
@@ -4540,7 +4782,8 @@ setInterval(loadBotCustomers, 30000);
 
     <div style="display:flex; gap:8px;">
       <button class="btn btn-secondary" style="flex:1;" onclick="closeOrderModal()">ยกเลิก</button>
-      <button class="btn btn-primary" style="flex:1;" onclick="submitOrder()">บันทึกออเดอร์</button>
+      <button class="btn btn-secondary" style="flex:1;background:#fff3e0;color:#e65100;border:1px solid #e65100;" onclick="submitOrder({draft:true})" title="บันทึกร่าง — ยังไม่ตัด stock รอลูกค้ายืนยันก่อน">📝 บันทึกร่าง</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="submitOrder({draft:false})" title="ยืนยัน+ตัด stock ทันที">✅ ยืนยัน+ตัดสต็อก</button>
     </div>
   </div>
 </div>

@@ -1705,6 +1705,28 @@ app.post('/api/orders/:id/cancel', async function(req, res) {
   }
 });
 
+// confirm-draft — ยืนยันร่าง → ตัด stock + status=pending
+app.post('/api/orders/:id/confirm-draft', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/confirm-draft', { method: 'POST' });
+    if (!r.ok) return res.status(r.status).json(await r.json());
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE order (draft only)
+app.delete('/api/orders/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id, { method: 'DELETE' });
+    if (!r.ok) return res.status(r.status).json(await r.json());
+    res.json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ INVOICE PROXY ============
 
 app.get('/api/orders/:id/invoice', async function(req, res) {
