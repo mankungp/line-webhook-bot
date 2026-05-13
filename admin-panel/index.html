@@ -1693,6 +1693,87 @@ input:focus, textarea:focus, select:focus {
 
 <!-- Manual Attendance Modal -->
 <!-- ============ EDIT CUSTOMER MODAL (สำหรับ Lazada/Shopee/TikTok ที่ลูกค้าส่งชื่อที่อยู่มาตอนหลัง) ============ -->
+<!-- ========== EDIT ORDER MODAL (แก้ไขออเดอร์ทั่วไป) ========== -->
+<div class="modal" id="editOrderModal">
+  <div class="modal-content" style="max-width:640px;">
+    <button class="close-btn" onclick="closeEditOrderModal()">×</button>
+    <h2 style="margin-bottom:6px;">✏️ แก้ไขออเดอร์</h2>
+    <div id="eoOrderNo" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
+    <input type="hidden" id="eoOrderId">
+
+    <div style="font-size:12px;color:#856404;background:#fff3cd;padding:8px;border-radius:6px;margin-bottom:12px;">
+      ⚠️ แก้รายการสินค้าไม่ได้ (ต้องยกเลิกแล้วสร้างใหม่) — ตัวที่แก้ได้: ข้อมูลลูกค้า / ขนส่ง / ค่าส่ง / ส่วนลด / สถานะชำระเงิน / หมายเหตุ
+    </div>
+
+    <h3 style="font-size:14px;margin:14px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">👤 ข้อมูลลูกค้า</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><label>ชื่อ</label>
+        <input type="text" id="eoCustomerName" style="width:100%;padding:8px;">
+      </div>
+      <div><label>เบอร์โทร</label>
+        <input type="text" id="eoCustomerPhone" style="width:100%;padding:8px;">
+      </div>
+    </div>
+    <div style="margin-top:8px;"><label>ที่อยู่</label>
+      <textarea id="eoCustomerAddress" rows="3" style="width:100%;padding:8px;"></textarea>
+    </div>
+    <div style="margin-top:8px;"><label>Tax ID</label>
+      <input type="text" id="eoTaxId" style="width:100%;padding:8px;" placeholder="13 หลัก (ถ้ามี)">
+    </div>
+
+    <h3 style="font-size:14px;margin:14px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">🚚 การจัดส่ง</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><label>ขนส่ง</label>
+        <select id="eoCourier" style="width:100%;padding:8px;"></select>
+      </div>
+      <div><label>เลขพัสดุ (tracking)</label>
+        <input type="text" id="eoTrackingNo" style="width:100%;padding:8px;">
+      </div>
+    </div>
+
+    <h3 style="font-size:14px;margin:14px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">💰 ยอดเงิน</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><label>ส่วนลด (บาท)</label>
+        <input type="number" id="eoDiscount" step="0.01" oninput="eoRecalc()" style="width:100%;padding:8px;">
+      </div>
+      <div><label>ค่าส่ง (บาท)</label>
+        <input type="number" id="eoShippingFee" step="0.01" oninput="eoRecalc()" style="width:100%;padding:8px;">
+      </div>
+    </div>
+    <div id="eoTotalPreview" style="background:#f8f9fa;border-radius:6px;padding:10px;margin-top:8px;font-size:13px;"></div>
+
+    <h3 style="font-size:14px;margin:14px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;">💳 การชำระเงิน</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><label>วิธีชำระเงิน</label>
+        <select id="eoPaymentMethod" style="width:100%;padding:8px;">
+          <option value="">-</option>
+          <option value="cash">เงินสด</option>
+          <option value="transfer">โอนเงิน</option>
+          <option value="qr">QR PromptPay</option>
+          <option value="cod">COD</option>
+        </select>
+      </div>
+      <div><label>สถานะชำระเงิน</label>
+        <select id="eoPaymentStatus" style="width:100%;padding:8px;">
+          <option value="unpaid">⏳ รอชำระ</option>
+          <option value="partial">💵 ชำระบางส่วน</option>
+          <option value="paid">✅ ชำระแล้ว</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;"><label>หมายเหตุ</label>
+      <textarea id="eoNotes" rows="2" style="width:100%;padding:8px;" placeholder="หมายเหตุภายใน"></textarea>
+    </div>
+
+    <div id="eoStatus" style="margin-top:10px;"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeEditOrderModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveEditOrder()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="editCustomerModal">
   <div class="modal-content" style="max-width:500px;">
     <button class="close-btn" onclick="closeEditCustomerModal()">×</button>
@@ -3191,6 +3272,10 @@ function renderOrders(list) {
     if (isMarketplace) {
       html += '<button class="btn btn-secondary btn-sm" onclick="openEditCustomerModal(' + o.id + ')" style="background:#fff3e0;color:#e65100;">✏️ แก้ลูกค้า</button> ';
     }
+    // ปุ่มแก้ไขออเดอร์ทั่วไป — แสดงทุก order ที่ยังไม่ถูกยกเลิก
+    if (o.status !== 'cancelled') {
+      html += '<button class="btn btn-sm" style="background:#e3f2fd;color:#0d47a1;" onclick="openEditOrderModal(' + o.id + ')">✏️ แก้ออเดอร์</button> ';
+    }
     // ปุ่มพิมพ์แสดงทุกสถานะ (รวม cancelled เผื่อดูประวัติ/พิมพ์ซ้ำ)
     html += '<button class="btn btn-secondary btn-sm" onclick="openOrderVideos(' + o.id + ')">🎥 วิดีโอ</button> ';
     html += '<button class="btn btn-secondary btn-sm" onclick="openInvoiceModal(' + o.id + ')">🖨️ พิมพ์</button> ';
@@ -3244,6 +3329,112 @@ async function cancelOrder(id) {
     await fetch('/api/orders/' + id + '/cancel', { method: 'POST' });
     loadOrders();
   } catch (e) { alert('เกิดข้อผิดพลาด'); }
+}
+
+// ============ EDIT ORDER (แก้ไขออเดอร์ทั้งหมด) ============
+async function openEditOrderModal(orderId) {
+  var o = (orders || []).find(function(x) { return x.id == orderId; });
+  if (!o) {
+    try {
+      var r = await fetch('/api/orders/' + orderId);
+      if (r.ok) o = await r.json();
+    } catch (e) {}
+  }
+  if (!o) { alert('ไม่พบออเดอร์'); return; }
+  document.getElementById('eoOrderId').value = o.id;
+  document.getElementById('eoOrderNo').textContent = (o.orderNo || '-') + ' · สถานะ: ' + (o.status || '-') + ' · ' + (o.items || []).length + ' รายการ';
+  document.getElementById('eoCustomerName').value = o.customerName || '';
+  document.getElementById('eoCustomerPhone').value = o.customerPhone || '';
+  document.getElementById('eoCustomerAddress').value = o.customerAddress || '';
+  document.getElementById('eoTaxId').value = o.taxId || o.customerTaxId || '';
+  document.getElementById('eoTrackingNo').value = o.trackingNo || '';
+  document.getElementById('eoDiscount').value = o.discount || 0;
+  document.getElementById('eoShippingFee').value = o.shippingFee || 0;
+  document.getElementById('eoPaymentMethod').value = o.paymentMethod || '';
+  document.getElementById('eoPaymentStatus').value = o.paymentStatus || 'unpaid';
+  document.getElementById('eoNotes').value = o.notes || '';
+  document.getElementById('eoStatus').innerHTML = '';
+  // dataset subtotal ไว้คำนวณ total
+  document.getElementById('editOrderModal').dataset.subtotal = o.subtotal || 0;
+  // โหลด couriers ถ้ายังไม่มี
+  await loadEoCouriers(o.courier || '');
+  eoRecalc();
+  document.getElementById('editOrderModal').classList.add('active');
+}
+
+async function loadEoCouriers(selected) {
+  var sel = document.getElementById('eoCourier');
+  sel.innerHTML = '<option value="">-</option>';
+  try {
+    var r = await fetch('/api/couriers');
+    var d = await r.json();
+    var couriers = d.couriers || d || [];
+    couriers.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c.id || c.name;
+      opt.textContent = c.name + (c.fee ? ' (+' + c.fee + ')' : '');
+      if (opt.value === selected) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('loadEoCouriers:', e);
+  }
+}
+
+function eoRecalc() {
+  var sub = parseFloat(document.getElementById('editOrderModal').dataset.subtotal) || 0;
+  var disc = parseFloat(document.getElementById('eoDiscount').value) || 0;
+  var ship = parseFloat(document.getElementById('eoShippingFee').value) || 0;
+  var total = Math.max(0, sub - disc + ship);
+  document.getElementById('eoTotalPreview').innerHTML =
+    '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>ราคาสินค้า (subtotal):</span><span>' + sub.toLocaleString() + ' บ.</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:2px 0;color:#c00;"><span>- ส่วนลด:</span><span>' + disc.toLocaleString() + ' บ.</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:2px 0;color:#0a8;"><span>+ ค่าส่ง:</span><span>' + ship.toLocaleString() + ' บ.</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid #ddd;margin-top:4px;font-weight:700;font-size:15px;"><span>ยอดรวมใหม่:</span><span style="color:#c00;">' + total.toLocaleString() + ' บ.</span></div>';
+}
+
+function closeEditOrderModal() {
+  document.getElementById('editOrderModal').classList.remove('active');
+}
+
+async function saveEditOrder() {
+  var id = document.getElementById('eoOrderId').value;
+  var sub = parseFloat(document.getElementById('editOrderModal').dataset.subtotal) || 0;
+  var disc = parseFloat(document.getElementById('eoDiscount').value) || 0;
+  var ship = parseFloat(document.getElementById('eoShippingFee').value) || 0;
+  var body = {
+    customerName: document.getElementById('eoCustomerName').value.trim(),
+    customerPhone: document.getElementById('eoCustomerPhone').value.trim(),
+    customerAddress: document.getElementById('eoCustomerAddress').value.trim(),
+    taxId: document.getElementById('eoTaxId').value.trim(),
+    courier: document.getElementById('eoCourier').value,
+    trackingNo: document.getElementById('eoTrackingNo').value.trim(),
+    discount: disc,
+    shippingFee: ship,
+    total: Math.max(0, sub - disc + ship),
+    paymentMethod: document.getElementById('eoPaymentMethod').value,
+    paymentStatus: document.getElementById('eoPaymentStatus').value,
+    notes: document.getElementById('eoNotes').value
+  };
+  document.getElementById('eoStatus').innerHTML = '<span style="color:#666;">⏳ กำลังบันทึก...</span>';
+  try {
+    var r = await fetch('/api/orders/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      var err = await r.json().catch(function() { return {}; });
+      throw new Error(err.error || 'HTTP ' + r.status);
+    }
+    document.getElementById('eoStatus').innerHTML = '<span style="color:#0a8;">✅ บันทึกสำเร็จ</span>';
+    setTimeout(function() {
+      closeEditOrderModal();
+      loadOrders();
+    }, 600);
+  } catch (e) {
+    document.getElementById('eoStatus').innerHTML = '<span style="color:#c00;">❌ ' + e.message + '</span>';
+  }
 }
 
 // ============ EDIT MARKETPLACE CUSTOMER ============
