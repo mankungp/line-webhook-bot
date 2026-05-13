@@ -173,18 +173,31 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 <div class="modal" id="checkoutModal">
   <div class="modal-content" style="max-width: 500px; margin: 0 auto;">
     <button class="close-btn" onclick="closeCheckoutModal()">×</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <button onclick="backToCart()" style="background:none;border:none;color:#0a8;font-size:14px;cursor:pointer;padding:4px;">← กลับตะกร้า</button>
+    </div>
     <h2>📦 ยืนยันสั่งซื้อ</h2>
 
-    <h3 style="font-size:14px;margin:12px 0 6px;">📍 ที่อยู่จัดส่ง</h3>
-    <div class="form-group">
-      <input type="text" id="coName" placeholder="ชื่อผู้รับ *" required>
-    </div>
-    <div class="form-group">
-      <input type="text" id="coPhone" placeholder="เบอร์โทร *" required>
-    </div>
-    <div class="form-group">
-      <textarea id="coAddress" placeholder="ที่อยู่ (บ้านเลขที่ หมู่ ตำบล อำเภอ จังหวัด รหัสไปรษณีย์) *"></textarea>
-    </div>
+    <details open style="margin:8px 0;">
+      <summary style="font-size:14px;font-weight:600;cursor:pointer;padding:6px 0;">📍 ที่อยู่จัดส่ง</summary>
+      <div class="form-group">
+        <label>ชื่อผู้รับ *</label>
+        <input type="text" id="coName" placeholder="เช่น สมชาย ใจดี" oninput="saveCheckoutDraft()" required>
+      </div>
+      <div class="form-group">
+        <label>เบอร์โทร *</label>
+        <input type="tel" id="coPhone" inputmode="numeric" maxlength="10" placeholder="0812345678" oninput="saveCheckoutDraft(); validatePhone(this)" required>
+        <div id="phoneError" style="color:#c00;font-size:11px;margin-top:2px;display:none;">⚠️ เบอร์ต้องมี 9-10 หลัก</div>
+      </div>
+      <div class="form-group">
+        <label>ที่อยู่ *</label>
+        <textarea id="coAddress" oninput="saveCheckoutDraft()" placeholder="บ้านเลขที่ หมู่ ตำบล อำเภอ จังหวัด รหัสไปรษณีย์"></textarea>
+      </div>
+      <div class="form-group">
+        <label>หมายเหตุถึงร้าน (ไม่บังคับ)</label>
+        <input type="text" id="coNote" oninput="saveCheckoutDraft()" placeholder="เช่น ส่งเช้า / ห่อของขวัญ ฯลฯ">
+      </div>
+    </details>
 
     <h3 style="font-size:14px;margin:12px 0 6px;">🚚 เลือกขนส่ง</h3>
     <div class="courier-list" id="coCourierList"></div>
@@ -207,10 +220,15 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
       </label>
     </div>
 
+    <details style="margin:8px 0;">
+      <summary style="font-size:14px;font-weight:600;cursor:pointer;padding:6px 0;">🛒 รายการสินค้า (<span id="coItemCount">0</span>)</summary>
+      <div id="coItemList" style="font-size:13px;padding:8px 0;"></div>
+    </details>
+
     <div id="coSummary" style="background:#f8f9fa;border-radius:8px;padding:12px;margin:12px 0;"></div>
 
     <div id="coStatus" style="margin:8px 0;font-size:13px;"></div>
-    <button class="btn-primary" onclick="submitOrder()">✅ ยืนยันสั่งซื้อ</button>
+    <button class="btn-primary" id="submitOrderBtn" onclick="submitOrder()">✅ ยืนยันสั่งซื้อ</button>
   </div>
 </div>
 
@@ -779,6 +797,7 @@ async function openCheckout() {
   document.getElementById('coAddress').value = '';
   renderCourierOptions();
   renderCheckoutSummary();
+  loadCheckoutDraft();
   closeCartModal();
   document.getElementById('checkoutModal').classList.add('active');
 }
@@ -822,20 +841,71 @@ function renderCheckoutSummary() {
   var sub = cartTotal();
   var ship = parseFloat(document.getElementById('checkoutModal').dataset.shippingFee) || 0;
   var total = sub + ship;
+  var itemHtml = '';
+  CART.forEach(function(it) {
+    itemHtml += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #eee;">' +
+      '<span style="flex:1;margin-right:8px;">' + escapeHtml(it.name) + ' × ' + it.quantity + '</span>' +
+      '<span style="color:#c00;font-weight:600;">' + (it.price * it.quantity).toLocaleString() + ' ฿</span>' +
+    '</div>';
+  });
+  document.getElementById('coItemList').innerHTML = itemHtml;
+  document.getElementById('coItemCount').textContent = cartCount() + ' ชิ้น';
   document.getElementById('coSummary').innerHTML =
-    '<div class="summary-row"><span>สินค้า:</span><span>' + sub.toLocaleString() + ' ฿</span></div>' +
+    '<div class="summary-row"><span>สินค้า (' + cartCount() + ' ชิ้น):</span><span>' + sub.toLocaleString() + ' ฿</span></div>' +
     '<div class="summary-row"><span>ค่าส่ง:</span><span>' + ship.toLocaleString() + ' ฿</span></div>' +
     '<div class="summary-row total"><span>ยอดรวม:</span><span style="color:#c00;">' + total.toLocaleString() + ' ฿</span></div>';
 }
 
+function backToCart() {
+  closeCheckoutModal();
+  openCartModal();
+}
+
+function validatePhone(el) {
+  var v = (el.value || '').replace(/\D/g, '');
+  el.value = v;
+  var err = document.getElementById('phoneError');
+  if (v.length === 0) { err.style.display = 'none'; return; }
+  if (v.length < 9 || v.length > 10) { err.style.display = 'block'; }
+  else { err.style.display = 'none'; }
+}
+
+function saveCheckoutDraft() {
+  try {
+    localStorage.setItem('shop_checkout_draft', JSON.stringify({
+      name: document.getElementById('coName').value || '',
+      phone: document.getElementById('coPhone').value || '',
+      address: document.getElementById('coAddress').value || '',
+      note: (document.getElementById('coNote') || {}).value || ''
+    }));
+  } catch(e) {}
+}
+
+function loadCheckoutDraft() {
+  try {
+    var d = JSON.parse(localStorage.getItem('shop_checkout_draft') || '{}');
+    if (d.name && !document.getElementById('coName').value) document.getElementById('coName').value = d.name;
+    if (d.phone && !document.getElementById('coPhone').value) document.getElementById('coPhone').value = d.phone;
+    if (d.address) document.getElementById('coAddress').value = d.address;
+    if (d.note && document.getElementById('coNote')) document.getElementById('coNote').value = d.note;
+  } catch(e) {}
+}
+
 async function submitOrder() {
+  var btn = document.getElementById('submitOrderBtn');
   var name = document.getElementById('coName').value.trim();
-  var phone = document.getElementById('coPhone').value.trim();
+  var phone = document.getElementById('coPhone').value.trim().replace(/\D/g, '');
   var address = document.getElementById('coAddress').value.trim();
+  var note = (document.getElementById('coNote') || {}).value || '';
   if (!name || !phone || !address) {
     document.getElementById('coStatus').innerHTML = '<span style="color:#c00;">⚠️ กรอกข้อมูลให้ครบ</span>';
     return;
   }
+  if (phone.length < 9 || phone.length > 10) {
+    document.getElementById('coStatus').innerHTML = '<span style="color:#c00;">⚠️ เบอร์โทรไม่ถูกต้อง</span>';
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังส่ง...'; }
   var courier = document.getElementById('checkoutModal').dataset.courierId;
   var shipping = parseFloat(document.getElementById('checkoutModal').dataset.shippingFee) || 0;
   var payment = document.querySelector('input[name="payment"]:checked').value;
@@ -853,6 +923,7 @@ async function submitOrder() {
         customerName: name,
         customerPhone: phone,
         customerAddress: address,
+        note: note,
         courier: courier,
         shippingFee: shipping,
         paymentMethod: payment,
@@ -872,6 +943,8 @@ async function submitOrder() {
     openPayment(d.order);
   } catch (e) {
     document.getElementById('coStatus').innerHTML = '<span style="color:#c00;">❌ ' + e.message + '</span>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ ยืนยันสั่งซื้อ'; }
   }
 }
 
