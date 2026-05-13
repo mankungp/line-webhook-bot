@@ -8,8 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; padding-bottom: 80px; }
-.sticky-header { position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; padding-bottom: 80px; padding-top: var(--header-h, 100px); }
+.sticky-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: #fff; }
 .topbar { background: #0a8; color: #fff; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
 .topbar h1 { font-size: 18px; }
 .user-pill { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -89,6 +89,20 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
   <button id="tabOrdersBtn" onclick="showTab('orders')" style="flex:1;padding:12px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;border-bottom:3px solid transparent;color:#666;">📆 ออเดอร์ของฉัน <span id="orderBadge" style="background:#c00;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;display:none;margin-left:4px;">0</span></button>
 </div>
 </div><!-- /sticky-header -->
+<script>
+// คำนวณความสูง sticky-header แล้ว set padding-top ของ body ให้ตรง — กัน content โดน header บัง
+(function(){
+  function syncHeaderH(){
+    var h = document.querySelector('.sticky-header');
+    if (!h) return;
+    document.documentElement.style.setProperty('--header-h', h.offsetHeight + 'px');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncHeaderH);
+  else syncHeaderH();
+  window.addEventListener('resize', syncHeaderH);
+  window.addEventListener('orientationchange', syncHeaderH);
+})();
+</script>
 
 <!-- Tab: Shop -->
 <div id="tabShop">
