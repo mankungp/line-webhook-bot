@@ -245,7 +245,7 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 var ME = null;
 var PRODUCTS = [];
 var PROD_PAGE = 1;
-var PROD_PAGE_SIZE = 50;
+var PROD_PAGE_SIZE = 30;
 var PROD_LOADING = false;
 var PROD_TOTAL = 0;
 var PROD_HAS_MORE = false;
@@ -482,25 +482,58 @@ function loginLine() {
 }
 
 // ===== Products =====
+// อายุ cache 5 นาที
+var CACHE_TTL_MS = 5 * 60 * 1000;
+function cacheGet(k) {
+  try {
+    var raw = localStorage.getItem('shop_cache_' + k);
+    if (!raw) return null;
+    var o = JSON.parse(raw);
+    if (Date.now() - o.t > CACHE_TTL_MS) return null;
+    return o.v;
+  } catch(e) { return null; }
+}
+function cacheSet(k, v) {
+  try { localStorage.setItem('shop_cache_' + k, JSON.stringify({ t: Date.now(), v: v })); } catch(e) {}
+}
+
 async function loadShopInfo() {
-  try { var r = await fetch('/api/shop'); SHOP_INFO = await r.json(); } catch (e) {}
+  var cached = cacheGet('shop_info');
+  if (cached) { SHOP_INFO = cached; }
+  try {
+    var r = await fetch('/api/shop');
+    SHOP_INFO = await r.json();
+    cacheSet('shop_info', SHOP_INFO);
+  } catch (e) {}
 }
 
 async function loadCategories() {
+  var cached = cacheGet('categories');
+  var cats;
+  if (cached) {
+    cats = cached;
+    fillCategorySelect(cats);
+  }
   try {
     var r = await fetch('/api/categories');
     var d = await r.json();
-    var cats = Array.isArray(d) ? d : (d.categories || []);
-    var sel = document.getElementById('catFilter');
-    var current = sel.value;
-    sel.innerHTML = '<option value="">ทุกหมวด</option>';
-    cats.forEach(function(c) {
-      var id = c.id || c.key;
-      var name = c.name || id;
-      sel.innerHTML += '<option value="' + escapeAttr(id) + '">' + escapeHtml(name) + '</option>';
-    });
-    if (current) sel.value = current;
+    cats = Array.isArray(d) ? d : (d.categories || []);
+    cacheSet('categories', cats);
+    fillCategorySelect(cats);
   } catch (e) { console.error('loadCategories:', e); }
+}
+
+function fillCategorySelect(cats) {
+  var sel = document.getElementById('catFilter');
+  if (!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '<option value="">ทุกหมวด</option>';
+  cats.forEach(function(c) {
+    var id = c.id || c.key;
+    var name = c.name || id;
+    sel.innerHTML += '<option value="' + escapeAttr(id) + '">' + escapeHtml(name) + '</option>';
+  });
+  if (current) sel.value = current;
 }
 
 async function loadProducts(append) {
@@ -596,7 +629,7 @@ function renderProducts() {
     html += '<div class="' + cardCls + '" onclick="openProductDetail(' + p.id + ')">';
     if (isOut) html += '<span class="out-badge">สินค้าหมด</span>';
     if (p.imageUrl) {
-      html += '<img src="' + escapeAttr(p.imageUrl) + '" onerror="this.outerHTML=&quot;<div class=\\&quot;placeholder\\&quot;>📦</div>&quot;">';
+      html += '<img src="' + escapeAttr(p.imageUrl) + '" loading="lazy" decoding="async" onerror="this.outerHTML=&quot;<div class=\\&quot;placeholder\\&quot;>📦</div>&quot;">';
     } else {
       html += '<div class="placeholder">📦</div>';
     }
@@ -657,7 +690,7 @@ function openProductDetail(id) {
     if (imgs.length > 1) {
       html += '<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding:2px 0;">';
       imgs.forEach(function(u, i) {
-        html += '<img onclick="swapDetailImg(\''+ escapeAttr(u) +'\', ' + (i+1) + ')" src="' + escapeAttr(u) + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;cursor:pointer;border:2px solid ' + (i === 0 ? '#0a8' : 'transparent') + ';" class="detail-thumb">';
+        html += '<img onclick="swapDetailImg(\''+ escapeAttr(u) +'\', ' + (i+1) + ')" src="' + escapeAttr(u) + '" loading="lazy" decoding="async" style="width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;cursor:pointer;border:2px solid ' + (i === 0 ? '#0a8' : 'transparent') + ';" class="detail-thumb">';
       });
       html += '</div>';
     }
@@ -850,7 +883,7 @@ function renderCartItems() {
     var stock = it.stock || 0;
     var atMax = stock > 0 && it.quantity >= stock;
     html += '<div class="cart-item">';
-    if (it.imageUrl) html += '<img src="' + escapeAttr(it.imageUrl) + '">';
+    if (it.imageUrl) html += '<img src="' + escapeAttr(it.imageUrl) + '" loading="lazy" decoding="async">';
     else html += '<div style="width:60px;height:60px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:28px;">📦</div>';
     html += '<div class="info">';
     html += '<div class="name">' + escapeHtml(it.name) + '</div>';
