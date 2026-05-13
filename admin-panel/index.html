@@ -3314,8 +3314,8 @@ function renderOrders(list) {
     if (isMarketplace) {
       html += '<button class="btn btn-secondary btn-sm" onclick="openEditCustomerModal(' + o.id + ')" style="background:#fff3e0;color:#e65100;">✏️ แก้ลูกค้า</button> ';
     }
-    // ปุ่มแก้ไขออเดอร์ทั่วไป — แสดงทุก order ที่ยังไม่ถูกยกเลิก
-    if (o.status !== 'cancelled') {
+    // ปุ่มแก้ไขออเดอร์ทั่วไป — ไม่แสดงใน marketplace + ต้องไม่ cancelled
+    if (o.status !== 'cancelled' && !isMarketplace) {
       html += '<button class="btn btn-sm" style="background:#e3f2fd;color:#0d47a1;" onclick="openEditOrderModal(' + o.id + ')">✏️ แก้ออเดอร์</button> ';
     }
     // ปุ่มพิมพ์แสดงทุกสถานะ (รวม cancelled เผื่อดูประวัติ/พิมพ์ซ้ำ)
@@ -3326,7 +3326,8 @@ function renderOrders(list) {
       html += '<button class="btn btn-sm" style="background:#ff6b0f;color:#fff;" onclick="openShipmentPhotoModal(' + o.id + ')" title="อัปรูปใบขนส่ง + ส่ง LINE">📤 ส่งใบขนส่ง</button> ';
     }
     // ✏️ ปุ่มย้อนไปร่าง — สำหรับออเดอร์ที่ตัด stock ไปแล้วแต่ยังไม่ส่ง
-    if (!isDraft && o.stockDeducted && o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'shipped') {
+    // ⚠️ ไม่แสดงบน marketplace orders (Lazada/Shopee/TikTok) — marketplace คุม flow + stock เอง
+    if (!isDraft && !isMarketplace && o.stockDeducted && o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'shipped') {
       html += '<button class="btn btn-sm" style="background:#ff9800;color:#fff;" onclick="revertOrderToDraft(' + o.id + ')" title="คืน stock + กลับไปร่าง แก้ไขได้">⏪ ย้อนไปร่าง</button> ';
     }
     if (o.status !== 'cancelled' && o.status !== 'completed') {
