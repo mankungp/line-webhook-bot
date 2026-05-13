@@ -9,7 +9,8 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; padding-bottom: 80px; }
-.topbar { background: #0a8; color: #fff; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.sticky-header { position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.topbar { background: #0a8; color: #fff; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
 .topbar h1 { font-size: 18px; }
 .user-pill { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .user-pill img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; }
@@ -74,6 +75,7 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 </head>
 <body>
 
+<div class="sticky-header">
 <div class="topbar">
   <h1 onclick="showTab('shop')" style="cursor:pointer;">🌾 เกิดการเกษตร</h1>
   <div id="userArea">
@@ -82,10 +84,11 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
 </div>
 
 <!-- Tab Bar -->
-<div id="tabBar" style="background:#fff;border-bottom:1px solid #eee;display:flex;position:sticky;top:54px;z-index:99;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+<div id="tabBar" style="background:#fff;border-bottom:1px solid #eee;display:flex;">
   <button id="tabShopBtn" onclick="showTab('shop')" style="flex:1;padding:12px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;border-bottom:3px solid #0a8;color:#0a8;">🛍️ สินค้า</button>
   <button id="tabOrdersBtn" onclick="showTab('orders')" style="flex:1;padding:12px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;border-bottom:3px solid transparent;color:#666;">📆 ออเดอร์ของฉัน <span id="orderBadge" style="background:#c00;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;display:none;margin-left:4px;">0</span></button>
 </div>
+</div><!-- /sticky-header -->
 
 <!-- Tab: Shop -->
 <div id="tabShop">
