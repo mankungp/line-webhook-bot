@@ -3542,7 +3542,8 @@ async function _edDoSearch() {
     var html = '';
     list.forEach(function(p) {
       var stock = p.stock || 0;
-      html += '<div onclick="edAddProduct(' + p.id + ', \'' + escapeAttr(p.name) + '\', \'' + escapeAttr(p.sku||'') + '\', ' + (p.price||0) + ')" style="padding:8px;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
+      // เก็บ name+sku ไว้ใน data-* — หลีกปัญหา quote/special char
+      html += '<div data-pid="' + p.id + '" data-name="' + escapeHtml(p.name) + '" data-sku="' + escapeHtml(p.sku||'') + '" data-price="' + (p.price||0) + '" onclick="edAddFromAttr(this)" style="padding:8px;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
       html += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;">' + escapeHtml(p.name) + '</div>';
       if (p.sku) html += '<div style="font-size:11px;color:#999;">SKU: ' + escapeHtml(p.sku) + '</div>';
       html += '</div>';
@@ -3553,6 +3554,14 @@ async function _edDoSearch() {
   } catch (e) {
     box.innerHTML = '<div style="padding:8px;color:#c00;">❌ ' + e.message + '</div>';
   }
+}
+
+function edAddFromAttr(el) {
+  var pid = parseInt(el.dataset.pid, 10);
+  var name = el.dataset.name || '';
+  var sku = el.dataset.sku || '';
+  var price = parseFloat(el.dataset.price) || 0;
+  edAddProduct(pid, name, sku, price);
 }
 
 function edAddProduct(productId, name, sku, price) {
