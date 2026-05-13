@@ -298,6 +298,13 @@ function statusBadge(o) {
   return { color:'#f59e0b', icon:'⏳', label:'รอชำระเงิน' };
 }
 
+var ORDER_FILTER = 'all';
+
+function setOrderFilter(f) {
+  ORDER_FILTER = f;
+  renderMyOrders();
+}
+
 function renderMyOrders() {
   var box = document.getElementById('ordersBody');
   var badge = document.getElementById('orderBadge');
@@ -312,8 +319,40 @@ function renderMyOrders() {
     box.innerHTML = '<div class="empty-state">📦 ยังไม่มีออเดอร์<br/><button class="btn-primary" style="margin-top:14px;width:auto;padding:10px 24px;" onclick="showTab(\'shop\')">🛍️ ช้อปปิ้ง</button></div>';
     return;
   }
-  var html = '';
+  // Filter chips + refresh
+  var counts = { all: MY_ORDERS.length, pending: 0, shipping: 0, done: 0 };
   MY_ORDERS.forEach(function(o) {
+    if (o.status === 'completed') counts.done++;
+    else if (o.status === 'shipped' || o.status === 'packed') counts.shipping++;
+    else if (o.status !== 'cancelled') counts.pending++;
+  });
+  var chips = '<div style="display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;align-items:center;">';
+  var chipDef = [
+    { id: 'all', label: 'ทั้งหมด', n: counts.all },
+    { id: 'pending', label: '⏳ รอดำเนินการ', n: counts.pending },
+    { id: 'shipping', label: '🚚 กำลังส่ง', n: counts.shipping },
+    { id: 'done', label: '✅ เสร็จแล้ว', n: counts.done }
+  ];
+  chipDef.forEach(function(c) {
+    var active = ORDER_FILTER === c.id;
+    chips += '<button onclick="setOrderFilter(\''+ c.id +'\')" style="flex-shrink:0;padding:6px 12px;border-radius:14px;border:1px solid '+ (active ? '#0a8' : '#ddd') +';background:'+ (active ? '#0a8' : '#fff') +';color:'+ (active ? '#fff' : '#666') +';font-size:12px;font-weight:600;cursor:pointer;">' + c.label + ' (' + c.n + ')</button>';
+  });
+  chips += '<button onclick="loadMyOrders()" title="รีเฟรช" style="flex-shrink:0;margin-left:auto;padding:6px 10px;border-radius:14px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px;">🔄</button>';
+  chips += '</div>';
+  // Filter
+  var filtered = MY_ORDERS.filter(function(o) {
+    if (ORDER_FILTER === 'all') return true;
+    if (ORDER_FILTER === 'done') return o.status === 'completed';
+    if (ORDER_FILTER === 'shipping') return o.status === 'shipped' || o.status === 'packed';
+    if (ORDER_FILTER === 'pending') return o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'shipped' && o.status !== 'packed';
+    return true;
+  });
+  if (!filtered.length) {
+    box.innerHTML = chips + '<div class="empty-state">— ไม่มีออเดอร์ในหมวดนี้ —</div>';
+    return;
+  }
+  var html = chips;
+  filtered.forEach(function(o) {
     var sb = statusBadge(o);
     var dt = o.createdAt ? new Date(o.createdAt) : null;
     var dateStr = dt ? dt.toLocaleDateString('th-TH') + ' ' + dt.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) : '-';
@@ -394,6 +433,11 @@ function openOrderDetail(id) {
       html += '<a href="' + escapeAttr(p.url) + '" target="_blank"><img src="' + escapeAttr(p.url) + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #ddd;"></a>';
     });
     html += '</div>';
+  }
+
+  // Tracking copy
+  if (o.trackingNo) {
+    html += '<button onclick="copyText(\''+ o.trackingNo +'\', this)" style="margin-top:8px;background:#fff;border:1px solid #06c755;color:#06c755;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;width:100%;">📋 คัดลอกเลขพัสดุ</button>';
   }
 
   // QR Re-show if QR + unpaid
