@@ -135,6 +135,9 @@ body { font-family: 'Sarabun', sans-serif; background: #f5f5f5; color: #1a1a1a; 
   <select id="catFilter" onchange="onCatChange()">
     <option value="">ทุกหมวด</option>
   </select>
+  <select id="brandFilter" onchange="loadProducts()">
+    <option value="">ทุกยี่ห้อ</option>
+  </select>
 </div>
 <div class="cat-chips" id="catChips"></div>
 
@@ -576,7 +579,33 @@ function onCatChange() {
     var label = b.textContent;
     b.classList.toggle('active', (v === '' && label === 'ทั้งหมด'));
   });
+  // refresh brand dropdown ตาม category
+  fillBrandSelect();
   loadProducts();
+}
+
+var __SHOP_BRANDS = [];
+async function loadBrandsShop() {
+  try {
+    var r = await fetch('/api/brands');
+    var arr = await r.json();
+    __SHOP_BRANDS = Array.isArray(arr) ? arr : [];
+    fillBrandSelect();
+  } catch (e) { console.error('loadBrandsShop:', e); }
+}
+function fillBrandSelect() {
+  var sel = document.getElementById('brandFilter');
+  if (!sel) return;
+  var current = sel.value;
+  var catEl = document.getElementById('catFilter');
+  var cat = catEl ? catEl.value : '';
+  var list = cat ? __SHOP_BRANDS.filter(function(b) { return b.categoryId === cat; }) : __SHOP_BRANDS.slice();
+  list.sort(function(a, b) { return (a.order || 9999) - (b.order || 9999); });
+  sel.innerHTML = '<option value="">ทุกยี่ห้อ</option>';
+  list.forEach(function(b) {
+    sel.innerHTML += '<option value="' + escapeAttr(b.id) + '">' + escapeHtml(b.name) + '</option>';
+  });
+  if (current && list.some(function(b) { return b.id === current; })) sel.value = current;
 }
 
 function applySortAndRender() {
@@ -608,6 +637,9 @@ async function loadProducts(append) {
     url += '&search=' + encodeURIComponent(tokens[0]);
   }
   if (cat) url += '&category=' + encodeURIComponent(cat);
+  var brandSel = document.getElementById('brandFilter');
+  var brand = brandSel ? brandSel.value : '';
+  if (brand) url += '&brandId=' + encodeURIComponent(brand);
   try {
     var r = await fetch(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1334,6 +1366,7 @@ function escapeAttr(s) { return escapeHtml(s); }
 (async function() {
   await loadShopInfo();
   await loadCategories();
+  await loadBrandsShop();
   await loadMe();
   await loadProducts();
   renderCartFab();

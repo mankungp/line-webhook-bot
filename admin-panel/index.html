@@ -859,14 +859,17 @@ input:focus, textarea:focus, select:focus {
         <button class="btn btn-secondary btn-sm" onclick="clearBulkSelection()">ยกเลิก</button>
       </div>
       <div class="toolbar">
-        <input type="text" class="search-box" id="pSearchBox" placeholder="ค้นหาสินค้า..." onkeyup="loadProducts()">
-        <select id="pCategoryFilter" onchange="loadProducts()">
+        <input type="text" class="search-box" id="pSearchBox" placeholder="ค้นหาสินค้า / ยี่ห้อ..." onkeyup="loadProducts()">
+        <select id="pCategoryFilter" onchange="onCategoryFilterChange()">
           <option value="">ทุกหมวดหมู่</option>
           <option value="agricultural">เครื่องเกษตร</option>
           <option value="motorcycle">อะไหล่มอเตอร์ไซค์</option>
           <option value="lawnmower">เครื่องตัดหญ้า</option>
           <option value="pump">เครื่องสูบน้ำ</option>
           <option value="other">อื่นๆ</option>
+        </select>
+        <select id="pBrandFilter" onchange="loadProducts()" title="กรองตามยี่ห้อ (เลือกหมวดก่อน)">
+          <option value="">ทุกยี่ห้อ</option>
         </select>
         <select id="pStockFilter" onchange="loadProducts()">
           <option value="">สต็อกทั้งหมด</option>
@@ -2006,12 +2009,22 @@ input:focus, textarea:focus, select:focus {
           </div>
           <div class="form-group">
             <label>หมวดหมู่ *</label>
-            <select id="pCategory" required>
+            <select id="pCategory" required onchange="onProductCategoryChange()">
               <!-- populated by loadCategories() -->
             </select>
           </div>
         </div>
         <div class="form-row">
+          <div class="form-group">
+            <label>ยี่ห้อ / หมวดหมู่ย่อย</label>
+            <div style="display:flex; gap:6px;">
+              <select id="pBrand" style="flex:1;">
+                <option value="">— ไม่ระบุ —</option>
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addBrandInline()" title="เพิ่มยี่ห้อใหม่ในหมวดนี้">+ ยี่ห้อใหม่</button>
+            </div>
+            <small style="color:#999;">เลือกหมวดก่อน — ยี่ห้อจะขึ้นตาม</small>
+          </div>
           <div class="form-group">
             <label>Barcode</label>
             <input type="text" id="pBarcode" placeholder="เช่น 8851234567890">
@@ -2469,9 +2482,12 @@ async function loadProducts(opts) {
   var channelFilter = chEl ? chEl.value : '';
 
   if (!append) pProductsState.page = 1;
+  var brandEl = document.getElementById('pBrandFilter');
+  var brandId = brandEl ? brandEl.value : '';
   var url = '/api/products?limit=' + pProductsState.limit + '&page=' + pProductsState.page;
   if (search) url += '&search=' + search;
   if (category) url += '&category=' + category;
+  if (brandId) url += '&brandId=' + encodeURIComponent(brandId);
   if (stockFilter) url += '&inStock=' + stockFilter;
   if (channelFilter) url += '&channelStatus=' + channelFilter;
 
@@ -2533,7 +2549,12 @@ function renderProducts(list) {
     }
     html += '<div class="product-name">' + escapeHtml(p.name) + '</div>';
     if (p.sku) html += '<div class="product-sku">' + escapeHtml(p.sku) + '</div>';
-    html += '<div style="margin:5px 0;"><span class="badge badge-' + (p.category || 'other') + '">' + getCatName(p.category) + '</span></div>';
+    html += '<div style="margin:5px 0;"><span class="badge badge-' + (p.category || 'other') + '">' + getCatName(p.category) + '</span>';
+    if (p.brandId) {
+      var __b = __BRANDS.find(function(x){ return x.id === p.brandId; });
+      if (__b) html += ' <span class="badge" style="background:#e3f2fd;color:#1976d2;">' + (__b.icon ? __b.icon + ' ' : '') + escapeHtml(__b.name) + '</span>';
+    }
+    html += '</div>';
     html += '<div class="product-price">' + numFormat(p.price) + ' บาท <small>/ ' + (p.unit || 'ชิ้น') + '</small></div>';
     if (p.priceWholesale > 0) html += '<div style="font-size:12px;color:#999;">ส่ง/ช่าง: ' + numFormat(p.priceWholesale) + '</div>';
     if (p.priceVip > 0) html += '<div style="font-size:12px;color:#d4a017;">VIP: ' + numFormat(p.priceVip) + '</div>';
@@ -2961,6 +2982,9 @@ function openProductModal() {
   renderChannelsList({});
   renderVariants([]);
   document.getElementById('profitDisplay').style.display = 'none';
+  // populate brand dropdown ตาม category ที่เลือกปัจจุบัน (default)
+  var catEl = document.getElementById('pCategory');
+  populateBrandSelect(catEl ? catEl.value : 'other', '');
 }
 
 function editProduct(id) {
@@ -2974,6 +2998,8 @@ function editProduct(id) {
   document.getElementById('pHideFromTech').checked = !!p.hide_from_tech;
   document.getElementById('pSku').value = p.sku || '';
   document.getElementById('pCategory').value = p.category || 'other';
+  // โหลด brand options ตาม category ของสินค้า — แล้ว set brandId
+  populateBrandSelect(p.category || 'other', p.brandId || '');
   document.getElementById('pDesc').value = p.description || '';
   document.getElementById('pBarcode').value = p.barcode || '';
   document.getElementById('pSupplier').value = p.supplier || '';
@@ -3077,6 +3103,7 @@ async function saveProduct(e) {
     name: document.getElementById('pName').value,
     sku: document.getElementById('pSku').value,
     category: document.getElementById('pCategory').value,
+    brandId: document.getElementById('pBrand') ? (document.getElementById('pBrand').value || null) : null,
     description: document.getElementById('pDesc').value,
     barcode: document.getElementById('pBarcode').value,
     supplier: document.getElementById('pSupplier').value,
@@ -3846,6 +3873,89 @@ async function loadCategories() {
 }
 // Initial load
 loadCategories();
+
+// ============ BRANDS (sub-category) ============
+var __BRANDS = []; // เก็บ master list ทั้งหมด
+
+async function loadBrands() {
+  try {
+    var r = await fetch('/api/brands');
+    __BRANDS = await r.json();
+    if (!Array.isArray(__BRANDS)) __BRANDS = [];
+  } catch (e) {
+    console.error('loadBrands failed:', e);
+    __BRANDS = [];
+  }
+}
+
+// Populate <select id="pBrand"> ตาม categoryId
+function populateBrandSelect(categoryId, selectedBrandId) {
+  var sel = document.getElementById('pBrand');
+  if (!sel) return;
+  var filtered = __BRANDS.filter(function(b) { return b.categoryId === categoryId; });
+  filtered.sort(function(a, b) { return (a.order || 9999) - (b.order || 9999); });
+  var html = '<option value="">— ไม่ระบุ —</option>';
+  filtered.forEach(function(b) {
+    var label = (b.icon ? b.icon + ' ' : '') + escapeHtml(b.name);
+    html += '<option value="' + escapeHtml(b.id) + '">' + label + '</option>';
+  });
+  sel.innerHTML = html;
+  if (selectedBrandId) sel.value = selectedBrandId;
+}
+
+// Populate <select id="pBrandFilter"> ข้าง toolbar — cascade ตามหมวดที่เลือก
+function populateBrandFilter() {
+  var sel = document.getElementById('pBrandFilter');
+  if (!sel) return;
+  var catEl = document.getElementById('pCategoryFilter');
+  var cat = catEl ? catEl.value : '';
+  var prev = sel.value;
+  var list = cat ? __BRANDS.filter(function(b) { return b.categoryId === cat; }) : __BRANDS.slice();
+  list.sort(function(a, b) { return (a.order || 9999) - (b.order || 9999); });
+  var html = '<option value="">ทุกยี่ห้อ</option>';
+  if (cat) html += '<option value="none">— ไม่ระบุยี่ห้อ —</option>';
+  list.forEach(function(b) {
+    var label = (b.icon ? b.icon + ' ' : '') + escapeHtml(b.name);
+    html += '<option value="' + escapeHtml(b.id) + '">' + label + '</option>';
+  });
+  sel.innerHTML = html;
+  // ถ้าค่าเดิมยังอยู่ใน list ใหม่ คงไว้ — ไม่งั้น reset
+  if (prev && (prev === 'none' || list.some(function(b) { return b.id === prev; }))) sel.value = prev;
+}
+
+function onCategoryFilterChange() {
+  populateBrandFilter();
+  loadProducts();
+}
+
+function onProductCategoryChange() {
+  var cat = document.getElementById('pCategory').value;
+  populateBrandSelect(cat, '');
+}
+
+async function addBrandInline() {
+  var cat = document.getElementById('pCategory').value;
+  if (!cat) { alert('เลือกหมวดหมู่ก่อน'); return; }
+  var name = prompt('ชื่อยี่ห้อใหม่:');
+  if (!name) return;
+  try {
+    var r = await fetch('/api/brands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), categoryId: cat })
+    });
+    var data = await r.json();
+    if (data && data.error) { alert('❌ ' + data.error); return; }
+    await loadBrands();
+    populateBrandSelect(cat, data.id);
+    populateBrandFilter();
+  } catch (e) {
+    alert('เกิดข้อผิดพลาด: ' + e.message);
+  }
+}
+
+// Initial load brands
+loadBrands().then(function() { populateBrandFilter(); });
 
 function numFormat(num) { return Number(num || 0).toLocaleString('th-TH'); }
 
@@ -5607,6 +5717,11 @@ function searchProductsForPos(query) {
         html += '<div style="display:flex; justify-content:space-between;">';
         html += '<div><strong>' + escapeHtml(p.name) + '</strong>';
         if (p.sku) html += ' <small style="color:#999;">' + escapeHtml(p.sku) + '</small>';
+        // แสดงยี่ห้อถ้ามี
+        if (p.brandId && typeof __BRANDS !== 'undefined') {
+          var __pb = __BRANDS.find(function(x){ return x.id === p.brandId; });
+          if (__pb) html += ' <span style="background:#e3f2fd;color:#1976d2;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:4px;">' + escapeHtml(__pb.name) + '</span>';
+        }
         html += '</div>';
         html += '<div style="text-align:right;"><strong>' + numFormat(tierPrice) + '</strong>' +
           (tierLabel ? '<div style="font-size:10px;color:#0a8855;">' + tierLabel + '</div>' : '') + '</div>';
