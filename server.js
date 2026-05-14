@@ -1419,6 +1419,58 @@ app.delete('/api/categories/:id', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ BRANDS (sub-category) PROXY ============
+app.get('/api/brands', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/brands' + (qs ? '?' + qs : ''));
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/brands', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/brands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/brands/reorder', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/brands/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/brands/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/brands/' + encodeURIComponent(req.params.id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/brands/:id', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await adminFetch(LOCAL_API_BASE + '/api/brands/' + encodeURIComponent(req.params.id) + (qs ? '?' + qs : ''), {
+      method: 'DELETE'
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ PRODUCTS PROXY ============
 app.get('/api/products', async function(req, res) {
   try {
