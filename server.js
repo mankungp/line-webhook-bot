@@ -1447,6 +1447,44 @@ app.post('/api/bigseller/pull-now', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/bigseller/suggest', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/suggest' + (qs ? '?' + qs : ''));
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/bigseller/search', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/search' + (qs ? '?' + qs : ''));
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/products/:id/bigseller-link', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/' + encodeURIComponent(req.params.id) + '/bigseller-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/bigseller/bulk-auto-link', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/bulk-auto-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ BRANDS (sub-category) PROXY ============
 app.get('/api/brands', async function(req, res) {
   try {

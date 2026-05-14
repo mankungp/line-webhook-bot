@@ -1557,6 +1557,7 @@ input:focus, textarea:focus, select:focus {
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button class="btn btn-primary" onclick="bigsellerPullNow()">🔄 Pull ตอนนี้</button>
         <button class="btn btn-secondary" onclick="loadBigseller()">↻ รีเฟรช</button>
+        <button class="btn btn-secondary" onclick="bigsellerBulkAutoLink()" title="ผูกอัตโนมัติตาม confidence">🔗 Auto-link</button>
         <span id="bsLastPull" style="color:#666;font-size:13px;">—</span>
         <span id="bsPushStatus" style="margin-left:auto;padding:6px 10px;border-radius:4px;font-size:12px;"></span>
       </div>
@@ -2023,6 +2024,20 @@ input:focus, textarea:focus, select:focus {
 </div>
 
 <!-- Product Modal -->
+<!-- BigSeller Link Modal -->
+<div class="modal" id="bsLinkModal">
+  <div class="modal-content" style="max-width:560px;max-height:80vh;overflow:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid #eee;">
+      <h3 style="margin:0;">🔗 ผูกกับ BigSeller</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeBsLinkModal()">✕</button>
+    </div>
+    <div style="padding-top:10px;">
+      <input type="text" id="bsLinkSearch" placeholder="🔍 ค้นหา SKU/ชื่อสินค้า BigSeller…" oninput="bsLinkSearchInput()" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:10px;">
+      <div id="bsLinkBody"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="productModal">
   <div class="modal-content" style="max-width:720px;">
     <button class="close-btn" onclick="closeProductModal()">×</button>
@@ -2636,10 +2651,21 @@ function renderChannelBadges(p) {
       + (on ? 'background:#0a8;color:#fff;' : 'background:#eee;color:#999;text-decoration:line-through;')
       + '">' + label + '</span>';
   };
+  // BigSeller badge
+  var bsBadge = '';
+  var bsStatus = p.bigseller_link_status || 'unlinked';
+  if (bsStatus === 'linked' && p.bigseller_sku) {
+    bsBadge = '<span onclick="openBigsellerLinkModal(' + p.id + ')" style="display:inline-block;padding:2px 8px;margin:2px 2px 0 0;border-radius:10px;font-size:11px;background:#1976d2;color:#fff;cursor:pointer;" title="linked: ' + escapeAttr(p.bigseller_sku) + '">📈 BS: ' + escapeHtml((p.bigseller_sku || '').slice(0, 12)) + '</span>';
+  } else if (bsStatus === 'not_in_bigseller') {
+    bsBadge = '<span onclick="openBigsellerLinkModal(' + p.id + ')" style="display:inline-block;padding:2px 8px;margin:2px 2px 0 0;border-radius:10px;font-size:11px;background:#888;color:#fff;cursor:pointer;" title="mark not in BigSeller">📈 ไม่อยู่ BS</span>';
+  } else {
+    bsBadge = '<span onclick="openBigsellerLinkModal(' + p.id + ')" style="display:inline-block;padding:2px 8px;margin:2px 2px 0 0;border-radius:10px;font-size:11px;background:#fff3e0;color:#e65100;cursor:pointer;border:1px dashed #e65100;" title="click to link">🔗 ผูก BS</span>';
+  }
   return '<div style="margin:6px 0;">'
     + pill(cs.lazada, '📦 Lazada')
     + pill(cs.shopee, '🛍 Shopee')
     + pill(cs.tiktok, '🎵 TikTok')
+    + bsBadge
     + '</div>';
 }
 
@@ -8018,6 +8044,168 @@ async function deleteJob() {
   } catch (e) { alert('❌ ' + e.message); }
 }
 
+// ============ BIGSELLER LINK MODAL ============
+var _bsLinkCurrentProduct = null;
+async function openBigsellerLinkModal(productId) {
+  _bsLinkCurrentProduct = productId;
+  document.getElementById('bsLinkModal').classList.add('active');
+  document.getElementById('bsLinkBody').innerHTML = '<div style="padding:20px;text-align:center;color:#999;">⏳ กำลังหาคำแนะนำ...</div>';
+  document.getElementById('bsLinkSearch').value = '';
+  try {
+    var r = await fetch('/api/bigseller/suggest?productId=' + encodeURIComponent(productId));
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'load failed');
+    renderBigsellerLinkModal(d);
+  } catch (e) {
+    document.getElementById('bsLinkBody').innerHTML = '<div style="color:#d33;padding:20px;">❌ ' + escapeHtml(e.message) + '</div>';
+  }
+}
+function renderBigsellerLinkModal(d) {
+  var p = d.product;
+  var cur = d.current_link || {};
+  var html = '';
+  // header
+  html += '<div style="padding:12px;background:#f5f5f5;border-radius:6px;margin-bottom:12px;">';
+  html += '<div style="font-weight:600;">' + escapeHtml(p.name || '') + '</div>';
+  html += '<div style="font-size:12px;color:#666;">SKU ระบบเรา: <code>' + escapeHtml(p.sku || '—') + '</code></div>';
+  html += '</div>';
+  // current link
+  if (cur.bigseller_sku) {
+    html += '<div style="padding:10px;background:#e3f2fd;border-radius:6px;margin-bottom:10px;">';
+    html += '<div style="font-size:12px;color:#1976d2;">ผูกไว้กับ:</div>';
+    html += '<div><strong>' + escapeHtml(cur.bigseller_sku) + '</strong> <small style="color:#666;">(' + escapeHtml(cur.method || '') + ')</small></div>';
+    html += '<button class="btn btn-sm" style="margin-top:6px;background:#d33;color:#fff;" onclick="bigsellerUnlink()">❌ ปลดผูก</button>';
+    html += '</div>';
+  } else if (cur.status === 'not_in_bigseller') {
+    html += '<div style="padding:10px;background:#fff3e0;border-radius:6px;margin-bottom:10px;">';
+    html += '<div style="font-size:12px;color:#888;">🚫 มาร์คไว้ว่า "ไม่อยู่ใน BigSeller"</div>';
+    html += '<button class="btn btn-sm" style="margin-top:6px;" onclick="bigsellerUnlink()">↻ สร้างผูกใหม่</button>';
+    html += '</div>';
+  }
+  // suggestions
+  if (d.suggestions && d.suggestions.length) {
+    html += '<h4 style="margin:10px 0 6px 0;font-size:13px;color:#666;">☝️ คำแนะนำอัตโนมัติ</h4>';
+    d.suggestions.forEach(function(s) {
+      var color = s.score >= 90 ? '#2e7d32' : (s.score >= 70 ? '#1976d2' : '#e65100');
+      html += '<div class="bs-suggest-row" style="padding:10px;border:1px solid #eee;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">';
+      html += '<div style="flex:1;"><div><strong>' + escapeHtml(s.sku) + '</strong> <span style="color:' + color + ';font-size:11px;font-weight:600;">[' + s.score + '%]</span></div>';
+      html += '<div style="font-size:12px;color:#666;">' + escapeHtml((s.name || '').slice(0, 60)) + '</div>';
+      html += '<div style="font-size:11px;color:#999;">stock: ' + (s.bigseller_stock || 0) + '</div></div>';
+      html += '<button class="btn btn-sm btn-primary" onclick="bigsellerLinkTo(\'' + escapeAttr(s.sku) + '\', \'auto-suggest\')">✓ ผูก</button>';
+      html += '</div>';
+    });
+  }
+  // manual search
+  html += '<h4 style="margin:14px 0 6px 0;font-size:13px;color:#666;">🔍 หรือค้นหาเอง</h4>';
+  html += '<div id="bsManualResults" style="min-height:40px;"></div>';
+  // mark not in BS
+  html += '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #eee;">';
+  html += '<button class="btn btn-sm" style="background:#888;color:#fff;" onclick="bigsellerMarkNotInBs()">🚫 ไม่อยู่ใน BigSeller</button>';
+  html += '<small style="color:#999;margin-left:8px;">(จะไม่ suggest อีก)</small>';
+  html += '</div>';
+  document.getElementById('bsLinkBody').innerHTML = html;
+}
+
+var _bsSearchTimer = null;
+function bsLinkSearchInput() {
+  clearTimeout(_bsSearchTimer);
+  _bsSearchTimer = setTimeout(bsLinkSearch, 300);
+}
+async function bsLinkSearch() {
+  var q = document.getElementById('bsLinkSearch').value.trim();
+  var box = document.getElementById('bsManualResults');
+  if (!box) return;
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div style="color:#999;padding:8px;">⏳ ค้นหา...</div>';
+  try {
+    var r = await fetch('/api/bigseller/search?q=' + encodeURIComponent(q) + '&limit=20');
+    var d = await r.json();
+    if (!d.results || !d.results.length) {
+      box.innerHTML = '<div style="color:#999;padding:8px;">— ไม่พบ —</div>'; return;
+    }
+    box.innerHTML = d.results.map(function(s) {
+      return '<div style="padding:8px;border:1px solid #eee;border-radius:4px;margin-bottom:4px;display:flex;align-items:center;gap:10px;">' +
+        '<div style="flex:1;"><strong>' + escapeHtml(s.sku) + '</strong>' +
+        '<div style="font-size:12px;color:#666;">' + escapeHtml((s.name || '').slice(0, 60)) + '</div>' +
+        '<div style="font-size:11px;color:#999;">stock: ' + (s.bigseller_stock || 0) + '</div></div>' +
+        '<button class="btn btn-sm btn-primary" onclick="bigsellerLinkTo(\'' + escapeAttr(s.sku) + '\', \'manual\')">✓ ผูก</button>' +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<div style="color:#d33;padding:8px;">❌ ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function bigsellerLinkTo(bigsellerSku, method) {
+  if (!_bsLinkCurrentProduct) return;
+  try {
+    var r = await fetch('/api/products/' + _bsLinkCurrentProduct + '/bigseller-link', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bigseller_sku: bigsellerSku, method: method })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'link failed');
+    closeBsLinkModal();
+    if (typeof loadProducts === 'function') loadProducts();
+    if (document.getElementById('page-bigseller').style.display !== 'none') loadBigseller();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function bigsellerUnlink() {
+  if (!_bsLinkCurrentProduct) return;
+  if (!confirm('ปลดผูกสินค้านี้จาก BigSeller?')) return;
+  try {
+    var r = await fetch('/api/products/' + _bsLinkCurrentProduct + '/bigseller-link', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unlink: true })
+    });
+    if (!r.ok) throw new Error('unlink failed');
+    closeBsLinkModal();
+    if (typeof loadProducts === 'function') loadProducts();
+    if (document.getElementById('page-bigseller').style.display !== 'none') loadBigseller();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function bigsellerMarkNotInBs() {
+  if (!_bsLinkCurrentProduct) return;
+  try {
+    var r = await fetch('/api/products/' + _bsLinkCurrentProduct + '/bigseller-link', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ not_in_bigseller: true })
+    });
+    if (!r.ok) throw new Error('mark failed');
+    closeBsLinkModal();
+    if (typeof loadProducts === 'function') loadProducts();
+    if (document.getElementById('page-bigseller').style.display !== 'none') loadBigseller();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+function closeBsLinkModal() {
+  document.getElementById('bsLinkModal').classList.remove('active');
+  _bsLinkCurrentProduct = null;
+}
+
+async function bigsellerBulkAutoLink() {
+  var threshold = parseFloat(prompt('Auto-link ที่ confidence ≥2 ? (แนะนำ 95)', '95'));
+  if (isNaN(threshold) || threshold < 50 || threshold > 100) return;
+  // dry run ก่อน
+  try {
+    var r1 = await fetch('/api/bigseller/bulk-auto-link', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threshold: threshold, dryRun: true })
+    });
+    var d1 = await r1.json();
+    if (!confirm('Dry run: จะผูก ' + d1.proposed + ' ตัว (skipped ' + d1.skipped + ')\n\nยืนยันทำจริง?')) return;
+    var r2 = await fetch('/api/bigseller/bulk-auto-link', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threshold: threshold, dryRun: false })
+    });
+    var d2 = await r2.json();
+    alert('✅ ผูกสำเร็จ ' + d2.applied + ' ตัว');
+    loadBigseller();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
 // ============ BIGSELLER SYNC ============
 async function loadBigseller() {
   await loadBigsellerStatus();
@@ -8081,13 +8269,15 @@ async function loadBigsellerMirror() {
       tbody.innerHTML = d.products.map(function(p) {
         var diffColor = p.diff > 0 ? '#e65100' : (p.diff < 0 ? '#1976d2' : '#2e7d32');
         var src = p.source || (p.in_our_system === false ? 'bigseller-only' : 'match');
+        var linkBtn = '';
+        if (p.our_id) linkBtn = '<button class="btn btn-sm" style="background:#1976d2;color:#fff;" onclick="openBigsellerLinkModal(' + p.our_id + ')">🔗 ผูก</button>';
         return '<tr style="border-top:1px solid #eee;">' +
           '<td style="padding:6px;"><code>' + escapeHtml(p.sku || '') + '</code></td>' +
           '<td style="padding:6px;">' + escapeHtml((p.name || '').slice(0, 60)) + '</td>' +
           '<td style="padding:6px;text-align:right;">' + (p.our_stock != null ? numFormat(p.our_stock) : '—') + '</td>' +
           '<td style="padding:6px;text-align:right;">' + (p.bigseller_stock != null ? numFormat(p.bigseller_stock) : '—') + '</td>' +
           '<td style="padding:6px;text-align:right;color:' + diffColor + ';font-weight:600;">' + (p.diff != null ? (p.diff > 0 ? '+' : '') + p.diff : '—') + '</td>' +
-          '<td style="padding:6px;text-align:center;font-size:11px;color:#666;">' + escapeHtml(src) + '</td>' +
+          '<td style="padding:6px;text-align:center;font-size:11px;color:#666;">' + escapeHtml(src) + ' ' + linkBtn + '</td>' +
           '</tr>';
       }).join('');
     }
