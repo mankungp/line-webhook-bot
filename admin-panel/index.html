@@ -275,6 +275,16 @@ input[type="password"], input[type="url"], textarea, select {
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   width: 100%;
 }
+/* ซ่อน spinner ของช่องตัวเลข เพื่อให้พิมพ์เลขได้สะดวกขึ้น */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--primary);
@@ -3116,10 +3126,34 @@ async function saveProduct(e) {
       await fetch('/api/products/' + savedId + '/image', { method: 'POST', body: formData });
     }
     closeProductModal();
-    loadProducts();
+    // รักษาตำแหน่ง scroll + จำนวน page ที่โหลดไว้แล้ว (อย่าให้การ์ดสินค้าล่างๆหายหลังกดแก้ไข)
+    await reloadProductsKeepScroll();
   } catch (err) {
     alert('เกิดข้อผิดพลาด: ' + err.message);
   }
+}
+
+// Reload products ขณะที่รักษา scroll position + จำนวน page ที่โหลดสะสมไว้
+async function reloadProductsKeepScroll() {
+  var prevScroll = window.scrollY || document.documentElement.scrollTop || 0;
+  var prevPages = pProductsState.page;
+  try {
+    // โหลดหน้าแรก
+    pProductsState.page = 1;
+    await loadProducts();
+    // ถ้าเคยกดโหลดเพิ่มมา — append ต่อจนครบ
+    while (pProductsState.page < prevPages &&
+           pProductsState.accumulated.length < pProductsState.total) {
+      pProductsState.page += 1;
+      await loadProducts({ append: true });
+    }
+  } catch (e) {
+    console.warn('reloadProductsKeepScroll failed', e);
+  }
+  // รอ DOM render เสร็จ แล้วคืน scroll
+  requestAnimationFrame(function() {
+    window.scrollTo({ top: prevScroll, left: 0, behavior: 'auto' });
+  });
 }
 
 // ===== Duplicates =====
@@ -4416,25 +4450,34 @@ function renderOrderItems() {
   noItems.style.display = 'none';
   var html = '';
   orderItems.forEach(function(it, idx) {
-    html += '<tr>';
+    html += '<tr data-row-idx="' + idx + '">';
     html += '<td style="padding:6px;">' + escapeHtml(it.name) + '</td>';
-    html += '<td style="padding:6px;text-align:right;"><input type="number" value="' + it.quantity + '" min="1" oninput="updateItemQty(' + idx + ',this.value)" style="width:50px;text-align:right;padding:4px;border:1px solid #ddd;border-radius:4px;"></td>';
-    html += '<td style="padding:6px;text-align:right;"><input type="number" value="' + it.price + '" oninput="updateItemPrice(' + idx + ',this.value)" style="width:70px;text-align:right;padding:4px;border:1px solid #ddd;border-radius:4px;"></td>';
-    html += '<td style="padding:6px;text-align:right;"><strong>' + numFormat(it.quantity * it.price) + '</strong></td>';
+    html += '<td style="padding:6px;text-align:right;"><input type="number" inputmode="decimal" value="' + it.quantity + '" min="1" step="any" data-item-qty="' + idx + '" oninput="updateItemQty(' + idx + ',this.value)" style="width:60px;text-align:right;padding:4px;border:1px solid #ddd;border-radius:4px;"></td>';
+    html += '<td style="padding:6px;text-align:right;"><input type="number" inputmode="decimal" value="' + it.price + '" min="0" step="any" data-item-price="' + idx + '" oninput="updateItemPrice(' + idx + ',this.value)" style="width:80px;text-align:right;padding:4px;border:1px solid #ddd;border-radius:4px;"></td>';
+    html += '<td style="padding:6px;text-align:right;" data-item-subtotal="' + idx + '"><strong>' + numFormat(it.quantity * it.price) + '</strong></td>';
     html += '<td><button onclick="removeItem(' + idx + ')" style="background:#fee; color:#d33; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">×</button></td>';
     html += '</tr>';
   });
   tbody.innerHTML = html;
 }
 
+// อัปเดต subtotal cell + total — ไม่ re-render ทั้ง row (focus ไม่หลุดขณะพิมพ์)
+function _refreshItemSubtotal(idx) {
+  var cell = document.querySelector('[data-item-subtotal="' + idx + '"]');
+  if (cell) cell.innerHTML = '<strong>' + numFormat(orderItems[idx].quantity * orderItems[idx].price) + '</strong>';
+}
+
 function updateItemQty(idx, qty) {
-  orderItems[idx].quantity = parseInt(qty) || 1;
-  renderOrderItems();
+  // ยอมให้พิมพ์ชั่วคราวได้ — ถ้าบลังค์หรือผิด ใช้ fallback ตอน blur
+  var n = parseFloat(qty);
+  orderItems[idx].quantity = (isNaN(n) || n <= 0) ? (qty === '' ? 0 : 1) : n;
+  _refreshItemSubtotal(idx);
   updateOrderTotal();
 }
 function updateItemPrice(idx, price) {
-  orderItems[idx].price = parseFloat(price) || 0;
-  renderOrderItems();
+  var n = parseFloat(price);
+  orderItems[idx].price = isNaN(n) ? 0 : n;
+  _refreshItemSubtotal(idx);
   updateOrderTotal();
 }
 function removeItem(idx) {
