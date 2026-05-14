@@ -1630,7 +1630,7 @@ app.post('/api/line/push-multi', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Proxy shipment photo upload (Render → Mac via ngrok, pass through binary)
+// Proxy shipment photo upload (Render → Mac via Cloudflare tunnel, pass through binary)
 app.post('/api/orders/:id/shipment-photo', async function(req, res) {
   try {
     var https = require('https');
@@ -1640,6 +1640,9 @@ app.post('/api/orders/:id/shipment-photo', async function(req, res) {
     var lib = isHttps ? https : http;
     var headers = Object.assign({}, req.headers);
     delete headers.host;
+    // ลบ accept-encoding — ไม่ต้องรับ gzip จะได้ body ตรงๆ (กัน binary concat bug)
+    delete headers['accept-encoding'];
+    delete headers['Accept-Encoding'];
     headers['X-Admin-Token'] = ADMIN_TOKEN;
     var options = {
       hostname: urlObj.hostname,
@@ -1649,11 +1652,30 @@ app.post('/api/orders/:id/shipment-photo', async function(req, res) {
       headers: headers
     };
     var proxyReq = lib.request(options, function(proxyRes) {
-      var body = '';
-      proxyRes.on('data', function(c) { body += c; });
+      // สะสมเป็น Buffer (ไม่ใช้ string concat — กันข้อมูลเสียหายตอนอยู่ระหว่าง multi-byte chars)
+      var chunks = [];
+      proxyRes.on('data', function(c) { chunks.push(c); });
       proxyRes.on('end', function() {
-        res.status(proxyRes.statusCode);
-        try { res.json(JSON.parse(body)); } catch (e) { res.send(body); }
+        var buf = Buffer.concat(chunks);
+        var ct = proxyRes.headers['content-type'] || 'application/json';
+        // ถ้า backend ส่ง JSON — พยายาม parse + ตอบกลับเป็น JSON; ไม่งั้นปล่อย raw ตาม content-type
+        if (ct.indexOf('application/json') >= 0) {
+          try {
+            var parsed = JSON.parse(buf.toString('utf8'));
+            return res.status(proxyRes.statusCode).json(parsed);
+          } catch (e) { /* fall through */ }
+        }
+        // ถ้า backend ตอบ JSON แต่ปลอมเป็น html (กรณี nginx/cloudflare error page) — force JSON error
+        var text = buf.toString('utf8');
+        if (/^\s*\{/.test(text)) {
+          try { return res.status(proxyRes.statusCode).json(JSON.parse(text)); } catch(_){}
+        }
+        res.status(proxyRes.statusCode || 502).set('Content-Type', 'application/json').json({
+          error: 'upstream returned non-JSON',
+          status: proxyRes.statusCode,
+          content_type: ct,
+          body_preview: text.slice(0, 200)
+        });
       });
     });
     proxyReq.on('error', function(e) { res.status(500).json({ error: e.message }); });
