@@ -1419,6 +1419,34 @@ app.delete('/api/categories/:id', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ BIGSELLER SYNC PROXY ============
+app.get('/api/bigseller/status', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/status');
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/bigseller/mirror', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/mirror' + (qs ? '?' + qs : ''));
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/bigseller/pull-now', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/pull-now' + (qs ? '?' + qs : ''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ BRANDS (sub-category) PROXY ============
 app.get('/api/brands', async function(req, res) {
   try {
