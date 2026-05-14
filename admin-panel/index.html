@@ -1590,7 +1590,7 @@ input:focus, textarea:focus, select:focus {
               <th style="padding:8px;text-align:center;">Source</th>
             </tr>
           </thead>
-          <tbody id="bsTbody"><tr><td colspan="6" style="padding:20px;text-align:center;color:#999;">— ยังไม่มีข้อมูล — กด Pull ตอนนี้</td></tr></tbody>
+          <tbody id="bsTbody"><tr><td colspan="7" style="padding:20px;text-align:center;color:#999;">— ยังไม่มีข้อมูล — กด Pull ตอนนี้</td></tr></tbody>
         </table>
       </div>
       <div id="bsRowsInfo" style="margin-top:8px;font-size:12px;color:#999;"></div>
@@ -8331,16 +8331,20 @@ async function openBsEditModal(bsSku, bsName, ourId, currentBsStock) {
     var hit = (d.products || []).find(function(x) { return x.sku === bsSku; });
     if (hit) {
       cur.name = hit.name || bsName;
-      cur.sale_price = hit.bigseller_sale_price;
+      // BigSeller ราคาขายมักว่าง — ใช้ shopee_price แทนถ้ามี
+      cur.sale_price = hit.bigseller_sale_price || hit.shopee_price || null;
       cur.cost_price = hit.bigseller_cost_price;
       cur.weight_g = hit.bigseller_weight_g;
-      cur.gtin = hit.bigseller_gtin || '';
+      cur.gtin = hit.bigseller_gtin || hit.shopee_gtin || '';
       cur.length_cm = hit.bigseller_length_cm;
       cur.width_cm = hit.bigseller_width_cm;
       cur.height_cm = hit.bigseller_height_cm;
       cur.image_url = hit.bigseller_image_url || '';
       cur.note = hit.bigseller_note || '';
       cur.category = hit.bigseller_category || '';
+      cur.shopee_price = hit.shopee_price;
+      cur.shopee_stock = hit.shopee_stock;
+      cur.shopee_item_id = hit.shopee_item_id;
     }
   } catch (e) { /* ignore — ใช้ค่า default */ }
   var ph = function(v, def) { return (v != null && v !== '') ? String(v) : (def || ''); };
@@ -8350,6 +8354,13 @@ async function openBsEditModal(bsSku, bsName, ourId, currentBsStock) {
   html += '<div><strong>BigSeller SKU:</strong> <code>' + escapeHtml(bsSku) + '</code></div>';
   html += '<div><strong>ชื่อปัจจุบัน:</strong> ' + escapeHtml(cur.name || '—') + '</div>';
   if (cur.category) html += '<div><strong>หมวด:</strong> ' + escapeHtml(cur.category) + '</div>';
+  if (cur.shopee_price) {
+    html += '<div style="margin-top:4px;padding:4px 8px;background:#fff4f1;border-left:3px solid #ee4d2d;border-radius:3px;font-size:11px;">';
+    html += '🛍 <strong>Shopee:</strong> ราคา ฿' + numFormat(cur.shopee_price);
+    if (cur.shopee_stock != null) html += ' · stock ' + cur.shopee_stock;
+    if (cur.shopee_item_id) html += ' · ID ' + cur.shopee_item_id;
+    html += '</div>';
+  }
   if (cur.image_url) html += '<div style="margin-top:4px;"><img src="' + escapeAttr(cur.image_url) + '" style="max-width:80px;max-height:80px;border-radius:4px;" onerror="this.style.display=&quot;none&quot;"></div>';
   html += '</div>';
   html += '<div style="font-size:11px;color:#999;margin-bottom:6px;">💡 placeholder = ค่าปัจจุบันใน BigSeller · ปล่อยว่าง = ไม่แก้</div>';
@@ -8552,7 +8563,7 @@ async function loadBigsellerMirror() {
     var d = await r.json();
     var tbody = document.getElementById('bsTbody');
     if (!d.products || !d.products.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:#999;">ไม่มีรายการตามตัวกรอง</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:#999;">ไม่มีรายการตามตัวกรอง</td></tr>';
     } else {
       tbody.innerHTML = d.products.map(function(p) {
         var diffColor = p.diff > 0 ? '#e65100' : (p.diff < 0 ? '#1976d2' : '#2e7d32');
@@ -8577,7 +8588,7 @@ async function loadBigsellerMirror() {
     document.getElementById('bsRowsInfo').textContent =
       'แสดง ' + d.returned + ' / ' + d.total + ' รายการ';
   } catch (e) {
-    document.getElementById('bsTbody').innerHTML = '<tr><td colspan="6" style="color:#d33;padding:10px;">❌ ' + escapeHtml(e.message) + '</td></tr>';
+    document.getElementById('bsTbody').innerHTML = '<tr><td colspan="7" style="color:#d33;padding:10px;">❌ ' + escapeHtml(e.message) + '</td></tr>';
   }
 }
 
