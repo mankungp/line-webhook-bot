@@ -8319,25 +8319,51 @@ async function loadBigseller() {
 
 // ============ EDIT QUEUE ============
 var _bsEditCtx = null;
-function openBsEditModal(bsSku, bsName, ourId, currentBsStock) {
+async function openBsEditModal(bsSku, bsName, ourId, currentBsStock) {
   _bsEditCtx = { sku: bsSku, name: bsName, our_id: ourId, current_stock: currentBsStock };
+  // ดึงข้อมูลปัจจุบันของ BigSeller (จาก mirror)
+  document.getElementById('bsEditModal').classList.add('active');
+  document.getElementById('bsEditBody').innerHTML = '<div style="padding:20px;text-align:center;color:#999;">⏳ กำลังโหลดข้อมูล...</div>';
+  var cur = { name: bsName, sale_price: null, cost_price: null, weight_g: null, gtin: '', length_cm: null, width_cm: null, height_cm: null, image_url: '', note: '' };
+  try {
+    var r = await fetch('/api/bigseller/mirror?search=' + encodeURIComponent(bsSku) + '&limit=5');
+    var d = await r.json();
+    var hit = (d.products || []).find(function(x) { return x.sku === bsSku; });
+    if (hit) {
+      cur.name = hit.name || bsName;
+      cur.sale_price = hit.bigseller_sale_price;
+      cur.cost_price = hit.bigseller_cost_price;
+      cur.weight_g = hit.bigseller_weight_g;
+      cur.gtin = hit.bigseller_gtin || '';
+      cur.length_cm = hit.bigseller_length_cm;
+      cur.width_cm = hit.bigseller_width_cm;
+      cur.height_cm = hit.bigseller_height_cm;
+      cur.image_url = hit.bigseller_image_url || '';
+      cur.note = hit.bigseller_note || '';
+      cur.category = hit.bigseller_category || '';
+    }
+  } catch (e) { /* ignore — ใช้ค่า default */ }
+  var ph = function(v, def) { return (v != null && v !== '') ? String(v) : (def || ''); };
   var html = '';
   html += '<div style="padding:10px 0;">';
   html += '<div style="padding:8px;background:#f5f5f5;border-radius:4px;margin-bottom:10px;font-size:12px;">';
   html += '<div><strong>BigSeller SKU:</strong> <code>' + escapeHtml(bsSku) + '</code></div>';
-  html += '<div><strong>ชื่อปัจจุบัน:</strong> ' + escapeHtml(bsName || '—') + '</div>';
+  html += '<div><strong>ชื่อปัจจุบัน:</strong> ' + escapeHtml(cur.name || '—') + '</div>';
+  if (cur.category) html += '<div><strong>หมวด:</strong> ' + escapeHtml(cur.category) + '</div>';
+  if (cur.image_url) html += '<div style="margin-top:4px;"><img src="' + escapeAttr(cur.image_url) + '" style="max-width:80px;max-height:80px;border-radius:4px;" onerror="this.style.display=&quot;none&quot;"></div>';
   html += '</div>';
+  html += '<div style="font-size:11px;color:#999;margin-bottom:6px;">💡 placeholder = ค่าปัจจุบันใน BigSeller · ปล่อยว่าง = ไม่แก้</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">ชื่อใหม่ (ปล่อยว่างถ้าไม่แก้)</label><input id="bsEdit_name" placeholder="' + escapeAttr(bsName||'') + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div><label style="font-size:12px;color:#666;">ราคาขาย</label><input id="bsEdit_sale_price" type="number" step="any" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div><label style="font-size:12px;color:#666;">ราคาต้นทุน</label><input id="bsEdit_cost_price" type="number" step="any" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div><label style="font-size:12px;color:#666;">น้ำหนัก (g)</label><input id="bsEdit_weight_g" type="number" step="any" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div><label style="font-size:12px;color:#666;">GTIN/Barcode</label><input id="bsEdit_gtin" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div><label style="font-size:12px;color:#666;">ยาว (cm)</label><input id="bsEdit_length_cm" type="number" step="any" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div><label style="font-size:12px;color:#666;">กว้าง (cm)</label><input id="bsEdit_width_cm" type="number" step="any" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div><label style="font-size:12px;color:#666;">สูง (cm)</label><input id="bsEdit_height_cm" type="number" step="any" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">Image URL</label><input id="bsEdit_image_url" placeholder="https://" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
-  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">หมายเหตุ</label><input id="bsEdit_note" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">ชื่อ</label><input id="bsEdit_name" placeholder="' + escapeAttr(ph(cur.name)) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">ราคาขาย</label><input id="bsEdit_sale_price" type="number" step="any" inputmode="decimal" placeholder="' + escapeAttr(ph(cur.sale_price, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">ราคาต้นทุน</label><input id="bsEdit_cost_price" type="number" step="any" inputmode="decimal" placeholder="' + escapeAttr(ph(cur.cost_price, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">น้ำหนัก (g)</label><input id="bsEdit_weight_g" type="number" step="any" inputmode="decimal" placeholder="' + escapeAttr(ph(cur.weight_g, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">GTIN/Barcode</label><input id="bsEdit_gtin" placeholder="' + escapeAttr(ph(cur.gtin, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">ยาว (cm)</label><input id="bsEdit_length_cm" type="number" step="any" placeholder="' + escapeAttr(ph(cur.length_cm, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">กว้าง (cm)</label><input id="bsEdit_width_cm" type="number" step="any" placeholder="' + escapeAttr(ph(cur.width_cm, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">สูง (cm)</label><input id="bsEdit_height_cm" type="number" step="any" placeholder="' + escapeAttr(ph(cur.height_cm, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">Image URL</label><input id="bsEdit_image_url" placeholder="' + escapeAttr(ph(cur.image_url, 'https://...')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">หมายเหตุ</label><input id="bsEdit_note" placeholder="' + escapeAttr(ph(cur.note, '—')) + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
   html += '</div>';
   html += '<div style="margin-top:14px;padding:8px;background:#fff3e0;border-radius:4px;font-size:12px;color:#666;">💡 กรอกเฉพาะ field ที่ต้องการแก้ ปล่อย field อื่นไว้ว่าง — ไม่ต้องกรอกทุกช่อง</div>';
   html += '<div style="display:flex;gap:10px;margin-top:14px;">';
@@ -8346,7 +8372,6 @@ function openBsEditModal(bsSku, bsName, ourId, currentBsStock) {
   html += '</div>';
   html += '</div>';
   document.getElementById('bsEditBody').innerHTML = html;
-  document.getElementById('bsEditModal').classList.add('active');
 }
 function closeBsEditModal() {
   document.getElementById('bsEditModal').classList.remove('active');
