@@ -1644,6 +1644,7 @@ input:focus, textarea:focus, select:focus {
           <button class="btn btn-primary btn-sm" onclick="lazadaAuthorize()">🔗 เชื่อมต่อ (OAuth)</button>
           <button class="btn btn-secondary btn-sm" onclick="lazadaSyncProducts()" id="lzSyncProdBtn">📦 Sync products</button>
           <button class="btn btn-secondary btn-sm" onclick="lazadaSyncOrders()" id="lzSyncOrdBtn">🧾 Sync orders</button>
+          <button class="btn btn-danger btn-sm" onclick="lazadaDisconnect()" id="lzDisconnectBtn" style="display:none;">🔌 Disconnect</button>
           <button class="btn btn-secondary btn-sm" onclick="lazadaRefreshToken()">♻️ Refresh token</button>
         </div>
         <div id="lzActionMsg" style="margin-top:6px; font-size:12px;"></div>
@@ -1665,6 +1666,7 @@ input:focus, textarea:focus, select:focus {
         <div id="tkInfo" style="font-size:12px; color:#999; margin-bottom:10px;"></div>
         <button class="btn btn-primary btn-sm" onclick="openMarketplaceConfig('tiktok')">⚙️ ตั้งค่า credentials</button>
         <button class="btn btn-secondary btn-sm" onclick="syncMarketplace('tiktok')" id="tkSyncBtn">🔄 Sync orders</button>
+        <button class="btn btn-danger btn-sm" onclick="tiktokDisconnect()" id="tkDisconnectBtn">🔌 Disconnect</button>
         <div style="margin-top:10px; padding:8px; background:#f6f8fa; border-radius:6px; font-size:11px; font-family:monospace;">
           Webhook URL:<br/><code style="word-break:break-all;">/api/marketplace/tiktok/webhook</code>
         </div>
@@ -8386,6 +8388,27 @@ async function bigsellerPullNow() {
 }
 
 // ============ MARKETPLACE ============
+async function lazadaDisconnect() {
+  if (!confirm('⚠️ Disconnect Lazada?\n\nระบบจะ:\n• ปิด OAuth token (ลบ access_token/refresh_token)\n• หยุด sync stock/orders อัตโนมัติ\n• เก็บ app_key/secret ไว้ (กลับ authorize ใหม่ได้ตลอด)\n• สินค้าบน Lazada ยังขายได้ปกติ')) return;
+  try {
+    var r = await fetch('/api/marketplace/lazada/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'disconnect failed');
+    alert('✅ ' + (d.message || 'Lazada disconnected'));
+    loadMarketplace();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+async function tiktokDisconnect() {
+  if (!confirm('⚠️ Disconnect TikTok?\n\n• ลบ access_token\n• หยุด sync orders')) return;
+  try {
+    var r = await fetch('/api/marketplace/tiktok/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'disconnect failed');
+    alert('✅ ' + (d.message || 'TikTok disconnected'));
+    loadMarketplace();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
 async function loadMarketplace() {
   loadNotifySettings();
   try {
@@ -8408,6 +8431,9 @@ async function loadMarketplace() {
           el.innerHTML = '⚠️ ยังไม่ authorize — กด <b>เชื่อมต่อ (OAuth)</b> เพื่อเริ่ม';
         }
       }
+      // toggle Disconnect button
+      var dcBtn = document.getElementById('lzDisconnectBtn');
+      if (dcBtn) dcBtn.style.display = s.authorized ? '' : 'none';
     }
   } catch (e) { console.warn('lazada status:', e); }
 }
