@@ -1683,6 +1683,40 @@ app.post('/api/orders/:id/shipment-photo', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// BigSeller edit queue
+app.get('/api/bigseller/edit-queue', async function(req, res) {
+  try { var r = await fetch(LOCAL_API_BASE + '/api/bigseller/edit-queue'); res.status(r.status).json(await r.json()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/bigseller/edit-queue', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/edit-queue', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/bigseller/edit-queue/:sku', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/edit-queue/' + encodeURIComponent(req.params.sku), { method: 'DELETE' });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/bigseller/edit-queue', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/edit-queue', { method: 'DELETE' });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/bigseller/edit-queue/upload', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/edit-queue/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Disconnect entire marketplace (clear OAuth token)
 app.post('/api/marketplace/lazada/disconnect', async function(req, res) {
   try {

@@ -1558,6 +1558,7 @@ input:focus, textarea:focus, select:focus {
         <button class="btn btn-primary" onclick="bigsellerPullNow()">🔄 Pull ตอนนี้</button>
         <button class="btn btn-secondary" onclick="loadBigseller()">↻ รีเฟรช</button>
         <button class="btn btn-secondary" onclick="bigsellerBulkAutoLink()" title="ผูกอัตโนมัติตาม confidence">🔗 Auto-link</button>
+        <span id="bsQueuePill" style="margin-left:auto;"></span>
         <span id="bsLastPull" style="color:#666;font-size:13px;">—</span>
         <span id="bsPushStatus" style="margin-left:auto;padding:6px 10px;border-radius:4px;font-size:12px;"></span>
       </div>
@@ -2026,6 +2027,28 @@ input:focus, textarea:focus, select:focus {
 </div>
 
 <!-- Product Modal -->
+<!-- BigSeller Edit Modal -->
+<div class="modal" id="bsEditModal">
+  <div class="modal-content" style="max-width:560px;max-height:85vh;overflow:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid #eee;">
+      <h3 style="margin:0;">✏️ แก้ข้อมูล BigSeller</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeBsEditModal()">✕</button>
+    </div>
+    <div id="bsEditBody"></div>
+  </div>
+</div>
+
+<!-- BigSeller Queue Modal -->
+<div class="modal" id="bsQueueModal">
+  <div class="modal-content" style="max-width:760px;max-height:85vh;overflow:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid #eee;">
+      <h3 style="margin:0;">📦 BigSeller Edit Queue</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeBsQueueModal()">✕</button>
+    </div>
+    <div id="bsQueueBody" style="padding-top:10px;"></div>
+  </div>
+</div>
+
 <!-- Unlink Channel Modal -->
 <div class="modal" id="unlinkChannelModal">
   <div class="modal-content" style="max-width:500px;">
@@ -8291,6 +8314,165 @@ async function bigsellerBulkAutoLink() {
 async function loadBigseller() {
   await loadBigsellerStatus();
   await loadBigsellerMirror();
+  await loadBsEditQueue();
+}
+
+// ============ EDIT QUEUE ============
+var _bsEditCtx = null;
+function openBsEditModal(bsSku, bsName, ourId, currentBsStock) {
+  _bsEditCtx = { sku: bsSku, name: bsName, our_id: ourId, current_stock: currentBsStock };
+  var html = '';
+  html += '<div style="padding:10px 0;">';
+  html += '<div style="padding:8px;background:#f5f5f5;border-radius:4px;margin-bottom:10px;font-size:12px;">';
+  html += '<div><strong>BigSeller SKU:</strong> <code>' + escapeHtml(bsSku) + '</code></div>';
+  html += '<div><strong>ชื่อปัจจุบัน:</strong> ' + escapeHtml(bsName || '—') + '</div>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">ชื่อใหม่ (ปล่อยว่างถ้าไม่แก้)</label><input id="bsEdit_name" placeholder="' + escapeAttr(bsName||'') + '" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">ราคาขาย</label><input id="bsEdit_sale_price" type="number" step="any" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">ราคาต้นทุน</label><input id="bsEdit_cost_price" type="number" step="any" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">น้ำหนัก (g)</label><input id="bsEdit_weight_g" type="number" step="any" inputmode="decimal" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">GTIN/Barcode</label><input id="bsEdit_gtin" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">ยาว (cm)</label><input id="bsEdit_length_cm" type="number" step="any" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">กว้าง (cm)</label><input id="bsEdit_width_cm" type="number" step="any" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div><label style="font-size:12px;color:#666;">สูง (cm)</label><input id="bsEdit_height_cm" type="number" step="any" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">Image URL</label><input id="bsEdit_image_url" placeholder="https://" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '<div style="grid-column:1/-1;"><label style="font-size:12px;color:#666;">หมายเหตุ</label><input id="bsEdit_note" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"></div>';
+  html += '</div>';
+  html += '<div style="margin-top:14px;padding:8px;background:#fff3e0;border-radius:4px;font-size:12px;color:#666;">💡 กรอกเฉพาะ field ที่ต้องการแก้ ปล่อย field อื่นไว้ว่าง — ไม่ต้องกรอกทุกช่อง</div>';
+  html += '<div style="display:flex;gap:10px;margin-top:14px;">';
+  html += '<button class="btn btn-primary" onclick="bsEditEnqueue()">➕ เพิ่มลง Queue</button>';
+  html += '<button class="btn btn-secondary" onclick="closeBsEditModal()">ยกเลิก</button>';
+  html += '</div>';
+  html += '</div>';
+  document.getElementById('bsEditBody').innerHTML = html;
+  document.getElementById('bsEditModal').classList.add('active');
+}
+function closeBsEditModal() {
+  document.getElementById('bsEditModal').classList.remove('active');
+  _bsEditCtx = null;
+}
+async function bsEditEnqueue() {
+  if (!_bsEditCtx) return;
+  var changes = {};
+  ['name','sale_price','cost_price','weight_g','gtin','length_cm','width_cm','height_cm','image_url','note'].forEach(function(k) {
+    var el = document.getElementById('bsEdit_' + k);
+    if (!el) return;
+    var v = el.value.trim();
+    if (v !== '') {
+      // numeric fields
+      if (['sale_price','cost_price','weight_g','length_cm','width_cm','height_cm'].indexOf(k) >= 0) {
+        var n = parseFloat(v);
+        if (!isNaN(n)) changes[k] = n;
+      } else {
+        changes[k] = v;
+      }
+    }
+  });
+  if (Object.keys(changes).length === 0) { alert('ยังไม่ได้กรอกอะไรเลย'); return; }
+  try {
+    var r = await fetch('/api/bigseller/edit-queue', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bigseller_sku: _bsEditCtx.sku,
+        bigseller_name: _bsEditCtx.name,
+        our_id: _bsEditCtx.our_id,
+        changes: changes
+      })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'enqueue failed');
+    closeBsEditModal();
+    await loadBsEditQueue();
+    if (d.overridden) {
+      // toast สั้นๆ
+      var p = document.getElementById('bsStatusMsg');
+      if (p) p.innerHTML = '<span style="color:#1976d2;">🔄 Override — มี ' + d.total + ' SKU ใน queue</span>';
+    }
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function loadBsEditQueue() {
+  try {
+    var r = await fetch('/api/bigseller/edit-queue');
+    var q = await r.json();
+    var pill = document.getElementById('bsQueuePill');
+    if (!pill) return;
+    if (!q.items || !q.items.length) {
+      pill.innerHTML = '<span style="color:#999;font-size:12px;">queue: ว่าง</span>';
+      return;
+    }
+    pill.innerHTML = '<button class="btn btn-warning" style="background:#e65100;color:#fff;" onclick="openBsQueueModal()">📦 Queue: <strong>' + q.items.length + '</strong> SKU รออัป</button>';
+  } catch (e) { /* ignore */ }
+}
+
+async function openBsQueueModal() {
+  document.getElementById('bsQueueModal').classList.add('active');
+  await renderBsQueue();
+}
+function closeBsQueueModal() {
+  document.getElementById('bsQueueModal').classList.remove('active');
+}
+async function renderBsQueue() {
+  try {
+    var r = await fetch('/api/bigseller/edit-queue');
+    var q = await r.json();
+    var box = document.getElementById('bsQueueBody');
+    if (!q.items || !q.items.length) {
+      box.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">— queue ว่าง —</div>';
+      return;
+    }
+    var html = '<div style="margin-bottom:10px;"><strong>' + q.items.length + ' SKU รออัปไป BigSeller</strong></div>';
+    html += '<table style="width:100%;font-size:12px;border-collapse:collapse;">';
+    html += '<thead style="background:#f5f5f5;"><tr><th style="padding:6px;text-align:left;">SKU</th><th style="padding:6px;text-align:left;">Changes</th><th style="padding:6px;"></th></tr></thead><tbody>';
+    q.items.forEach(function(it) {
+      var changes = Object.keys(it.changes||{}).map(function(k) { return k + '=' + JSON.stringify(it.changes[k]); }).join(', ');
+      html += '<tr style="border-top:1px solid #eee;">';
+      html += '<td style="padding:6px;"><code>' + escapeHtml(it.bigseller_sku) + '</code></td>';
+      html += '<td style="padding:6px;font-family:monospace;font-size:11px;color:#444;">' + escapeHtml(changes) + '</td>';
+      html += '<td style="padding:6px;"><button class="btn btn-sm btn-danger" onclick="bsQueueRemove(\'' + escapeAttr(it.bigseller_sku) + '\')">✕</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="display:flex;gap:10px;margin-top:14px;">';
+    html += '<button class="btn btn-primary" onclick="bsQueueUpload()">🚀 Upload ทั้งหมด (' + q.items.length + ' SKU) ไป BigSeller</button>';
+    html += '<button class="btn btn-secondary" onclick="bsQueueClearAll()">✕ ล้าง queue ทั้งหมด</button>';
+    html += '<button class="btn btn-secondary" onclick="closeBsQueueModal()">ปิด</button>';
+    html += '</div>';
+    if (q.lastUpload) {
+      html += '<div style="margin-top:8px;font-size:11px;color:#999;">Upload ล่าสุด: ' + new Date(q.lastUpload.at).toLocaleString('th-TH') + ' (' + q.lastUpload.count + ' SKU)</div>';
+    }
+    box.innerHTML = html;
+  } catch (e) { document.getElementById('bsQueueBody').innerHTML = '<div style="color:#d33;padding:20px;">❌ ' + e.message + '</div>'; }
+}
+async function bsQueueRemove(sku) {
+  try {
+    var r = await fetch('/api/bigseller/edit-queue/' + encodeURIComponent(sku), { method: 'DELETE' });
+    if (!r.ok) throw new Error('remove failed');
+    await renderBsQueue();
+    await loadBsEditQueue();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+async function bsQueueClearAll() {
+  if (!confirm('ล้าง queue ทั้งหมด?')) return;
+  try {
+    var r = await fetch('/api/bigseller/edit-queue', { method: 'DELETE' });
+    if (!r.ok) throw new Error('clear failed');
+    await renderBsQueue();
+    await loadBsEditQueue();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+async function bsQueueUpload() {
+  if (!confirm('Upload ทั้งหมดไป BigSeller?\n\nระบบจะ:\n• สร้าง Excel ตาม template\n• Bot login + upload (30-90 วินาที)\n• BigSeller sync ไป Shopee/TikTok/Lazada (~10 นาที)\n• Auto Pull-bot หลัง 10 นาทีเพื่อ verify')) return;
+  try {
+    var r = await fetch('/api/bigseller/edit-queue/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'upload failed');
+    alert('✅ สั่งงาน upload แล้ว (PID ' + d.pid + ') — ' + d.queue_size + ' SKU\n\nรอ 30-90 วินาทีแล้ว refresh หน้านี้');
+    closeBsQueueModal();
+    setTimeout(loadBigseller, 30000);
+    setTimeout(loadBigseller, 90000);
+  } catch (e) { alert('❌ ' + e.message); }
 }
 
 async function loadBigsellerStatus() {
@@ -8352,13 +8534,18 @@ async function loadBigsellerMirror() {
         var src = p.source || (p.in_our_system === false ? 'bigseller-only' : 'match');
         var linkBtn = '';
         if (p.our_id) linkBtn = '<button class="btn btn-sm" style="background:#1976d2;color:#fff;" onclick="openBigsellerLinkModal(' + p.our_id + ')">🔗 ผูก</button>';
+        var editBtn = '';
+        if (p.sku) {
+          var _bsName = (p.name || '').replace(/'/g, '&apos;');
+          editBtn = ' <button class="btn btn-sm" style="background:#0a8;color:#fff;" onclick="openBsEditModal(&quot;' + escapeAttr(p.sku) + '&quot;, &quot;' + escapeAttr(_bsName) + '&quot;, ' + (p.our_id || 'null') + ', ' + (p.bigseller_stock != null ? p.bigseller_stock : 'null') + ')">✏️ แก้</button>';
+        }
         return '<tr style="border-top:1px solid #eee;">' +
           '<td style="padding:6px;"><code>' + escapeHtml(p.sku || '') + '</code></td>' +
           '<td style="padding:6px;">' + escapeHtml((p.name || '').slice(0, 60)) + '</td>' +
           '<td style="padding:6px;text-align:right;">' + (p.our_stock != null ? numFormat(p.our_stock) : '—') + '</td>' +
           '<td style="padding:6px;text-align:right;">' + (p.bigseller_stock != null ? numFormat(p.bigseller_stock) : '—') + '</td>' +
           '<td style="padding:6px;text-align:right;color:' + diffColor + ';font-weight:600;">' + (p.diff != null ? (p.diff > 0 ? '+' : '') + p.diff : '—') + '</td>' +
-          '<td style="padding:6px;text-align:center;font-size:11px;color:#666;">' + escapeHtml(src) + ' ' + linkBtn + '</td>' +
+          '<td style="padding:6px;text-align:center;font-size:11px;color:#666;white-space:nowrap;">' + escapeHtml(src) + ' ' + linkBtn + editBtn + '</td>' +
           '</tr>';
       }).join('');
     }
