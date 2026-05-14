@@ -2024,6 +2024,17 @@ input:focus, textarea:focus, select:focus {
 </div>
 
 <!-- Product Modal -->
+<!-- Unlink Channel Modal -->
+<div class="modal" id="unlinkChannelModal">
+  <div class="modal-content" style="max-width:500px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid #eee;">
+      <h3 style="margin:0;">❌ Unlink ช่องทาง</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeUnlinkChannelModal()">✕</button>
+    </div>
+    <div id="unlinkChannelBody"></div>
+  </div>
+</div>
+
 <!-- BigSeller Link Modal -->
 <div class="modal" id="bsLinkModal">
   <div class="modal-content" style="max-width:560px;max-height:80vh;overflow:auto;">
@@ -2646,7 +2657,13 @@ function renderProducts(list) {
 // ===== Channel badges + Push modal =====
 function renderChannelBadges(p) {
   var cs = p.channelStatus || { lazada: false, shopee: false, tiktok: false };
-  var pill = function(on, label) {
+  // pill ที่กดได้ — ถ้า enabled → เปิด unlink modal
+  var pill = function(on, label, pid, channelKey) {
+    if (on && channelKey) {
+      return '<span onclick="openUnlinkChannelModal(' + pid + ', \'' + escapeAttr(channelKey) + '\', \'' + escapeAttr(label) + '\')" '
+        + 'style="display:inline-block;padding:2px 8px;margin:2px 2px 0 0;border-radius:10px;font-size:11px;background:#0a8;color:#fff;cursor:pointer;" '
+        + 'title="คลิกเพื่อ unlink">' + label + '</span>';
+    }
     return '<span style="display:inline-block;padding:2px 8px;margin:2px 2px 0 0;border-radius:10px;font-size:11px;'
       + (on ? 'background:#0a8;color:#fff;' : 'background:#eee;color:#999;text-decoration:line-through;')
       + '">' + label + '</span>';
@@ -2661,12 +2678,63 @@ function renderChannelBadges(p) {
   } else {
     bsBadge = '<span onclick="openBigsellerLinkModal(' + p.id + ')" style="display:inline-block;padding:2px 8px;margin:2px 2px 0 0;border-radius:10px;font-size:11px;background:#fff3e0;color:#e65100;cursor:pointer;border:1px dashed #e65100;" title="click to link">🔗 ผูก BS</span>';
   }
+  // หา channel key ของ Shopee ที่ enabled (มี 3 ร้าน)
+  var shopeeKey = null;
+  if (p.channels) {
+    if (p.channels.shopee_main && p.channels.shopee_main.enabled) shopeeKey = 'shopee_main';
+    else if (p.channels.shopee_sub1 && p.channels.shopee_sub1.enabled) shopeeKey = 'shopee_sub1';
+    else if (p.channels.shopee_sub2 && p.channels.shopee_sub2.enabled) shopeeKey = 'shopee_sub2';
+  }
   return '<div style="margin:6px 0;">'
-    + pill(cs.lazada, '📦 Lazada')
-    + pill(cs.shopee, '🛍 Shopee')
-    + pill(cs.tiktok, '🎵 TikTok')
+    + pill(cs.lazada, '📦 Lazada', p.id, cs.lazada ? 'lazada' : null)
+    + pill(cs.shopee, '🛍 Shopee', p.id, shopeeKey)
+    + pill(cs.tiktok, '🎵 TikTok', p.id, cs.tiktok ? 'tiktok' : null)
     + bsBadge
     + '</div>';
+}
+
+// ============ UNLINK CHANNEL MODAL ============
+var _unlinkCtx = null;
+function openUnlinkChannelModal(productId, channelKey, channelLabel) {
+  _unlinkCtx = { productId: productId, channelKey: channelKey, channelLabel: channelLabel };
+  var p = (products || []).find(function(x) { return x.id == productId; });
+  var ch = (p && p.channels && p.channels[channelKey]) || {};
+  var body = '<div style="padding:10px 0;">';
+  body += '<div style="margin-bottom:10px;"><strong>สินค้า:</strong> ' + escapeHtml((p && p.name) || '') + '</div>';
+  body += '<div style="margin-bottom:10px;"><strong>ช่องทาง:</strong> ' + escapeHtml(channelLabel) + ' <code style="color:#999;">(' + escapeHtml(channelKey) + ')</code></div>';
+  // แสดง marketplace id ถ้ามี
+  var mid = ch.lazada_item_id || ch.shopee_item_id || ch.tiktok_product_id || '';
+  if (mid) body += '<div style="padding:8px;background:#f5f5f5;border-radius:4px;margin-bottom:10px;font-size:12px;"><code>ID: ' + escapeHtml(String(mid)) + '</code>' + (ch.url ? ' <a href="' + escapeAttr(ch.url) + '" target="_blank" style="margin-left:8px;">↗ เปิด</a>' : '') + '</div>';
+  body += '<div style="padding:10px;background:#fff3e0;border-left:3px solid #e65100;border-radius:4px;margin-bottom:14px;font-size:13px;">';
+  body += '⚠️ <strong>Unlink จะทำดังนี้:</strong><br>';
+  body += '• ปิด channel (enabled=false) — ไม่ sync สต็อกอีก<br>';
+  body += '• ล้าง marketplace ID ในระบบเรา (เก็บ backup snapshot ไว้เผื่อ relink)<br>';
+  body += '• สินค้าบน ' + escapeHtml(channelLabel) + ' <strong>ยังอยู่เหมือนเดิม</strong> — ลองปิดตรงใน marketplace ได้';
+  body += '</div>';
+  body += '<div style="display:flex;gap:10px;">';
+  body += '<button class="btn btn-danger" onclick="doUnlinkChannel()">❌ Unlink</button>';
+  body += '<button class="btn btn-secondary" onclick="closeUnlinkChannelModal()">ยกเลิก</button>';
+  body += '</div>';
+  body += '</div>';
+  document.getElementById('unlinkChannelBody').innerHTML = body;
+  document.getElementById('unlinkChannelModal').classList.add('active');
+}
+function closeUnlinkChannelModal() {
+  document.getElementById('unlinkChannelModal').classList.remove('active');
+  _unlinkCtx = null;
+}
+async function doUnlinkChannel() {
+  if (!_unlinkCtx) return;
+  try {
+    var r = await fetch('/api/products/' + _unlinkCtx.productId + '/unlink-channel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: _unlinkCtx.channelKey })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'unlink failed');
+    closeUnlinkChannelModal();
+    loadProducts();
+  } catch (e) { alert('❌ ' + e.message); }
 }
 
 async function openPushChannelModal(productId) {

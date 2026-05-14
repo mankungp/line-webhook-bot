@@ -1683,6 +1683,30 @@ app.post('/api/orders/:id/shipment-photo', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Unlink product from a channel (Lazada/Shopee/TikTok)
+app.post('/api/products/:id/unlink-channel', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/' + encodeURIComponent(req.params.id) + '/unlink-channel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Relink product to a channel
+app.post('/api/products/:id/relink-channel', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/' + encodeURIComponent(req.params.id) + '/relink-channel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Push product to a channel (Lazada/Shopee/TikTok)
 app.post('/api/products/:id/push-to-channel', async function(req, res) {
   try {
