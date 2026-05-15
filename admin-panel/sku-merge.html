@@ -427,14 +427,13 @@ function applyFilterAndSearch() {
 }
 
 function onFilter() { curPage=1; applyFilterAndSearch(); render(); }
-function onSearch() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(function(){ curPage=1; applyFilterAndSearch(); render(); }, 300);
+function onSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(function(){ curPage=1; reloadList(); }, 300); }, 300);
 }
 
 // ===== Render =====
 function render() {
-  applyFilterAndSearch();
+  // 2026-05-15: server filter แล้ว — ใช้ allItems = page ปัจจุบันตรงๆ
+  filteredItems = allItems;
   var tbody = document.getElementById('tableBody');
   if(filteredItems.length===0){
     document.getElementById('skuTable').style.display='none';
@@ -447,8 +446,8 @@ function render() {
   document.getElementById('skuTable').style.display='';
   document.getElementById('paginationBar').style.display='';
 
-  var start = (curPage-1)*perPage;
-  var page = filteredItems.slice(start, start+perPage);
+  // server paginated แล้ว — ใช้ allItems ตรง
+  var page = allItems;
   var html = '';
   for(var i=0;i<page.length;i++){
     var item = page[i];
@@ -460,10 +459,14 @@ function render() {
     var diffStr = (item.diff!==undefined && item.diff>0) ? '<span style="color:var(--accent);font-weight:600;">'+item.diff+'</span>' : (item.diff===0?'0':'—');
     var hasPending = item.sku in pendingMap;
     var pendingBadge = hasPending ? '<span class="badge badge-pending">🔵 Pending</span> ' : '';
+    // 2026-05-15: ชื่อ fallback — mirror.name → shopee.product_name → ours.name
+    var displayName = item.name || (item.shopee && item.shopee.product_name) || (item.ours && item.ours.name) || '—';
+    // SKU ฝั่งเรา — แสดงถ้าต่างจาก sku_ref
+    var ourSkuCell = item.ours && item.ours.sku && item.ours.sku !== item.sku ? '<br><small style="color:#0a8855;">เรา: '+esc(item.ours.sku)+'</small>' : '';
     html += '<tr id="row-'+item.sku+'" onclick="toggleExpand(\''+item.sku+'\')">';
     html += '<td onclick="event.stopPropagation()"><input type="checkbox" class="row-check" data-sku="'+item.sku+'" '+checked+' onchange="updateSelected()"></td>';
-    html += '<td><strong>'+esc(item.sku)+'</strong></td>';
-    html += '<td>'+esc(item.name)+'</td>';
+    html += '<td><strong>'+esc(item.sku)+'</strong>'+ourSkuCell+'</td>';
+    html += '<td>'+esc(displayName)+'</td>';
     html += '<td>'+shopeeStr+'</td>';
     html += '<td>'+bsStr+'</td>';
     html += '<td>'+oursStr+'</td>';
@@ -514,7 +517,8 @@ function renderPagination() {
 
 function goPage(p){
   if(p<1 || p>totalPages) return;
-  curPage=p; render();
+  curPage=p;
+  reloadList();  // server paginated — ต้อง fetch หน้าใหม่
 }
 function jumpPage(){
   var v = parseInt(document.getElementById('jumpInput').value);
@@ -569,7 +573,7 @@ function renderExpandPanel(sku) {
 
   // Search box for our products
   var searchHtml = '<div class="search-our-box">';
-  searchHtml += '<input type="text" placeholder="🔍 ค้นหาสินค้าในระบบเรา..." id="srch-'+sku+'" oninput="onSearchOur(\''+sku+'\')">';
+  searchHtml += '<input type="text" placeholder="🔍 ค้นในระบบเรา (SKU/ชื่อ/บาร์โค้ด)..." id="srch-'+sku+'" oninput="onSearchOur(\''+sku+'\')">';
   searchHtml += '<div class="search-results" id="sres-'+sku+'"></div>';
   searchHtml += '</div>';
 
@@ -606,7 +610,8 @@ function onSearchOur(sku){
     items.forEach(function(p){
       var safeName = (p.name||'').replace(/'/g, '');
       html += '<div class="search-result-item" onclick="selectOurProduct(\''+sku+'\','+p.id+',\''+esc(p.sku)+'\',\''+esc(safeName)+'\')">';
-      html += '<strong>'+esc(p.sku)+'</strong> — '+esc(p.name)+' (stock: '+(p.stock||0)+')';
+      html += '<span style="background:#0a8855;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">🏪 เรา</span>';
+      html += '<strong>'+esc(p.sku)+'</strong> — '+esc(p.name)+' <span style="color:#888;">(stock: '+(p.stock||0)+')</span>';
       html += '</div>';
     });
     if(!items.length) html += '<div style="padding:8px;color:var(--text-muted);font-size:12px;">ไม่พบสินค้า</div>';
