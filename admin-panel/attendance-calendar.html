@@ -379,10 +379,9 @@ function renderCalendar() {
       if (!firstIn) {
         badges += '<span class="day-badge att-miss">❌ ขาด</span> ';
       } else {
-        // 2026-05-15: เต็มวัน = 480 นาที (8 ชม.จริง), ช่วง 12:00-13:00 พักเที่ยง ไม่นับ
+        // 2026-05-15 Hybrid: สแกน 4 ครั้ง → พักจริง / สแกน 2 ครั้ง → ตัด 12:00-13:00
         var FULL_DAY = 480;
         function tm(l){ var d=new Date(l.recordTime); return d.getHours()*60+d.getMinutes(); }
-        // ตัดช่วงพักเที่ยงออกจาก [a..b]
         function workExcludeLunch(a, b) {
           if (b <= a) return 0;
           var L0 = 12*60, L1 = 13*60;
@@ -391,12 +390,26 @@ function renderCalendar() {
           var afternoon = Math.max(0, b - Math.max(a, L1));
           return morning + afternoon;
         }
+        // คำนวณ break จริงจากสแกน (check_out → next check_in)
+        var realBreak = 0;
+        for (var j=0; j<sorted.length-1; j++) {
+          if (sorted[j].type==='check_out' && sorted[j+1].type==='check_in') {
+            var gap = tm(sorted[j+1]) - tm(sorted[j]);
+            if (gap > 0 && gap < 12*60) realBreak += gap;
+          }
+        }
         var inMin = Math.max(tm(firstIn), 7*60+45);     // clamp 07:45
         var outMin = lastOut ? Math.min(tm(lastOut), 17*60) : null;  // clamp 17:00
         var workMin;
         if (outMin === null) {
           workMin = (dk >= todayDk) ? FULL_DAY : 0;
+        } else if (realBreak > 0) {
+          // มีพักจริง → work = span - 60 - excess (หักส่วนเกิน 60น.)
+          var grossSpan = outMin - inMin;
+          var excessBreak = Math.max(0, realBreak - 60);
+          workMin = Math.min(FULL_DAY, Math.max(0, grossSpan - 60 - excessBreak));
         } else {
+          // ไม่มีพักจากสแกน → ตัด 12:00-13:00
           workMin = workExcludeLunch(inMin, outMin);
         }
         var shortfall = Math.max(0, FULL_DAY - workMin);
