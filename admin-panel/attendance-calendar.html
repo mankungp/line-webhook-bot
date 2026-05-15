@@ -273,19 +273,39 @@ document.addEventListener('DOMContentLoaded', function(){ loadEmployees().then(l
 
 async function loadEmployees() {
   try {
-    var r = await fetch('/api/employees'), data = await r.json();
-    employees = {}; var sel = document.getElementById('empSelect'); sel.innerHTML = '';
-    if (Array.isArray(data)) {
-      data.forEach(function(e){ employees[e.emp_code]=e;
-        var o=document.createElement('option'); o.value=e.emp_code; o.textContent=e.name+' ('+e.emp_code+')'; sel.appendChild(o);
-      });
-    } else if (data && typeof data==='object') {
-      for (var k in data) if (data.hasOwnProperty(k)) { var e=data[k]; employees[k]=e;
-        var o=document.createElement('option'); o.value=k; o.textContent=e.name+' ('+k+')'; sel.appendChild(o);
-      }
+    var r = await fetch('/api/employees');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    // รองรับ 3 format: { employees: [] } | [] | { E001: {...} }
+    var list = [];
+    if (Array.isArray(data)) list = data;
+    else if (data && Array.isArray(data.employees)) list = data.employees;
+    else if (data && typeof data === 'object') list = Object.values(data);
+
+    employees = {};
+    var sel = document.getElementById('empSelect');
+    sel.innerHTML = '';
+    list.forEach(function(e) {
+      if (!e || !e.emp_code) return;
+      if (e.active === false) return; // ข้ามพนักงานที่ inactive
+      employees[e.emp_code] = e;
+      var o = document.createElement('option');
+      o.value = e.emp_code;
+      var label = (e.nickname || e.name || '') + ' (' + e.emp_code + ')';
+      o.textContent = label;
+      sel.appendChild(o);
+    });
+
+    if (sel.options.length === 0) {
+      toast('ไม่พบพนักงาน active', 'error');
+      return;
     }
-    if (employees[curEmp]) sel.value=curEmp; else if(sel.options.length>0) curEmp=sel.value;
-  } catch(e){ console.error(e); toast('โหลดพนักงานไม่สำเร็จ','error'); }
+    if (employees[curEmp]) sel.value = curEmp;
+    else curEmp = sel.value;
+  } catch (e) {
+    console.error('loadEmployees:', e);
+    toast('โหลดพนักงานไม่สำเร็จ: ' + e.message, 'error');
+  }
 }
 
 function changeEmp(){ curEmp=document.getElementById('empSelect').value; loadCalendar(); }
