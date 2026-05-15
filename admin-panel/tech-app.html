@@ -729,7 +729,19 @@
     state.myJobs = mine;
     state.pendingJobs = pending;
 
+    const needClockIn = state.todaySummary && state.todaySummary._needClockIn;
+    const clockInBanner = needClockIn ? `
+      <div style="background:#fff7ed; border:2px solid #f97316; color:#9a3412; padding:14px 16px; border-radius:14px; margin-bottom:14px; display:flex; align-items:center; gap:12px;">
+        <div style="font-size:28px;">⏰</div>
+        <div style="flex:1; font-size:13px; line-height:1.5;">
+          <div style="font-weight:700; margin-bottom:2px;">ยังไม่ได้ลงเวลาเข้างานวันนี้</div>
+          <div>กรุณาสแกน QR Code จากหน้าจอลงเวลาที่ร้าน</div>
+        </div>
+      </div>
+    ` : '';
+
     root.innerHTML = `
+      ${clockInBanner}
       <!-- Commission card -->
       <div style="background:linear-gradient(135deg,#0a8855 0%,#34c98f 100%); color:#fff; padding:18px 16px; border-radius:14px; margin-bottom:14px; box-shadow:0 4px 12px rgba(10,136,85,0.25);">
         <div style="font-size:13px; opacity:.9; margin-bottom:4px;">💰 คอมเดือนนี้</div>
@@ -802,9 +814,8 @@
     document.getElementById('miClock').addEventListener('click', (e) => {
       e.stopPropagation();
       ov.remove(); menu.remove();
-      if (confirm(confirmMsg)) {
-        location.href = '/attendance/scan?type=' + nextAction;
-      }
+      // 2026-05-15: บังคับสแกน QR หน้าร้านเท่านั้น — ไม่ให้ขอ token จากนอกร้าน
+      alert('กรุณาสแกน QR Code จากหน้าจอลงเวลาที่ร้านเพื่อลงเวลา');
     });
     if (showInstall) {
       const btnInstall = document.getElementById('miInstall');
@@ -1546,15 +1557,15 @@
     }
     state.me = t.body || {};
 
-    // 2.5) ตรวจสถานะการลงเวลา — ถ้ายังไม่มี check_in วันนี้ → ไปลงเวลาก่อน
+    // 2.5) ตรวจสถานะการลงเวลา — ถ้ายังไม่มี check_in วันนี้ → แสดงแจ้งเตือนให้สแกน QR หน้าร้าน
+    // 2026-05-15: ไม่ auto-redirect ไปหน้าสแกนอีกต่อไป — บังคับสแกน QR จากหน้าจอเท่านั้น
     if (state.user && state.user.role === 'technician') {
       try {
         const sumRes = await api('/api/tech/today-summary');
         if (sumRes.ok && sumRes.body) {
           state.todaySummary = sumRes.body;
           if (!sumRes.body.first_in) {
-            location.href = '/attendance/scan?type=check_in';
-            return;
+            state.todaySummary._needClockIn = true; // dashboard จะแสดงแถบเตือน
           }
         }
       } catch (_) {}

@@ -227,17 +227,8 @@
     return null;
   }
 
-  // ขอ token สด (สำหรับกรณีมาจาก /tech ไม่มี token)
-  async function fetchFreshToken() {
-    // ลอง self endpoint ก่อน (ช่างมีสิทธิ์) → fallback admin endpoint
-    for (const url of ['/api/attendance/qr-token-self', '/api/attendance/qr-token']) {
-      try {
-        const r = await api(url);
-        if (r.ok && r.body && r.body.token) return r.body.token;
-      } catch(_) {}
-    }
-    return null;
-  }
+  // fetchFreshToken() — REMOVED 2026-05-15
+  // เหตุผล: บังคับสแกน QR จากหน้าจอเท่านั้น — กันลงเวลาจากนอกร้าน
 
   function fmtTime(d = new Date()) {
     return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
@@ -475,11 +466,12 @@
       if (el) el.textContent = fmtTime();
     }, 1000);
 
+    // 2026-05-15: PIN-only flow — ไม่ต้องถ่ายรูปแล้ว กดปุ่ม→ลงเวลาเลย
     if (nextAction) {
-      $('btnClock').addEventListener('click', () => { state.selectedType = nextAction; showCamera(); });
+      $('btnClock').addEventListener('click', () => { state.selectedType = nextAction; submitCheckin(); });
     } else {
-      $('btnIn').addEventListener('click', () => { state.selectedType = 'check_in'; showCamera(); });
-      $('btnOut').addEventListener('click', () => { state.selectedType = 'check_out'; showCamera(); });
+      $('btnIn').addEventListener('click', () => { state.selectedType = 'check_in'; submitCheckin(); });
+      $('btnOut').addEventListener('click', () => { state.selectedType = 'check_out'; submitCheckin(); });
     }
 
     // ถ้า URL มี ?type=check_in/check_out → auto-skip
@@ -487,10 +479,16 @@
       const t = state.presetType;
       state.presetType = null; // ใช้ครั้งเดียว
       state.selectedType = t;
-      setTimeout(() => showCamera(), 300);
+      setTimeout(() => submitCheckin(), 300);
     }
   }
 
+  // ====================================================================
+  // 2026-05-15: showCamera() + showPreview() — KEPT FOR FUTURE USE
+  // ขณะนี้ระบบไม่ได้เรียก function เหล่านี้ (showReady → submitCheckin ตรง)
+  // ถ้าอยากเปิด selfie กลับ → เปลี่ยนบรรทัด showCamera/showPreview
+  //   ใน showReady() จาก submitCheckin() → showCamera()
+  // ====================================================================
   async function showCamera() {
     setHTML(`
       <h3 style="margin-top:0">${state.selectedType === 'check_in' ? '✅ เข้างาน' : '🚪 ออกงาน'} — ถ่ายเซลฟี่</h3>
@@ -530,7 +528,7 @@
       token: state.token,
       type: state.selectedType,
       line_user_id: state.user && state.user.lineUserId,
-      selfie_base64: state.selfieDataUrl,
+      // 2026-05-15: PIN-only — ไม่ส่ง selfie_base64 แล้ว
     };
     if (state.empCode) payload.selected_emp_code = state.empCode;
     if (state._pendingPin) payload.pin = state._pendingPin;
@@ -664,20 +662,23 @@
     state.token = getToken();
     state.presetType = getPresetType(); // ถ้า ?type=check_out → skip ไปถ่ายรูปเลย
     if (!state.token) {
-      // ลองขอ token สด (กรณีช่างกดปุ่ม จากหน้า /tech)
-      showLoading('กำลังขอ QR token...');
-      const fresh = await fetchFreshToken();
-      if (!fresh) {
-        showError('ไม่พบ token — กรุณาสแกน QR จากหน้าจอลงเวลา', () => location.reload());
-        return;
-      }
-      state.token = fresh;
-      // อัพเดต URL ให้มี token (ไม่ reload)
-      try {
-        const u = new URL(location.href);
-        u.searchParams.set('token', fresh);
-        history.replaceState({}, '', u.toString());
-      } catch(_) {}
+      // ไม่มี token → บังคับสแกน QR จากหน้าจอเครื่องที่ร้านเท่านั้น (ป้องกันลงเวลาจากนอกร้าน)
+      setHTML(`
+        <div class="center">
+          <div class="big-emoji">📱</div>
+          <h2 style="margin:6px 0">กรุณาสแกน QR ที่หน้าจอเครื่องที่ร้าน</h2>
+          <div class="alert alert-warn" style="text-align:left">
+            <p style="margin:6px 0">เพื่อบันทึกเวลาเข้า-ออกงาน ต้องสแกน QR Code จากหน้าจอลงเวลาที่ติดตั้งที่ร้านเท่านั้น</p>
+            <p style="margin:6px 0;font-size:13px;color:#666">• เข้างาน — สแกน QR ตอนมาถึงร้าน</p>
+            <p style="margin:6px 0;font-size:13px;color:#666">• พักเที่ยง — สแกน QR ออกพัก + สแกนกลับเข้ามา</p>
+            <p style="margin:6px 0;font-size:13px;color:#666">• เลิกงาน — สแกน QR ก่อนออกจากร้าน</p>
+          </div>
+        </div>
+        <button class="btn btn-ghost" id="btnClose" type="button">ปิดหน้านี้</button>
+      `);
+      const btn = document.getElementById('btnClose');
+      if (btn) btn.addEventListener('click', () => { try { window.close(); } catch(_){} });
+      return;
     }
 
     // 1) verify token

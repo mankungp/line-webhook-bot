@@ -293,7 +293,7 @@ app.get('/images/*', async function(req, res) {
 
 // Attendance (QR check-in)
 app.get('/api/attendance/qr-token', forwardWithCookie('GET'));
-app.get('/api/attendance/qr-token-self', forwardWithCookie('GET'));
+// app.get('/api/attendance/qr-token-self', ...) — REMOVED 2026-05-15: บังคับสแกน QR หน้าร้านเท่านั้น
 app.get('/api/attendance/today', forwardWithCookie('GET'));
 app.post('/api/attendance/manual', forwardWithCookie('POST'));
 app.post('/api/attendance/verify-token', forwardWithCookie('POST'));
