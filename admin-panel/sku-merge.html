@@ -427,8 +427,7 @@ function applyFilterAndSearch() {
 }
 
 function onFilter() { curPage=1; applyFilterAndSearch(); render(); }
-function onSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(function(){ curPage=1; reloadList(); }, 300); }, 300);
-}
+function onSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(function(){ curPage=1; reloadList(); }, 300); }
 
 // ===== Render =====
 function render() {
