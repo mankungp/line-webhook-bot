@@ -321,6 +321,11 @@ app.get('/api/audit-log/hr', forwardWithCookie('GET'));
 app.get('/api/commissions', forwardWithCookie('GET'));
 app.post('/api/commissions', forwardWithCookie('POST'));
 app.delete('/api/commissions/:id', forwardWithCookie('DELETE'));
+// 2026-05-15: commission slips
+app.get('/api/commission-slips/pending', forwardWithCookie('GET'));
+app.post('/api/commission-slips/issue', forwardWithCookie('POST'));
+app.get('/api/commission-slips/:id/pdf', forwardWithCookie('GET'));
+app.get('/api/commission-slips', forwardWithCookie('GET'));
 app.delete('/api/payroll/:id', forwardWithCookie('DELETE'));
 // 2026-05-15: preview pdf + send-line batch
 app.post('/api/payroll/preview-pdf', forwardWithCookie('POST'));

@@ -1938,6 +1938,27 @@ input:focus, textarea:focus, select:focus {
 </div>
 
 <!-- HR Audit Log Modal (2026-05-15) -->
+<!-- Issue Commission Slip Modal (2026-05-15) -->
+<div class="modal" id="issueSlipModal">
+  <div class="modal-content" style="max-width:560px;">
+    <button class="close-btn" onclick="closeIssueSlipModal()">×</button>
+    <h2>🧾 ออกสลิปค่าคอม</h2>
+    <div id="issueSlipEmpInfo" style="background:#fff7ed;border-left:3px solid #f97316;padding:10px;margin:12px 0;"></div>
+    <div id="issueSlipSummary" style="margin:12px 0;">⏳ กำลังโหลด...</div>
+    <div style="margin:10px 0;">
+      <label><input type="checkbox" id="issueSlipSendLine" checked> 📲 ส่ง LINE ให้พนักงานทันที</label>
+    </div>
+    <div><label>หมายเหตุ (ไม่บังคับ)</label>
+      <input type="text" id="issueSlipNote" placeholder="เช่น รอบประจำสัปดาห์" style="width:100%;padding:8px;">
+    </div>
+    <div id="issueSlipStatus" style="margin-top:10px;"></div>
+    <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeIssueSlipModal()">ปิด</button>
+      <button class="btn btn-primary" id="issueSlipBtn" onclick="submitIssueSlip()" style="background:#f97316;">🧾 ออกสลิป</button>
+    </div>
+  </div>
+</div>
+
 <!-- Commission Modal (2026-05-15) -->
 <div class="modal" id="commissionModal">
   <div class="modal-content" style="max-width:560px;">
@@ -7446,8 +7467,9 @@ function renderEmployeesList() {
       html += '<td>' + comm + '</td>';
       html += '<td>' + (e.zk_user_id ? '<code>' + escapeHtml(String(e.zk_user_id)) + '</code>' : '<span style="color:#d80;">ไม่ได้ผูก</span>') + '</td>';
       var hasRate = (Number(e.commission_rate)>0) || (Number(e.technician_commission_rate)>0);
-      var comBtn = hasRate ? '<button class="btn btn-warning btn-sm" onclick="openCommissionModal(\'' + escapeHtml(e.emp_code) + '\')" style="margin-right:4px;">💰 คอม</button>' : '';
-      html += '<td>' + comBtn + '<button class="btn btn-secondary btn-sm" onclick="editEmployee(\'' + escapeHtml(e.emp_code) + '\')">แก้ไข</button></td>';
+      var comBtn = hasRate ? '<button class="btn btn-warning btn-sm" onclick="openCommissionModal(\'' + escapeHtml(e.emp_code) + '\')" style="margin-right:4px;" title="คีย์ยอดขาย">💰 คอม</button>' : '';
+      var slipBtn = hasRate ? '<button class="btn btn-sm" style="background:#f97316;color:#fff;margin-right:4px;" onclick="openIssueSlipModal(\'' + escapeHtml(e.emp_code) + '\')" title="ออกสลิปค่าคอม">🧾 สลิปคอม</button>' : '';
+      html += '<td>' + comBtn + slipBtn + '<button class="btn btn-secondary btn-sm" onclick="editEmployee(\'' + escapeHtml(e.emp_code) + '\')">แก้ไข</button></td>';
       html += '</tr>';
     });
   }
@@ -9200,6 +9222,90 @@ if (typeof _origShowPage_qrAtt === 'function') {
     if (page !== 'qr-att') stopQrTimers();
     return _origShowPage_qrAtt.apply(this, arguments);
   };
+}
+
+// ============ ISSUE COMMISSION SLIP (2026-05-15) ============
+var _issueSlipEmp = null;
+var _issueSlipPending = null;
+
+async function openIssueSlipModal(empCode) {
+  _issueSlipEmp = empCode;
+  document.getElementById('issueSlipNote').value = '';
+  document.getElementById('issueSlipStatus').innerHTML = '';
+  document.getElementById('issueSlipSendLine').checked = true;
+  document.getElementById('issueSlipBtn').disabled = false;
+  document.getElementById('issueSlipModal').classList.add('active');
+
+  document.getElementById('issueSlipSummary').innerHTML = '⏳ กำลังโหลด...';
+  document.getElementById('issueSlipEmpInfo').innerHTML = '';
+
+  try {
+    var r = await fetch('/api/commission-slips/pending?empCode=' + encodeURIComponent(empCode));
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    _issueSlipPending = d;
+
+    var e = d.emp;
+    var bankLine = e.bank_name ? e.bank_name + ' ' + (e.bank_account || '') : '';
+    document.getElementById('issueSlipEmpInfo').innerHTML =
+      '<strong>' + e.emp_code + '</strong> ' + e.name +
+      '<br><small>commission_rate=' + (e.commission_rate||0) + '% | tech_rate=' + (e.technician_commission_rate||0) + '%</small>' +
+      (bankLine ? '<br><small>🏦 ' + bankLine + '</small>' : '<br><small style="color:#d80;">⚠ ยังไม่ได้ตั้งบัญชี</small>') +
+      (!e.line_user_id ? '<br><small style="color:#d80;">⚠ ยังไม่ link LINE — ส่งไปไม่ได้</small>' : '');
+
+    var rows = '';
+    if (d.tech_jobs_count > 0) {
+      rows += '<div style="margin:6px 0;"><b>🔧 งานช่างที่ approve แล้ว (' + d.tech_jobs_count + ' งาน):</b> ' +
+        '<span style="color:#0a8;font-weight:bold;">+ ฿' + Number(d.tech_jobs_total).toLocaleString() + '</span></div>';
+    }
+    if (d.commissions_count > 0) {
+      rows += '<div style="margin:6px 0;"><b>🛒 ยอดขาย (' + d.commissions_count + ' รายการ):</b> ' +
+        '<span style="color:#0a8;font-weight:bold;">+ ฿' + Number(d.commissions_total).toLocaleString() + '</span></div>';
+    }
+    if (d.total === 0) {
+      document.getElementById('issueSlipSummary').innerHTML = '<div style="color:#888;text-align:center;padding:20px;">— ไม่มียอดคอมค้างจ่าย —</div>';
+      document.getElementById('issueSlipBtn').disabled = true;
+    } else {
+      document.getElementById('issueSlipSummary').innerHTML = rows +
+        '<hr style="margin:10px 0;">' +
+        '<div style="font-size:18px;font-weight:bold;text-align:right;">รวม: <span style="color:#f97316;">฿' + Number(d.total).toLocaleString() + '</span></div>';
+    }
+  } catch (e) {
+    document.getElementById('issueSlipSummary').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
+}
+
+function closeIssueSlipModal() {
+  document.getElementById('issueSlipModal').classList.remove('active');
+  _issueSlipEmp = null;
+  _issueSlipPending = null;
+}
+
+async function submitIssueSlip() {
+  if (!_issueSlipEmp) return;
+  var sendLine = document.getElementById('issueSlipSendLine').checked;
+  var note = document.getElementById('issueSlipNote').value.trim();
+  document.getElementById('issueSlipBtn').disabled = true;
+  document.getElementById('issueSlipStatus').innerHTML = '⏳ กำลังออกสลิป...';
+  try {
+    var r = await fetch('/api/commission-slips/issue', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ emp_code: _issueSlipEmp, send_line: sendLine, note: note })
+    });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'failed');
+    var slip = d.slip;
+    var lineMsg = sendLine ? (slip.line_sent_status === 'sent' ? '✅ ส่ง LINE สำเร็จ' : slip.line_sent_status === 'mock' ? '⚠ MOCK (ไม่มี LINE token)' : '❌ LINE ส่งผิด') : '';
+    document.getElementById('issueSlipStatus').innerHTML =
+      '<span style="color:#0a0;">✅ ออกสลิปสำเร็จ — ยอด ฿' + Number(slip.total).toLocaleString() + '</span> ' + lineMsg +
+      '<br><button class="btn btn-sm btn-primary" onclick="window.open(\'/api/commission-slips/' + slip.id + '/pdf\', \'_blank\')" style="margin-top:8px;">📄 ดู PDF</button>';
+    // refresh pending summary
+    if (typeof loadEmployees === 'function') loadEmployees();
+  } catch (e) {
+    document.getElementById('issueSlipStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+    document.getElementById('issueSlipBtn').disabled = false;
+  }
 }
 
 // ============ COMMISSION ENTRIES (2026-05-15) ============
