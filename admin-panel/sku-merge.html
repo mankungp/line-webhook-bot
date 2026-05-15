@@ -577,13 +577,16 @@ function renderPagination() {
 }
 
 function goPage(p){
-  if(p<1 || p>totalPages) return;
+  if(p<1 || p>totalPages) { alert('goPage: out of range p='+p+' totalPages='+totalPages); return; }
+  alert('goPage called p='+p+' curPage='+curPage+' isUsingApi='+isUsingApi+' totalPages='+totalPages);
   curPage=p;
   // 2026-05-15: ถ้าเป็น API mode จะ reloadList() (server-paginated)
   // ถ้าเป็น mock mode (หรือ API ส่งทั้งหมดมา) จะ render() ตรงๆ
   if(isUsingApi) {
+    alert('reloadList()...');
     reloadList();
   } else {
+    alert('render()...');
     render();
   }
 }
