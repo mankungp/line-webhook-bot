@@ -1377,6 +1377,27 @@ input:focus, textarea:focus, select:focus {
         <div id="empTechCommWrap" style="display:none;"><label>คอมช่าง (%)</label><input type="number" id="empTechComm" step="0.1" value="0"></div>
         <div><label>เข้างาน</label><input type="time" id="empWorkStart" value="08:00"></div>
         <div><label>ออกงาน</label><input type="time" id="empWorkEnd" value="17:00"></div>
+        <div><label>ธนาคาร</label>
+          <select id="empBankName" style="width:100%;">
+            <option value="">-- ไม่ระบุ --</option>
+            <option value="KBANK">🟢 กสิกรไทย (KBANK)</option>
+            <option value="SCB">🟣 ไทยพาณิชย์ (SCB)</option>
+            <option value="BBL">🔵 กรุงเทพ (BBL)</option>
+            <option value="KTB">🔵 กรุงไทย (KTB)</option>
+            <option value="BAY">🟡 กรุงศรีอยุธยา (BAY)</option>
+            <option value="TTB">🔵 TTB</option>
+            <option value="GSB">🟣 ออมสิน (GSB)</option>
+            <option value="BAAC">🟢 ธ.ก.ส. (BAAC)</option>
+            <option value="GHB">🏠 อาคารสงเคราะห์ (GHB)</option>
+            <option value="KKP">🟣 เกียรตินาคิน (KKP)</option>
+            <option value="CIMB">🔴 CIMB Thai</option>
+            <option value="UOB">🔵 UOB</option>
+            <option value="LH">🟡 LH Bank</option>
+            <option value="TISCO">🔵 TISCO</option>
+            <option value="OTHER">อื่นๆ</option>
+          </select>
+        </div>
+        <div><label>เลขที่บัญชี</label><input type="text" id="empBankAccount" placeholder="เช่น 123-4-56789-0"></div>
       </div>
       <div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap;">
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -7462,6 +7483,8 @@ function openEmpModal() {
   document.getElementById('empTechComm').value = 0;
   document.getElementById('empWorkStart').value = '08:00';
   document.getElementById('empWorkEnd').value = '17:00';
+  document.getElementById('empBankName').value = '';
+  document.getElementById('empBankAccount').value = '';
   ['empSocSec','empPaidLeave','empHasComm'].forEach(function(id){ document.getElementById(id).checked = false; });
   document.getElementById('empSocSecAmount').value = '';
   toggleSocSecAmount();
@@ -7492,6 +7515,8 @@ function editEmployee(code) {
   document.getElementById('empTechComm').value = e.technician_commission_rate || 0;
   document.getElementById('empWorkStart').value = e.work_start || '08:00';
   document.getElementById('empWorkEnd').value = e.work_end || '17:00';
+  document.getElementById('empBankName').value = e.bank_name || '';
+  document.getElementById('empBankAccount').value = e.bank_account || '';
   document.getElementById('empSocSec').checked = !!e.has_social_security;
   document.getElementById('empSocSecAmount').value = e.social_security_amount != null ? e.social_security_amount : '';
   toggleSocSecAmount();
@@ -7528,6 +7553,8 @@ async function saveEmployee() {
     technician_commission_rate: parseFloat(document.getElementById('empTechComm').value) || 0,
     work_start: document.getElementById('empWorkStart').value,
     work_end: document.getElementById('empWorkEnd').value,
+    bank_name: document.getElementById('empBankName').value,
+    bank_account: document.getElementById('empBankAccount').value.trim(),
     has_social_security: document.getElementById('empSocSec').checked,
     social_security_amount: (function() {
       var v = document.getElementById('empSocSecAmount').value.trim();
