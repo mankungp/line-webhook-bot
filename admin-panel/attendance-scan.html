@@ -427,10 +427,12 @@
     let nextAction = null;
     let summaryOk = false;
     try {
+      // 2026-05-15: แก้ bug — api() return {status, ok, body} ต้องอ่าน sum.body.next_action
       const sum = await api('/api/tech/today-summary');
       summaryOk = true;
-      if (sum && sum.ok && (sum.next_action === 'check_in' || sum.next_action === 'check_out')) {
-        nextAction = sum.next_action;
+      const data = (sum && sum.body) || {};
+      if (sum && sum.ok && (data.next_action === 'check_in' || data.next_action === 'check_out')) {
+        nextAction = data.next_action;
       } else {
         // request OK แต่ไม่มี next_action (owner/admin ที่ไม่ link employee) → default check_in
         nextAction = 'check_in';
