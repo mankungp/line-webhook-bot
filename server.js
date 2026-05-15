@@ -222,7 +222,17 @@ function forwardWithCookie(method) {
       }
       var r = await fetch(url, opts);
       var ct = r.headers.get('content-type') || 'application/json';
-      res.status(r.status).set('Content-Type', ct).send(await r.text());
+      // 2026-05-15: รองรับ binary content (PDF, image, etc.) — ใช้ arrayBuffer
+      var isBinary = ct.indexOf('application/json') < 0 && ct.indexOf('text/') < 0;
+      if (isBinary) {
+        var ab = await r.arrayBuffer();
+        // forward content-disposition ถ้ามี
+        var cd = r.headers.get('content-disposition');
+        if (cd) res.setHeader('Content-Disposition', cd);
+        res.status(r.status).set('Content-Type', ct).send(Buffer.from(ab));
+      } else {
+        res.status(r.status).set('Content-Type', ct).send(await r.text());
+      }
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -312,6 +322,9 @@ app.get('/api/commissions', forwardWithCookie('GET'));
 app.post('/api/commissions', forwardWithCookie('POST'));
 app.delete('/api/commissions/:id', forwardWithCookie('DELETE'));
 app.delete('/api/payroll/:id', forwardWithCookie('DELETE'));
+// 2026-05-15: preview pdf + send-line batch
+app.post('/api/payroll/preview-pdf', forwardWithCookie('POST'));
+app.post('/api/payroll/send-line-batch', forwardWithCookie('POST'));
 
 // Mobile attendance scan page (public — token required in query)
 app.get('/attendance/scan', (req, res) => {

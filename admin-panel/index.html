@@ -1550,7 +1550,9 @@ input:focus, textarea:focus, select:focus {
           <tbody id="payrollTableBody"><tr><td colspan="11" style="text-align:center; color:#888;">เลือกรอบแล้วกด Preview</td></tr></tbody>
         </table>
       </div>
-      <div id="payrollFooter" style="margin-top:12px; display:none; gap:8px; justify-content:flex-end;">
+      <div id="payrollFooter" style="margin-top:12px; display:none; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="sendLineBatchPayroll('paid')" data-perm="hr:write" title="ส่งเฉพาะคนที่มี status=paid">✅ ส่ง LINE คนจ่ายแล้ว</button>
+        <button class="btn btn-warning" onclick="sendLineBatchPayroll('unsent')" data-perm="hr:write" title="ส่งเฉพาะคนที่ยังไม่เคยส่ง">⏳ ส่งเฉพาะคนยังไม่ส่ง</button>
         <button class="btn btn-secondary" onclick="sendAllPayslipsLine()">📲 ส่ง LINE ทุกคน</button>
         <button class="btn btn-primary" onclick="commitPayroll()" data-perm="hr:write">💾 บันทึก commit</button>
       </div>
@@ -9548,11 +9550,14 @@ function renderPayrollTable(slips, committed) {
     if (s.status === 'paid') statusBadge = '<span style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:10px; font-size:11px;">✓ จ่ายแล้ว</span>';
     else if (s.status === 'pending_payment') statusBadge = '<span style="background:#fff3cd; color:#856404; padding:2px 8px; border-radius:10px; font-size:11px;">รอจ่าย</span>';
     else statusBadge = '<span style="color:#888; font-size:11px;">preview</span>';
-    var actions = '<button class="btn btn-sm" onclick="showPayslip(\'' + (s.id || s.emp_code) + '\')" style="padding:3px 8px;">👁</button>';
+    var actions = '<button class="btn btn-sm" onclick="showPayslip(\'' + (s.id || s.emp_code) + '\')" style="padding:3px 8px;" title="ดูรายละเอียด">👁</button>';
     if (committed && s.id) {
-      actions += ' <button class="btn btn-sm" onclick="openPayslipPdf(\'' + s.id + '\')" style="padding:3px 8px;">PDF</button>';
-      actions += ' <button class="btn btn-sm" onclick="sendPayslipLine(\'' + s.id + '\')" style="padding:3px 8px;">📲</button>';
-      if (s.status !== 'paid') actions += ' <button class="btn btn-sm btn-primary" onclick="markPayslipPaid(\'' + s.id + '\')" style="padding:3px 8px;">✓</button>';
+      actions += ' <button class="btn btn-sm" onclick="openPayslipPdf(\'' + s.id + '\')" style="padding:3px 8px;" title="PDF">PDF</button>';
+      actions += ' <button class="btn btn-sm" onclick="sendPayslipLine(\'' + s.id + '\')" style="padding:3px 8px;" title="ส่ง LINE">📲</button>';
+      if (s.status !== 'paid') actions += ' <button class="btn btn-sm btn-primary" onclick="markPayslipPaid(\'' + s.id + '\')" style="padding:3px 8px;" title="ยืนยันจ่ายแล้ว">✓</button>';
+    } else if (!committed && s.emp_code) {
+      // ยังไม่ commit — มีปุ่มปรีวิว PDF
+      actions += ' <button class="btn btn-sm" onclick="previewPayslipPdf(\'' + s.emp_code + '\',\'' + s.period_start + '\',\'' + s.period_end + '\')" style="padding:3px 8px;" title="ปรีวิว PDF">📄</button>';
     }
     var quotaCell = '-';
     var bonusCell = '-';
@@ -9621,6 +9626,51 @@ function closePayslipModal() {
 
 function openPayslipPdf(id) {
   window.open('/api/payroll/' + encodeURIComponent(id) + '/pdf', '_blank');
+}
+
+// 2026-05-15: ปรีวิว PDF ของ slip ที่ยังไม่ commit
+async function previewPayslipPdf(empCode, ps, pe) {
+  try {
+    var r = await fetch('/api/payroll/preview-pdf', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ emp_code: empCode, period_start: ps, period_end: pe })
+    });
+    if (!r.ok) {
+      var err = await r.json().catch(()=>({error:'HTTP '+r.status}));
+      alert('❌ สร้าง PDF ไม่สำเร็จ: ' + (err.error || r.status));
+      return;
+    }
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    // cleanup หลัง 30 วิ
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
+  } catch(e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+// 2026-05-15: ส่ง LINE batch ตาม filter
+async function sendLineBatchPayroll(filter) {
+  var p = _payrollPeriod(); if (!p) return;
+  var filterLabel = { paid:'จ่ายแล้ว', unpaid:'ยังไม่จ่าย', unsent:'ยังไม่ส่ง', all:'ทุกคน' }[filter] || filter;
+  if (!confirm('ส่งสลิปเงินเดือนทาง LINE → คนที่ ' + filterLabel + ' ?')) return;
+  _payrollMsg('กำลังส่ง LINE…');
+  try {
+    var r = await fetch('/api/payroll/send-line-batch', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ period_start: p.period_start, period_end: p.period_end, filter: filter })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    _payrollMsg('✅ ส่งแล้ว ' + d.success + '/' + d.total + ' (ข้าม ' + d.skipped + ', ผิด ' + d.failed + ')');
+    // refresh list
+    if (typeof loadPayrollList === 'function') loadPayrollList();
+  } catch(e) {
+    _payrollMsg('❌ ' + e.message, 'err');
+  }
 }
 
 async function commitPayroll() {
