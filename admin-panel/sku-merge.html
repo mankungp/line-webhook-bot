@@ -371,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function(){ init(); });
 
 // ===== Init (2026-05-15 — เชื่อม API จริง) =====
 async function init() {
+  reloadList = loadFromAPI;  // alias
   await acquireLock();
   await loadFromAPI();
   render();
@@ -406,12 +407,44 @@ async function loadFromAPI() {
       ' | Total: <strong>' + (s.total || 0) + '</strong>' +
       ' | Diff: <strong style="color:#f97316;">' + (s.diff_gt_0 || 0) + '</strong>' +
       ' | Our-only: ' + (s.our_only || 0);
+    isUsingApi = true;
   } catch (e) {
     console.error('loadFromAPI:', e);
-    toast('❌ โหลดข้อมูลไม่สำเร็จ: ' + e.message, 'error');
-    allItems = [];
-    filteredItems = [];
+    toast('⚠️ ใช้ข้อมูลทดสอบ (API ยังไม่พร้อม): ' + e.message, 'info');
+    // TODO: remove mock เมื่อ backend พร้อม
+    isUsingApi = false;
+    loadMockData();
   }
+}
+
+// ---- reloadList (alias — set in init after loadFromAPI exists) ----
+var reloadList = null;
+
+// ===== Mock Data (fallback ถ้า API ยังไม่พร้อม) =====
+function loadMockData() {
+  allItems = [];
+  for(var i=0; i<103; i++){
+    var sku = 'SKU-' + String(i+1).padStart(4,'0');
+    var item = {
+      sku: sku,
+      name: 'สินค้าตัวอย่าง #'+(i+1)+(i%3===0?' HONDA':' ISUZU'),
+      shopee: i%5===0 ? null : { stock: Math.floor(Math.random()*50), price: Math.floor(Math.random()*500)+20 },
+      bigseller: { stock: Math.floor(Math.random()*30) },
+      ours: i%4===0 ? null : { id: 1000+i, sku: sku, stock: Math.floor(Math.random()*20), name: 'ของเรา #'+(i+1) },
+      diff: 0,
+      link_status: i%4===0 ? 'unlinked' : (i%7===0 ? 'our_only' : 'auto-match'),
+      pending: null
+    };
+    if(item.ours && item.bigseller && Math.random()>0.7) item.diff = Math.floor(Math.random()*10)+1;
+    allItems.push(item);
+  }
+  filteredItems = allItems;
+  serverTotal = allItems.length;
+  totalPages = Math.max(1, Math.ceil(serverTotal / perPage));
+  document.getElementById('statsBar').innerHTML =
+    'Pending: <strong id="pendingCount">0</strong> | ' +
+    'Matched: <strong>' + (allItems.filter(function(it){return it.link_status==='auto-match';}).length) + '</strong>/' + allItems.length;
+  isUsingApi = false;
 }
 
 // ===== Filtering =====
@@ -438,14 +471,31 @@ function applyFilterAndSearch() {
 }
 
 function onFilter() { curPage=1; applyFilterAndSearch(); render(); }
-function onSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(function(){ curPage=1; reloadList(); }, 300); }
+function onSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function(){
+    curPage=1;
+    // 2026-05-15: fallback client-side filter ก่อน — ใช้ applyFilterAndSearch + render
+    applyFilterAndSearch();
+    render();
+    // TODO: เมื่อ backend filter/search พร้อม เปลี่ยนเป็น reloadList()
+  }, 300);
+}
 
 // ===== Render =====
 function render() {
-  // 2026-05-15: server filter แล้ว — ใช้ allItems = page ปัจจุบันตรงๆ
+  // 2026-05-15: slice ตาม page — ถ้า server ส่งมา paginated แล้ว (allItems.length <= perPage) ก็ใช้ตรงๆ
   filteredItems = allItems;
   var tbody = document.getElementById('tableBody');
-  if(filteredItems.length===0){
+  var start = (curPage-1)*perPage;
+  var pageItems = allItems.slice(start, start + perPage);
+  if(pageItems.length===0 && allItems.length>0){
+    // page ว่าง → กลับไปหน้าสุดท้าย
+    curPage = totalPages;
+    start = (curPage-1)*perPage;
+    pageItems = allItems.slice(start, start + perPage);
+  }
+  if(allItems.length===0){
     document.getElementById('skuTable').style.display='none';
     document.getElementById('paginationBar').style.display='none';
     document.getElementById('loadingMsg').style.display='block';
@@ -456,8 +506,7 @@ function render() {
   document.getElementById('skuTable').style.display='';
   document.getElementById('paginationBar').style.display='';
 
-  // server paginated แล้ว — ใช้ allItems ตรง
-  var page = allItems;
+  var page = pageItems;
   var html = '';
   for(var i=0;i<page.length;i++){
     var item = page[i];
@@ -515,7 +564,8 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 // ===== Pagination =====
 function renderPagination() {
-  document.getElementById('pageInfo').textContent = 'หน้า '+curPage+'/'+totalPages+' (ทั้งหมด '+serverTotal+' รายการ)';
+  var totalItems = isUsingApi ? serverTotal : filteredItems.length;
+  document.getElementById('pageInfo').textContent = 'หน้า '+curPage+'/'+totalPages+' (ทั้งหมด '+totalItems+' รายการ)';
   var nums = document.getElementById('pageNumbers');
   var html = '';
   var startP = Math.max(1, curPage-2), endP = Math.min(totalPages, curPage+2);
@@ -528,7 +578,13 @@ function renderPagination() {
 function goPage(p){
   if(p<1 || p>totalPages) return;
   curPage=p;
-  reloadList();  // server paginated — ต้อง fetch หน้าใหม่
+  // 2026-05-15: ถ้าเป็น API mode จะ reloadList() (server-paginated)
+  // ถ้าเป็น mock mode (หรือ API ส่งทั้งหมดมา) จะ render() ตรงๆ
+  if(isUsingApi) {
+    reloadList();
+  } else {
+    render();
+  }
 }
 function jumpPage(){
   var v = parseInt(document.getElementById('jumpInput').value);
