@@ -362,6 +362,7 @@ var totalPages = 1;
 var selected = {};          // sku_ref → true
 var isLocked = false;
 var currentRow = null;      // sku_ref ที่กำลัง expand
+var serverTotal = 0;
 var pendingMap = {};        // sku_ref → pending info
 var ourProducts = {};       // id → product for search
 var searchTimer = null;
@@ -393,7 +394,8 @@ async function loadFromAPI() {
     if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
     allItems = d.items || [];
     filteredItems = allItems;
-    totalPages = Math.max(1, Math.ceil((d.total || 0) / (d.perPage || perPage)));
+    serverTotal = d.total || 0;
+    totalPages = Math.max(1, Math.ceil(serverTotal / (d.perPage || perPage)));
     // sync pendingMap จาก server
     pendingMap = {};
     allItems.forEach(function(it){ if (it.pending) pendingMap[it.sku] = it.pending; });
@@ -513,7 +515,7 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 // ===== Pagination =====
 function renderPagination() {
-  document.getElementById('pageInfo').textContent = 'หน้า '+curPage+'/'+totalPages+' ('+filteredItems.length+' รายการ)';
+  document.getElementById('pageInfo').textContent = 'หน้า '+curPage+'/'+totalPages+' (ทั้งหมด '+serverTotal+' รายการ)';
   var nums = document.getElementById('pageNumbers');
   var html = '';
   var startP = Math.max(1, curPage-2), endP = Math.min(totalPages, curPage+2);
