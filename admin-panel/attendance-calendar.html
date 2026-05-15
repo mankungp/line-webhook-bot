@@ -368,12 +368,8 @@ function renderCalendar() {
     var cls='calendar-day'; if(wk) cls+=' weekend'; if(lk) cls+=' locked';
     var logs=lbs[dk]||[], adv=abs[dk]||null;
     var badges='';
-    // 2026-05-15: แสดง badge ทุกวันรวม weekend ถ้ามี logs (มาทำงานวันหยุด)
-    if(wk && logs.length === 0){
-      // เสาร์/อาทิตย์ไม่มา → ไม่แสดง badge (ปกติหยุด)
-    } else if (false) {
-      // dummy branch — จะประมวลผลลงไปข้างล่าง
-    } else if(true){
+    // 2026-05-15: ร้านเปิดทุกวัน — weekend คิดเหมือนวันธรรมดานิง (ไม่มี OT)
+    {
       // คำนวณจาก first_in/last_out + clamp 07:45-17:00 + break 60min
       var todayDk = new Date().toISOString().slice(0,10);
       var sorted = logs.slice().sort(function(a,b){ return new Date(a.recordTime)-new Date(b.recordTime); });
@@ -405,20 +401,13 @@ function renderCalendar() {
         if (outMin === null && dk >= todayDk) {
           badges += '<span class="day-badge att-half">⏳ กำลังทำงาน</span> ';
         } else if (shortfall === 0) {
-          var ot = wk ? '✨ OT เต็มวัน' : '✅ เต็มวัน';
-          badges += '<span class="day-badge att-pair">'+ot+'</span> ';
+          badges += '<span class="day-badge att-pair">✅ เต็มวัน</span> ';
         } else if (shortfall >= 540) {
-          if (wk) {
-            // weekend มี log แปลก — ไม่ถือว่าขาด (ไม่แสดง badge)
-          } else {
-            badges += '<span class="day-badge att-miss">❌ ขาด</span> ';
-          }
+          badges += '<span class="day-badge att-miss">❌ ขาด</span> ';
         } else if (shortfall >= 240) {
-          var pre = wk ? '✨ OT' : '⚠️ ครึ่งวัน';
-          badges += '<span class="day-badge att-half">'+pre+' มา '+Math.floor((540-shortfall)/60)+'ชม.</span> ';
+          badges += '<span class="day-badge att-half">⚠️ ครึ่งวัน หัก '+shortfall+'น.</span> ';
         } else {
-          var pre = wk ? '✨ OT' : '🟢 มาทำงาน';
-          badges += '<span class="day-badge att-pair">'+pre+' หัก '+shortfall+'น.</span> ';
+          badges += '<span class="day-badge att-pair">🟢 มาทำงาน หัก '+shortfall+'น.</span> ';
         }
       }
     }
@@ -437,7 +426,7 @@ function renderCalendar() {
     var oc=lk?'':' onclick="openDayModal('+d+')"';
     html+='<div class="'+cls+'"'+oc+'>';
     html+='<div class="day-number">'+d+'</div>'+badges+prev;
-    if(!lk&&!wk) html+='<div class="click-hint">👆</div>';
+    if(!lk) html+='<div class="click-hint">👆</div>';
     html+='</div>';
   }
   var tc=sd+dim, rm=7-(tc%7);
