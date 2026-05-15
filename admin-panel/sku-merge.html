@@ -257,7 +257,7 @@ table.sku-table tr.row-expanded td { background: #e6f7f0; }
     <option value="pending">pending</option>
   </select>
   <button class="btn btn-sm btn-secondary" onclick="manualBackup()">💾 Backup</button>
-  <span class="stats" id="statsBar">Pending: <strong id="pendingCount">0</strong> | Matched: <strong>0</strong>/2010</span>
+  <span class="stats" id="statsBar">Pending: <strong id="statsPendingCount">0</strong> | Matched: <strong>0</strong>/2010</span>
 </div>
 
 <!-- Table -->
@@ -371,7 +371,6 @@ document.addEventListener('DOMContentLoaded', function(){ init(); });
 
 // ===== Init (2026-05-15 — เชื่อม API จริง) =====
 async function init() {
-  reloadList = loadFromAPI;  // alias
   await acquireLock();
   await loadFromAPI();
   render();
@@ -402,7 +401,7 @@ async function loadFromAPI() {
     allItems.forEach(function(it){ if (it.pending) pendingMap[it.sku] = it.pending; });
     var s = d.stats || {};
     document.getElementById('statsBar').innerHTML =
-      'Pending: <strong id="pendingCount">' + (s.pending_count || 0) + '</strong> | ' +
+      'Pending: <strong id="statsPendingCount">' + (s.pending_count || 0) + '</strong> | ' +
       'Matched: <strong>' + (s.matched || 0) + '</strong>/' + (s.mirror_total || 0) +
       ' | Total: <strong>' + (s.total || 0) + '</strong>' +
       ' | Diff: <strong style="color:#f97316;">' + (s.diff_gt_0 || 0) + '</strong>' +
@@ -418,8 +417,8 @@ async function loadFromAPI() {
   }
 }
 
-// ---- reloadList (alias — set in init after loadFromAPI exists) ----
-var reloadList = null;
+// ---- reloadList (alias — เปลี่ยนเป็น function ป้องกัน hoisting issue) ----
+function reloadList() { loadFromAPI(); }
 
 // ===== Mock Data (fallback ถ้า API ยังไม่พร้อม) =====
 function loadMockData() {
@@ -443,7 +442,7 @@ function loadMockData() {
   serverTotal = allItems.length;
   totalPages = Math.max(1, Math.ceil(serverTotal / perPage));
   document.getElementById('statsBar').innerHTML =
-    'Pending: <strong id="pendingCount">0</strong> | ' +
+    'Pending: <strong id="statsPendingCount">0</strong> | ' +
     'Matched: <strong>' + (allItems.filter(function(it){return it.link_status==='auto-match';}).length) + '</strong>/' + allItems.length;
   isUsingApi = false;
 }
@@ -471,15 +470,25 @@ function applyFilterAndSearch() {
   if(curPage > totalPages) curPage = totalPages;
 }
 
-function onFilter() { curPage=1; applyFilterAndSearch(); render(); }
+function onFilter() {
+  curPage=1;
+  if(isUsingApi) {
+    reloadList();
+  } else {
+    applyFilterAndSearch();
+    render();
+  }
+}
 function onSearch() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(function(){
     curPage=1;
-    // 2026-05-15: fallback client-side filter ก่อน — ใช้ applyFilterAndSearch + render
-    applyFilterAndSearch();
-    render();
-    // TODO: เมื่อ backend filter/search พร้อม เปลี่ยนเป็น reloadList()
+    if(isUsingApi) {
+      reloadList();
+    } else {
+      applyFilterAndSearch();
+      render();
+    }
   }, 300);
 }
 
@@ -783,8 +792,8 @@ function onSearchOur(sku){
     } catch(e) { console.error('search err', e); }
     var html = '';
     items.forEach(function(p){
-      var safeName = (p.name||'').replace(/'/g, '');
-      html += '<div class="search-result-item" onclick="selectOurProduct(\''+sku+'\','+p.id+',\''+esc(p.sku)+'\',\''+esc(safeName)+'\')">';
+      var safeName = escapeAttr(p.name||'');
+      html += '<div class="search-result-item" onclick="selectOurProduct(\''+sku+'\','+p.id+',\''+esc(p.sku)+'\',\''+safeName+'\')">';
       html += '<span style="background:#0a8855;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">🏪 เรา</span>';
       html += '<strong>'+esc(p.sku)+'</strong> — '+esc(p.name)+' <span style="color:#888;">(stock: '+(p.stock||0)+')</span>';
       html += '</div>';
@@ -883,7 +892,8 @@ function updateSelected(){
 
 function updatePending(){
   var n = Object.keys(pendingMap).length;
-  document.getElementById('pendingCount').textContent = n;
+  var pe = document.getElementById('pendingCount') || document.getElementById('statsPendingCount');
+  if(pe) pe.textContent = n;
   document.getElementById('footerPending').textContent = n;
 }
 
@@ -927,6 +937,8 @@ function updateLockUI(){
 
 // ===== Backup =====
 async function manualBackup(){
+  var btn = document.querySelector('button[onclick*="manualBackup"]');
+  if(btn) btn.disabled = true;
   toast('💾 backup...', 'info');
   try {
     var r = await fetch('/api/sku-merge/manual-backup', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
@@ -934,6 +946,7 @@ async function manualBackup(){
     if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
     toast('✅ Backup เรียบร้อย', 'success');
   } catch(e) { toast('❌ ' + e.message, 'error'); }
+  finally { if(btn) btn.disabled = false; }
 }
 
 // ===== Preview (real) =====
