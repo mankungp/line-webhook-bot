@@ -271,6 +271,30 @@ var THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มี
 var THAI_DAYS = ['อา','จ','อ','พ','พฤ','ศ','ส'];
 var curY, curM, curEmp = 'E001', employees = {}, calData = null;
 var selDay = null, editId = null, delId = null;
+
+// 2026-05-15: helper — แปลง ISO เป็นเวลา local Asia/Bangkok (HH:MM:SS)
+function fmtLocalTime(iso) {
+  if (!iso) return '??:??';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '??:??';
+  return d.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+}
+function fmtLocalDateTime(iso) {
+  if (!iso) return '??';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '??';
+  var ds = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var t = d.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+  return ds + ' ' + t;
+}
+// สำหรับ input type=datetime-local (YYYY-MM-DDTHH:MM ในเวลา local)
+function toLocalInputValue(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
 (function(){ var d=new Date(); curY=d.getFullYear(); curM=d.getMonth(); })();
 
 document.addEventListener('DOMContentLoaded', function(){ loadEmployees().then(loadCalendar); });
@@ -392,7 +416,7 @@ function renderCalendar() {
     var prev='';
     if(logs.length>0){
       var ps=logs.slice(0,3).map(function(l){
-        var t=l.recordTime?l.recordTime.slice(11,19):'??:??', ic=l.type==='check_in'?'🟢':'🔴';
+        var t=fmtLocalTime(l.recordTime), ic=l.type==='check_in'?'🟢':'🔴';
         return '<div class="day-log-entry">'+ic+' '+t+'</div>';
       });
       prev='<div class="day-logs">'+ps.join('')+'</div>';
@@ -424,7 +448,7 @@ function openDayModal(date){
   else {
     body+='<div>';
     for(var i=0;i<logs.length;i++){
-      var lg=logs[i], t=lg.recordTime?lg.recordTime.slice(0,19).replace('T',' '):'??';
+      var lg=logs[i], t=fmtLocalDateTime(lg.recordTime);
       var ic=lg.type==='check_in'?'🟢':'🔴', tl=lg.type==='check_in'?'เข้างาน':'ออกงาน', sr=lg.source||'-';
       var he=lg.edit_history&&lg.edit_history.length>0;
       body+='<div class="log-entry"><div class="log-info">';
@@ -437,7 +461,7 @@ function openDayModal(date){
         for(var j=0;j<lg.edit_history.length;j++){
           var eh=lg.edit_history[j];
           body+='<div style="margin-top:4px;padding:4px 0;border-top:1px solid var(--border);">';
-          body+='⏱ '+eh.recordTime+' | '+eh.type;
+          body+='⏱ '+fmtLocalDateTime(eh.recordTime)+' | '+eh.type;
           if(eh.reason) body+=' | เหตุผล: '+eh.reason;
           if(eh.changed_by) body+=' | โดย: '+eh.changed_by;
           body+='</div>';
@@ -461,7 +485,8 @@ function openDayModal(date){
 
 function openEditModal(id,rt,typ){
   editId=id;
-  document.getElementById('editTime').value=rt?rt.slice(0,16):'';
+  // แปลง UTC ISO → เวลา local สำหรับ input datetime-local
+  document.getElementById('editTime').value=toLocalInputValue(rt);
   document.getElementById('editType').value=typ;
   document.getElementById('editReason').value='';
   openModal('editModal');
