@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a8">
+<title>🔗 ผสม SKU Manual - ร้านเกิดการเกษตร</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Design Tokens */
+:root {
+  --primary: #0a8; --primary-hover: #097; --accent: #f97316;
+  --success: #0a8; --warning: #f39c12; --danger: #e74c3c; --info: #3498db;
+  --bg-app: #f8f9fa; --bg-card: #ffffff; --bg-hover: #f0f1f3; --bg-input: #f8f9fa;
+  --text-primary: #1a1f24; --text-secondary: #5a6168; --text-muted: #9098a0;
+  --text-inverse: #ffffff; --border: #e8eaed; --border-strong: #d0d4d8;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12); --shadow-xl: 0 16px 48px rgba(0,0,0,0.16);
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+}
+[data-theme="dark"] {
+  --bg-app: #0f1419; --bg-card: #1a1f24; --bg-hover: #232932; --bg-input: #232932;
+  --text-primary: #e6e8eb; --text-secondary: #b0b6bd; --text-muted: #707880;
+  --border: #2a3038; --border-strong: #3a414a;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5); --shadow-xl: 0 16px 48px rgba(0,0,0,0.6);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: var(--bg-app); color: var(--text-primary); min-height: 100vh;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+.app-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+select, input, textarea, button { font-family: inherit; }
+
+/* Buttons */
+.btn {
+  padding: 8px 16px; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.btn-primary { background: var(--primary); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--primary-hover); box-shadow: var(--shadow-md); }
+.btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-hover); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #c0392b; }
+.btn-success { background: #059669; color: #fff; }
+.btn-success:hover { background: #047857; }
+.btn-warning { background: var(--accent); color: #fff; }
+.btn-warning:hover { background: #ea580c; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-xs { padding: 3px 8px; font-size: 11px; }
+.btn-outline-primary { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+.btn-outline-primary:hover { background: var(--primary); color: #fff; }
+
+/* Header */
+.page-header { margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.page-header h1 { font-size: 24px; font-weight: 700; margin: 0; color: var(--text-primary); }
+.header-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+.lock-badge { font-size: 13px; padding: 4px 10px; border-radius: 20px; font-weight: 500; }
+.lock-badge.unlocked { background: #d4edda; color: #155724; }
+.lock-badge.locked { background: #f8d7da; color: #721c24; }
+[data-theme="dark"] .lock-badge.unlocked { background: rgba(21,87,36,0.3); color: #81c784; }
+[data-theme="dark"] .lock-badge.locked { background: rgba(114,28,36,0.3); color: #ef9a9a; }
+
+/* Toolbar */
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 12px; padding: 12px; background: var(--bg-card);
+  border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+}
+.toolbar input[type="search"] {
+  flex: 1; min-width: 180px; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font-size: 14px;
+}
+.toolbar input[type="search"]:focus { outline: none; border-color: var(--primary); }
+.toolbar select.flt {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-input); color: var(--text-primary); font-size: 14px;
+}
+.toolbar .stats {
+  font-size: 13px; color: var(--text-muted); margin-left: auto; white-space: nowrap;
+}
+.toolbar .stats strong { color: var(--text-primary); }
+
+/* Table */
+.table-wrapper {
+  background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm); overflow-x: auto;
+}
+table.sku-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+table.sku-table th {
+  position: sticky; top: 0; background: var(--bg-hover); z-index: 2;
+  padding: 10px 8px; text-align: left; font-weight: 600; color: var(--text-secondary);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+table.sku-table td {
+  padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle;
+}
+table.sku-table tr:hover:not(.expanded) td { background: var(--bg-hover); }
+table.sku-table tr.row-expanded td { background: #e6f7f0; }
+[data-theme="dark"] table.sku-table tr.row-expanded td { background: rgba(10,136,85,0.1); }
+
+/* Badges */
+.badge {
+  display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 500;
+}
+.badge-matched { background: #d4edda; color: #155724; }
+.badge-diff { background: #fff3cd; color: #856404; }
+.badge-unlinked { background: #e2e3e5; color: #383d41; }
+.badge-pending { background: #cce5ff; color: #004085; }
+.badge-our-only { background: #e8daef; color: #6c3483; }
+.badge-new { background: #f8d7da; color: #721c24; }
+[data-theme="dark"] .badge-matched { background: rgba(21,87,36,0.3); color: #81c784; }
+[data-theme="dark"] .badge-diff { background: rgba(133,100,4,0.3); color: #ffd54f; }
+[data-theme="dark"] .badge-unlinked { background: rgba(56,61,65,0.3); color: #b0b6bd; }
+[data-theme="dark"] .badge-pending { background: rgba(0,64,133,0.3); color: #64b5f6; }
+[data-theme="dark"] .badge-our-only { background: rgba(108,52,131,0.3); color: #ce93d8; }
+[data-theme="dark"] .badge-new { background: rgba(114,28,36,0.3); color: #ef9a9a; }
+
+/* Expand Panel */
+.expand-panel {
+  display: none; padding: 16px; background: var(--bg-app); border-bottom: 1px solid var(--border);
+}
+.expand-panel.open { display: table-row; }
+.expand-panel td { padding: 0 !important; border: none !important; }
+.expand-panel-inner {
+  padding: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+}
+.panel-col {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 12px; min-height: 120px;
+}
+.panel-col h4 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: var(--text-primary); }
+.panel-col .field { font-size: 12px; margin-bottom: 4px; color: var(--text-secondary); }
+.panel-col .field strong { color: var(--text-primary); }
+.search-our-box input {
+  width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-input); color: var(--text-primary); font-size: 13px; margin-bottom: 6px;
+}
+.search-our-box input:focus { outline: none; border-color: var(--primary); }
+.search-results {
+  max-height: 150px; overflow-y: auto; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg-card);
+}
+.search-result-item {
+  padding: 6px 10px; cursor: pointer; font-size: 12px; border-bottom: 1px solid var(--border);
+}
+.search-result-item:hover { background: var(--bg-hover); }
+.search-result-item.selected { background: #e6f7f0; font-weight: 600; }
+.panel-actions { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+.panel-status { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+/* Pagination */
+.pagination-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 8px; background: var(--bg-card); border-top: 1px solid var(--border);
+  font-size: 13px; color: var(--text-secondary);
+}
+.pagination-bar .page-btns { display: flex; gap: 4px; align-items: center; }
+.pagination-bar button.page-btn {
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-card); color: var(--text-primary); cursor: pointer; font-size: 12px;
+}
+.pagination-bar button.page-btn:hover { background: var(--bg-hover); }
+.pagination-bar button.page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pagination-bar button.page-btn:disabled { opacity: 0.4; cursor: default; }
+.pagination-bar .jump-input {
+  width: 50px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  text-align: center; font-size: 13px;
+}
+
+/* Footer */
+.footer-bar {
+  position: sticky; bottom: 0; z-index: 10;
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  background: var(--bg-card); border-top: 1px solid var(--border); box-shadow: var(--shadow-md);
+  margin-top: 12px; border-radius: var(--radius-lg);
+}
+.footer-bar .fstat { font-size: 13px; color: var(--text-muted); }
+.footer-bar .fstat strong { color: var(--text-primary); }
+.footer-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+/* Modal */
+.modal {
+  display: none; position: fixed; inset: 0; background: rgba(15,20,25,0.55);
+  backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+}
+.modal.active { display: flex; }
+.modal-content {
+  background: var(--bg-card); border-radius: var(--radius-xl); padding: 28px;
+  width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+  box-shadow: var(--shadow-xl); position: relative; border: 1px solid var(--border);
+}
+.modal h2 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
+.modal-close {
+  position: absolute; top: 16px; right: 20px; font-size: 24px; cursor: pointer;
+  color: var(--text-muted); background: none; border: none; line-height: 1;
+}
+.modal-close:hover { color: var(--text-primary); }
+.modal-footer { margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+.form-group textarea {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-input); color: var(--text-primary); font-size: 14px; resize: vertical; min-height: 60px;
+}
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: var(--radius-md);
+  color: #fff; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-lg);
+  z-index: 2000; opacity: 0; transform: translateY(10px); transition: opacity 0.3s, transform 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { background: #059669; }
+.toast.error { background: var(--danger); }
+.toast.info { background: var(--info); }
+.loading { text-align: center; padding: 60px; color: var(--text-muted); font-size: 16px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-container { padding: 10px; }
+  .expand-panel-inner { grid-template-columns: 1fr; }
+  table.sku-table { font-size: 12px; }
+  .toolbar .stats { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="app-container">
+
+<!-- Header -->
+<div class="page-header">
+  <h1>🔗 ผสม SKU (Manual)</h1>
+  <div class="header-right">
+    <span class="lock-badge unlocked" id="lockBadge">🔓 ว่าง</span>
+    <button class="btn btn-sm btn-outline-primary" id="lockBtn" onclick="toggleLock()">🔒 Lock</button>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <input type="search" id="searchInput" placeholder="🔍 ค้นหา SKU/ชื่อ..." oninput="onSearch()">
+  <select class="flt" id="filterSelect" onchange="onFilter()">
+    <option value="all">ทุก</option>
+    <option value="unmatched">unmatched</option>
+    <option value="diff">diff&gt;0</option>
+    <option value="our_only">our_only</option>
+    <option value="new">new</option>
+    <option value="pending">pending</option>
+  </select>
+  <button class="btn btn-sm btn-secondary" onclick="manualBackup()">💾 Backup</button>
+  <span class="stats" id="statsBar">Pending: <strong id="pendingCount">0</strong> | Matched: <strong>0</strong>/2010</span>
+</div>
+
+<!-- Table -->
+<div class="table-wrapper" id="tableWrapper">
+  <div class="loading" id="loadingMsg">⏳ กำลังโหลด...</div>
+  <table class="sku-table" id="skuTable" style="display:none;">
+    <thead>
+      <tr>
+        <th style="width:30px;"><input type="checkbox" id="checkAll" onchange="toggleAllCheckboxes()"></th>
+        <th>SKU</th>
+        <th>ชื่อ</th>
+        <th style="width:90px;">Shopee</th>
+        <th style="width:60px;">BS</th>
+        <th style="width:60px;">เรา</th>
+        <th style="width:40px;">Diff</th>
+        <th>สถานะ</th>
+        <th style="width:80px;">Action</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <div class="pagination-bar" id="paginationBar" style="display:none;">
+    <span id="pageInfo">หน้า 1/1 (0 รายการ)</span>
+    <div class="page-btns">
+      <button class="page-btn" onclick="goPage(1)">«</button>
+      <button class="page-btn" onclick="goPage(curPage-1)">‹</button>
+      <span id="pageNumbers"></span>
+      <button class="page-btn" onclick="goPage(curPage+1)">›</button>
+      <button class="page-btn" onclick="goPage(totalPages)">»</button>
+    </div>
+    <div>
+      ไปหน้า <input class="jump-input" id="jumpInput" onkeydown="if(event.key==='Enter')jumpPage()"> 
+      <button class="btn btn-xs btn-secondary" onclick="jumpPage()">ไป</button>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer-bar">
+  <span class="fstat">Selected: <strong id="selCount">0</strong></span>
+  <span class="fstat" style="margin-left:12px;">Pending: <strong id="footerPending">0</strong></span>
+  <div class="footer-right">
+    <button class="btn btn-sm btn-secondary" id="previewBtn" onclick="openPreview()" disabled>👁️ Preview</button>
+    <button class="btn btn-sm btn-primary" id="applyBtn" onclick="openApply()" disabled>✅ Apply selected</button>
+    <button class="btn btn-sm btn-secondary" onclick="openRollback()">↩️ Rollback last</button>
+  </div>
+</div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal" id="previewModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal('previewModal')">&times;</button>
+    <h2>👁️ Preview การผสม</h2>
+    <div id="previewBody"><p class="loading">⏳ กำลังคำนวณ...</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('previewModal')">ปิด</button>
+      <button class="btn btn-primary btn-sm" onclick="doApply()">✅ ยืนยัน Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Apply Modal -->
+<div class="modal" id="applyModal">
+  <div class="modal-content" style="max-width:440px;">
+    <button class="modal-close" onclick="closeModal('applyModal')">&times;</button>
+    <h2>✅ ยืนยัน Apply</h2>
+    <p style="margin-bottom:12px;color:var(--text-secondary);">กำลังจะ apply <strong id="applyCount">0</strong> รายการ</p>
+    <div class="form-group"><label>เหตุผล</label><textarea id="applyReason" placeholder="ระบุเหตุผลการ merge batch นี้..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('applyModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" id="applyConfirmBtn" onclick="doApply()">✅ Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rollback Modal -->
+<div class="modal" id="rollbackModal">
+  <div class="modal-content" style="max-width:440px;">
+    <button class="modal-close" onclick="closeModal('rollbackModal')">&times;</button>
+    <h2>↩️ Rollback</h2>
+    <p style="margin-bottom:12px;color:var(--text-secondary);">กู้คืน batch apply ล่าสุด</p>
+    <div id="rollbackInfo"></div>
+    <div class="form-group"><label>เหตุผล</label><textarea id="rollbackReason" placeholder="ระบุเหตุผล..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('rollbackModal')">ยกเลิก</button>
+      <button class="btn btn-danger btn-sm" onclick="doRollback()">↩️ Rollback</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== State =====
+var allItems = [];          // full data
+var filteredItems = [];     // after filter+search
+var perPage = 200;
+var curPage = 1;
+var totalPages = 1;
+var selected = {};          // sku_ref → true
+var isLocked = false;
+var currentRow = null;      // sku_ref ที่กำลัง expand
+var pendingMap = {};        // sku_ref → pending info
+var ourProducts = {};       // id → product for search
+var searchTimer = null;
+
+document.addEventListener('DOMContentLoaded', function(){ init(); });
+
+// ===== Init =====
+async function init() {
+  await loadMockData();  // TODO: replace with real API call
+  render();
+  acquireLock();
+  window.addEventListener('beforeunload', function(e) {
+    var p = Object.keys(pendingMap).length;
+    if(p > 0) { e.preventDefault(); e.returnValue = 'คุณยังมี '+p+' รายการ pending'; return e.returnValue; }
+  });
+  window.addEventListener('unload', function(){ releaseLock(); });
+}
+
+// ===== Mock Data =====
+async function loadMockData() {
+  // TODO: replace with GET /api/sku-merge/list
+  allItems = [];
+  for(var i=0; i<102; i++){
+    var sku = 'SKU-' + String(i+1).padStart(4,'0');
+    var item = {
+      sku: sku,
+      name: 'สินค้าตัวอย่าง #'+(i+1)+(i%3===0?' HONDA':' ISUZU'),
+      shopee: i%5===0 ? null : { stock: Math.floor(Math.random()*50), price: Math.floor(Math.random()*500)+20 },
+      bigseller: { stock: Math.floor(Math.random()*30) },
+      ours: i%4===0 ? null : { id: 1000+i, sku: sku, stock: Math.floor(Math.random()*20), name: 'ของเรา #'+(i+1) },
+      diff: 0,
+      link_status: i%4===0 ? 'unlinked' : (i%7===0 ? 'our_only' : 'auto-match'),
+      pending: null
+    };
+    if(item.ours && item.bigseller && Math.random()>0.7) item.diff = Math.floor(Math.random()*10)+1;
+    allItems.push(item);
+  }
+  // stats mock
+  document.getElementById('statsBar').innerHTML = 'Pending: <strong id="pendingCount">0</strong> | Matched: <strong>102</strong>/2010';
+}
+
+// ===== Filtering =====
+function getFilter() { return document.getElementById('filterSelect').value; }
+function getSearch() { return document.getElementById('searchInput').value.trim().toLowerCase(); }
+
+function applyFilterAndSearch() {
+  var f = getFilter(), q = getSearch();
+  filteredItems = allItems.filter(function(item){
+    if(f==='unmatched' && item.link_status!=='unlinked' && item.link_status!=='new') return false;
+    if(f==='diff' && (item.diff===undefined||item.diff===0)) return false;
+    if(f==='our_only' && item.link_status!=='our_only') return false;
+    if(f==='new' && item.link_status!=='new') return false;
+    if(f==='pending' && !(item.sku in pendingMap)) return false;
+    if(q){
+      var m = item.sku.toLowerCase().indexOf(q)>=0 || item.name.toLowerCase().indexOf(q)>=0;
+      if(!m && item.ours && item.ours.name && item.ours.name.toLowerCase().indexOf(q)>=0) m=true;
+      return m;
+    }
+    return true;
+  });
+  totalPages = Math.max(1, Math.ceil(filteredItems.length / perPage));
+  if(curPage > totalPages) curPage = totalPages;
+}
+
+function onFilter() { curPage=1; applyFilterAndSearch(); render(); }
+function onSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function(){ curPage=1; applyFilterAndSearch(); render(); }, 300);
+}
+
+// ===== Render =====
+function render() {
+  applyFilterAndSearch();
+  var tbody = document.getElementById('tableBody');
+  if(filteredItems.length===0){
+    document.getElementById('skuTable').style.display='none';
+    document.getElementById('paginationBar').style.display='none';
+    document.getElementById('loadingMsg').style.display='block';
+    document.getElementById('loadingMsg').textContent = 'ไม่พบรายการ';
+    return;
+  }
+  document.getElementById('loadingMsg').style.display='none';
+  document.getElementById('skuTable').style.display='';
+  document.getElementById('paginationBar').style.display='';
+
+  var start = (curPage-1)*perPage;
+  var page = filteredItems.slice(start, start+perPage);
+  var html = '';
+  for(var i=0;i<page.length;i++){
+    var item = page[i];
+    var checked = selected[item.sku] ? 'checked' : '';
+    var statBadge = statusBadge(item);
+    var shopeeStr = item.shopee ? (item.shopee.stock+' ('+item.shopee.price+'฿)') : '—';
+    var bsStr = item.bigseller ? ''+item.bigseller.stock : '—';
+    var oursStr = item.ours ? ''+item.ours.stock : '—';
+    var diffStr = (item.diff!==undefined && item.diff>0) ? '<span style="color:var(--accent);font-weight:600;">'+item.diff+'</span>' : (item.diff===0?'0':'—');
+    var hasPending = item.sku in pendingMap;
+    var pendingBadge = hasPending ? '<span class="badge badge-pending">🔵 Pending</span> ' : '';
+    html += '<tr id="row-'+item.sku+'" onclick="toggleExpand(\''+item.sku+'\')">';
+    html += '<td onclick="event.stopPropagation()"><input type="checkbox" class="row-check" data-sku="'+item.sku+'" '+checked+' onchange="updateSelected()"></td>';
+    html += '<td><strong>'+esc(item.sku)+'</strong></td>';
+    html += '<td>'+esc(item.name)+'</td>';
+    html += '<td>'+shopeeStr+'</td>';
+    html += '<td>'+bsStr+'</td>';
+    html += '<td>'+oursStr+'</td>';
+    html += '<td>'+diffStr+'</td>';
+    html += '<td>'+pendingBadge+statBadge+'</td>';
+    html += '<td style="font-size:18px;text-align:center;cursor:pointer;">'+expandIcon(item, hasPending)+'</td>';
+    html += '</tr>';
+    // Expand panel (hidden by default)
+    html += '<tr class="expand-panel" id="ep-'+item.sku+'"><td colspan="9"><div class="expand-panel-inner" id="epi-'+item.sku+'">';
+    html += '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+  renderPagination();
+  updateSelected();
+  updatePending();
+}
+
+function statusBadge(item) {
+  if(item.sku in pendingMap) return '<span class="badge badge-pending">🔵 Pending</span>';
+  switch(item.link_status){
+    case 'auto-match': return '<span class="badge badge-matched">✅ Match</span>';
+    case 'our_only': return '<span class="badge badge-our-only">🔮 Our only</span>';
+    case 'unlinked': return '<span class="badge badge-unlinked">❓ New</span>';
+    case 'new': return '<span class="badge badge-new">🆕 New</span>';
+    default: return '<span class="badge badge-unlinked">'+item.link_status+'</span>';
+  }
+}
+
+function expandIcon(item, hasPending){
+  if(item.link_status==='auto-match' && !hasPending && item.ours && item.bigseller) return '✅';
+  if(hasPending) return '<span style="color:var(--info);">🔵</span>';
+  return '🔗';
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ===== Pagination =====
+function renderPagination() {
+  document.getElementById('pageInfo').textContent = 'หน้า '+curPage+'/'+totalPages+' ('+filteredItems.length+' รายการ)';
+  var nums = document.getElementById('pageNumbers');
+  var html = '';
+  var startP = Math.max(1, curPage-2), endP = Math.min(totalPages, curPage+2);
+  for(var p=startP; p<=endP; p++){
+    html += '<button class="page-btn'+(p===curPage?' active':'')+'" onclick="goPage('+p+')">'+p+'</button>';
+  }
+  nums.innerHTML = html;
+}
+
+function goPage(p){
+  if(p<1 || p>totalPages) return;
+  curPage=p; render();
+}
+function jumpPage(){
+  var v = parseInt(document.getElementById('jumpInput').value);
+  if(v>=1 && v<=totalPages) goPage(v);
+}
+
+// ===== Expand Panel =====
+function toggleExpand(sku) {
+  var ep = document.getElementById('ep-'+sku);
+  if(!ep) return;
+  var isOpen = ep.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.expand-panel.open').forEach(function(el){ el.classList.remove('open'); });
+  if(!isOpen) {
+    ep.classList.add('open');
+    renderExpandPanel(sku);
+    currentRow = sku;
+  } else { currentRow = null; }
+}
+
+function renderExpandPanel(sku) {
+  var item = allItems.find(function(i){ return i.sku===sku; });
+  if(!item) return;
+  var epi = document.getElementById('epi-'+sku);
+  var hasPending = sku in pendingMap;
+  var pendInfo = pendingMap[sku] || null;
+
+  var shopeeHtml = '<h4>🛒 Shopee</h4>';
+  if(item.shopee){
+    shopeeHtml += '<div class="field">Stock: <strong>'+item.shopee.stock+'</strong></div>';
+    shopeeHtml += '<div class="field">Price: <strong>'+item.shopee.price+'฿</strong></div>';
+    if(item.shopee.product_name) shopeeHtml += '<div class="field">ชื่อ: '+esc(item.shopee.product_name)+'</div>';
+  } else shopeeHtml += '<p style="color:var(--text-muted);font-size:12px;">ไม่มีข้อมูล</p>';
+
+  var bsHtml = '<h4>📦 BigSeller</h4>';
+  if(item.bigseller){
+    bsHtml += '<div class="field">Stock: <strong>'+item.bigseller.stock+'</strong></div>';
+    if(item.bigseller.sku_type) bsHtml += '<div class="field">Type: '+item.bigseller.sku_type+'</div>';
+    if(item.bigseller.category) bsHtml += '<div class="field">หมวด: '+item.bigseller.category+'</div>';
+  } else bsHtml += '<p style="color:var(--text-muted);font-size:12px;">ไม่มีข้อมูล</p>';
+
+  var oursHtml = '<h4>🏪 ระบบเรา</h4>';
+  if(item.ours){
+    oursHtml += '<div class="field">ID: <strong>'+item.ours.id+'</strong></div>';
+    oursHtml += '<div class="field">SKU: <strong>'+esc(item.ours.sku)+'</strong></div>';
+    oursHtml += '<div class="field">Stock: <strong>'+item.ours.stock+'</strong></div>';
+    oursHtml += '<div class="field">ชื่อ: '+esc(item.ours.name)+'</div>';
+  } else {
+    oursHtml += '<p style="color:var(--text-muted);font-size:12px;">ไม่มีข้อมูลในระบบเรา</p>';
+    oursHtml += '<p style="color:var(--text-muted);font-size:12px;">กรุณาสร้างสินค้าใหม่หรือผูกกับที่มีอยู่</p>';
+  }
+
+  // Search box for our products
+  var searchHtml = '<div class="search-our-box">';
+  searchHtml += '<input type="text" placeholder="🔍 ค้นหาสินค้าในระบบเรา..." id="srch-'+sku+'" oninput="onSearchOur(\''+sku+'\')">';
+  searchHtml += '<div class="search-results" id="sres-'+sku+'"></div>';
+  searchHtml += '</div>';
+
+  var actionsHtml = '<div class="panel-actions">';
+  if(!hasPending){
+    actionsHtml += '<button class="btn btn-sm btn-success" onclick="stageMerge(\''+sku+'\')" id="stg-'+sku+'" disabled>✓ ผูก 3 ฝั่ง</button> ';
+    actionsHtml += '<button class="btn btn-sm btn-primary" onclick="stageCreateNew(\''+sku+'\')">🆕 สร้างใหม่</button> ';
+    actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="stageSkip(\''+sku+'\')">🗑️ ข้าม</button>';
+  } else {
+    actionsHtml += '<span class="badge badge-pending">🔵 Pending</span> ';
+    actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="unstageItem(\''+sku+'\')">↩️ ปลด</button>';
+  }
+  actionsHtml += '</div>';
+  var pendNote = hasPending ? '<div class="panel-status">🔵 Pending: '+(pendInfo&&pendInfo.type||'merge')+'</div>' : '';
+
+  epi.innerHTML = shopeeHtml + '</div><div class="panel-col">' + bsHtml + '</div><div class="panel-col">' + oursHtml + searchHtml + actionsHtml + pendNote + '</div>';
+}
+
+// ===== Search Our Products =====
+var searchTimers = {};
+function onSearchOur(sku){
+  clearTimeout(searchTimers[sku]);
+  searchTimers[sku] = setTimeout(async function(){
+    var q = document.getElementById('srch-'+sku).value.trim();
+    var resEl = document.getElementById('sres-'+sku);
+    if(!q){ resEl.innerHTML=''; return; }
+    var items = [];
+    try {
+      var r = await fetch('/api/sku-merge/search?q=' + encodeURIComponent(q) + '&limit=15');
+      var d = await r.json();
+      items = d.items || [];
+    } catch(e) { console.error('search err', e); }
+    var html = '';
+    items.forEach(function(p){
+      var safeName = (p.name||'').replace(/'/g, '');
+      html += '<div class="search-result-item" onclick="selectOurProduct(\''+sku+'\','+p.id+',\''+esc(p.sku)+'\',\''+esc(safeName)+'\')">';
+      html += '<strong>'+esc(p.sku)+'</strong> — '+esc(p.name)+' (stock: '+(p.stock||0)+')';
+      html += '</div>';
+    });
+    if(!items.length) html += '<div style="padding:8px;color:var(--text-muted);font-size:12px;">ไม่พบสินค้า</div>';
+    resEl.innerHTML = html;
+  }, 300);
+}
+
+var selectedOurProduct = {};
+function selectOurProduct(sku, prodId, prodSku, prodName){
+  selectedOurProduct[sku] = { id: prodId, sku: prodSku, name: prodName || prodSku };
+  document.getElementById('srch-'+sku).value = prodSku;
+  document.getElementById('sres-'+sku).innerHTML = '';
+  document.getElementById('stg-'+sku).disabled = false;
+}
+
+// ===== Stage Actions =====
+function stageMerge(sku){
+  var match = selectedOurProduct[sku];
+  if(!match){ toast('กรุณาเลือกสินค้าในระบบเราก่อน','error'); return; }
+  // TODO: POST /api/sku-merge/stage { sku_ref, type:"merge", our_product_id: match.id }
+  pendingMap[sku] = { type:'merge', our_product_id: match.id, our_name: match.sku };
+  toast('✅ Stage: '+sku+' → '+match.sku, 'success');
+  updatePending();
+  render();
+}
+
+function stageCreateNew(sku){
+  // TODO: POST /api/sku-merge/stage { sku_ref, type:"create_new" }
+  pendingMap[sku] = { type:'create_new' };
+  toast('✅ Stage: '+sku+' (สร้างใหม่)', 'success');
+  updatePending();
+  render();
+}
+
+function stageSkip(sku){
+  // TODO: POST /api/sku-merge/stage { sku_ref, type:"skip" }
+  pendingMap[sku] = { type:'skip' };
+  toast('⏭️ Skip: '+sku, 'info');
+  updatePending();
+  render();
+}
+
+function unstageItem(sku){
+  // TODO: POST /api/sku-merge/unstage { sku_ref }
+  delete pendingMap[sku];
+  delete selectedOurProduct[sku];
+  toast('↩️ Unstage: '+sku, 'info');
+  updatePending();
+  render();
+}
+
+// ===== Selected (Checkboxes) =====
+function toggleAllCheckboxes(){
+  var all = document.getElementById('checkAll').checked;
+  document.querySelectorAll('.row-check').forEach(function(cb){ cb.checked=all; });
+  updateSelected();
+}
+
+function updateSelected(){
+  selected = {};
+  document.querySelectorAll('.row-check:checked').forEach(function(cb){
+    selected[cb.getAttribute('data-sku')]=true;
+  });
+  var n = Object.keys(selected).length;
+  document.getElementById('selCount').textContent = n;
+  document.getElementById('previewBtn').disabled = n===0;
+  document.getElementById('applyBtn').disabled = n===0;
+}
+
+function updatePending(){
+  var n = Object.keys(pendingMap).length;
+  document.getElementById('pendingCount').textContent = n;
+  document.getElementById('footerPending').textContent = n;
+}
+
+// ===== Lock =====
+async function acquireLock(){
+  // TODO: POST /api/sku-merge/lock (auto on page load)
+  isLocked = true;
+  updateLockUI();
+}
+async function releaseLock(){
+  // TODO: POST /api/sku-merge/unlock (on unload)
+  isLocked = false;
+}
+function toggleLock(){
+  if(isLocked){
+    // POST /api/sku-merge/unlock
+    isLocked = false;
+  } else {
+    // POST /api/sku-merge/lock
+    isLocked = true;
+  }
+  updateLockUI();
+}
+function updateLockUI(){
+  var badge = document.getElementById('lockBadge');
+  var btn = document.getElementById('lockBtn');
+  if(isLocked){
+    badge.className='lock-badge locked'; badge.textContent='🔒 ล็อก';
+    btn.textContent='🔓 Unlock'; btn.className='btn btn-sm btn-warning';
+  } else {
+    badge.className='lock-badge unlocked'; badge.textContent='🔓 ว่าง';
+    btn.textContent='🔒 Lock'; btn.className='btn btn-sm btn-outline-primary';
+  }
+}
+
+// ===== Backup =====
+function manualBackup(){
+  toast('💾 กำลัง backup...', 'info');
+  // TODO: replace with real backup call
+  setTimeout(function(){ toast('💾 Backup เรียบร้อย', 'success'); }, 500);
+}
+
+// ===== Preview =====
+function openPreview(){
+  // TODO: GET /api/sku-merge/preview
+  toast('👁️ Preview (Phase D — กำลังพัฒนา)', 'info');
+}
+
+// ===== Apply =====
+function openApply(){
+  document.getElementById('applyCount').textContent = Object.keys(selected).length;
+  openModal('applyModal');
+}
+function doApply(){
+  // TODO: POST /api/sku-merge/apply { reason, dry_run: false }
+  toast('✅ Apply (Phase D — กำลังพัฒนา)', 'info');
+  closeModal('previewModal');
+  closeModal('applyModal');
+}
+
+// ===== Rollback =====
+function openRollback(){
+  // TODO: GET /api/sku-merge/status → last_apply
+  document.getElementById('rollbackInfo').innerHTML = '<p style="color:var(--text-muted);">⏳ กำลังโหลด...</p>';
+  openModal('rollbackModal');
+  // TODO: then call GET /api/sku-merge/preview or status
+  setTimeout(function(){
+    document.getElementById('rollbackInfo').innerHTML = '<p style="color:var(--text-muted);">Phase D — กำลังพัฒนา</p>';
+  }, 300);
+}
+function doRollback(){
+  // TODO: POST /api/sku-merge/rollback { batch_id, reason }
+  toast('↩️ Rollback (Phase D)', 'info');
+  closeModal('rollbackModal');
+}
+
+// ===== Modal Helpers =====
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+
+// ===== Toast =====
+var toastTimer;
+function toast(msg,type){
+  type=type||'info'; var el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+type+' show';
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ el.classList.remove('show'); },3000);
+}
+</script>
+</body>
+</html>

@@ -326,6 +326,19 @@ app.get('/api/commission-slips/pending', forwardWithCookie('GET'));
 app.post('/api/commission-slips/issue', forwardWithCookie('POST'));
 app.get('/api/commission-slips/:id/pdf', forwardWithCookie('GET'));
 app.get('/api/commission-slips', forwardWithCookie('GET'));
+// 2026-05-15: SKU merge
+app.get('/api/sku-merge/list', forwardWithCookie('GET'));
+app.get('/api/sku-merge/search', forwardWithCookie('GET'));
+app.get('/api/sku-merge/status', forwardWithCookie('GET'));
+app.get('/api/sku-merge/preview', forwardWithCookie('GET'));
+app.get('/api/sku-merge/history', forwardWithCookie('GET'));
+app.post('/api/sku-merge/lock', forwardWithCookie('POST'));
+app.post('/api/sku-merge/unlock', forwardWithCookie('POST'));
+app.post('/api/sku-merge/stage', forwardWithCookie('POST'));
+app.post('/api/sku-merge/unstage', forwardWithCookie('POST'));
+app.post('/api/sku-merge/apply', forwardWithCookie('POST'));
+app.post('/api/sku-merge/rollback', forwardWithCookie('POST'));
+app.post('/api/sku-merge/manual-backup', forwardWithCookie('POST'));
 app.delete('/api/payroll/:id', forwardWithCookie('DELETE'));
 // 2026-05-15: preview pdf + send-line batch
 app.post('/api/payroll/preview-pdf', forwardWithCookie('POST'));
