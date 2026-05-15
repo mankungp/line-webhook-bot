@@ -235,7 +235,11 @@ select.emp-select:focus { outline: none; border-color: var(--primary); }
   <div class="modal-content" style="max-width:440px;">
     <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
     <h2>➕ เพิ่มลงเวลา</h2>
-    <div class="form-group"><label>เวลา</label><input type="datetime-local" id="addTime"></div>
+    <div class="form-group">
+      <label>วันที่</label>
+      <div id="addDateLabel" style="padding:8px 0; font-weight:600; color:var(--primary);">-</div>
+    </div>
+    <div class="form-group"><label>เวลา (ชม.:นาที)</label><input type="time" id="addTime"></div>
     <div class="form-group">
       <label>ประเภท</label>
       <select id="addType"><option value="check_in">🟢 เข้างาน</option><option value="check_out">🔴 ออกงาน</option></select>
@@ -444,7 +448,13 @@ async function confirmEditLog(){
 
 function openAddModal(t){
   addingType=t;
-  document.getElementById('addTime').value='';
+  if (!selDay) { toast('กรุณาคลิกวันในปฏิทินก่อน','error'); return; }
+  // แสดงวันที่เลือก (ไม่ให้แก้ กันสับสน)
+  var d = new Date(selDay.y, selDay.m, selDay.d);
+  var thaiDate = d.toLocaleDateString('th-TH', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  document.getElementById('addDateLabel').textContent = thaiDate;
+  // default time = 08:00 (เข้า) / 17:00 (ออก)
+  document.getElementById('addTime').value = t === 'check_in' ? '08:00' : '17:00';
   document.getElementById('addType').value=t;
   document.getElementById('addReason').value='';
   openModal('addModal');
@@ -458,7 +468,9 @@ async function confirmAddLog(){
   closeModal('addModal');
   try {
     var ds=selDay.y+'-'+String(selDay.m+1).padStart(2,'0')+'-'+String(selDay.d).padStart(2,'0');
-    var tzTime=ds+'T'+time.slice(11,16)+':00+07:00';
+    // time เป็น 'HH:MM' (จาก input type=time)
+    var hhmm = time.length >= 5 ? time.slice(0,5) : time;
+    var tzTime=ds+'T'+hhmm+':00+07:00';
     var r=await fetch('/api/attendance/manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({emp_code:curEmp,type:typ,ts:tzTime,reason:reason})});
     var d=await r.json();
     if(r.ok&&d.ok){ toast('✅ เพิ่มลงเวลาสำเร็จ','success'); loadCalendar(); }
