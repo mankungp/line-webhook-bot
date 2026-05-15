@@ -1540,6 +1540,7 @@ input:focus, textarea:focus, select:focus {
         <table class="table" id="payrollTable" style="width:100%;">
           <thead>
             <tr>
+              <th style="width:30px;"><input type="checkbox" id="payrollCheckAll" onchange="togglePayrollCheckAll()" title="เลือกทั้งหมด"></th>
               <th>Code</th><th>ชื่อ</th><th class="num">วันทำงาน</th>
               <th class="num">โควต้า/ใช้</th><th class="num">โบนัส/หัก</th>
               <th class="num">ฐาน</th><th class="num">คอมช่าง</th>
@@ -1547,7 +1548,7 @@ input:focus, textarea:focus, select:focus {
               <th>สถานะ</th><th>จัดการ</th>
             </tr>
           </thead>
-          <tbody id="payrollTableBody"><tr><td colspan="11" style="text-align:center; color:#888;">เลือกรอบแล้วกด Preview</td></tr></tbody>
+          <tbody id="payrollTableBody"><tr><td colspan="12" style="text-align:center; color:#888;">เลือกรอบแล้วกด Preview</td></tr></tbody>
         </table>
       </div>
       <div id="payrollFooter" style="margin-top:12px; display:none; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
@@ -9642,11 +9643,13 @@ function renderPayrollTable(slips, committed) {
   var tb = document.getElementById('payrollTableBody');
   var footer = document.getElementById('payrollFooter');
   if (!slips || slips.length === 0) {
-    tb.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#888;">ไม่มีข้อมูล</td></tr>';
+    tb.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#888;">ไม่มีข้อมูล</td></tr>';
     footer.style.display = 'none';
     document.getElementById('payrollSummary').textContent = '';
     return;
   }
+  var checkAll = document.getElementById('payrollCheckAll');
+  if (checkAll) checkAll.checked = !committed;  // ติ๊กทุกคน default ถ้ายังไม่ commit
   var totalGross=0, totalDeduct=0, totalNet=0;
   tb.innerHTML = slips.map(function(s) {
     totalGross += Number(s.gross||0);
@@ -9673,7 +9676,10 @@ function renderPayrollTable(slips, committed) {
       else if (s.leave_info.excess_days > 0) bonusCell = '<span style="color:#c0392b;">-' + _fmt(s.leave_info.leave_excess_deduction) + '</span>';
       else bonusCell = '0';
     }
+    // checkbox เฉพาะตอนยังไม่ commit — ถ้า commit แล้วไม่ต้องมี
+    var cbCell = committed ? '<td></td>' : '<td><input type="checkbox" class="payroll-row-cb" data-emp="' + s.emp_code + '" checked onchange="updatePayrollCheckAll()"></td>';
     return '<tr>' +
+      cbCell +
       '<td>' + s.emp_code + '</td>' +
       '<td>' + (s.name || '-') + '</td>' +
       '<td class="num">' + s.days_worked + '/' + s.days_in_period + '</td>' +
@@ -9779,17 +9785,45 @@ async function sendLineBatchPayroll(filter) {
   }
 }
 
+// 2026-05-15: ติ๊กทั้งหมด/ปลดทั้งหมด
+function togglePayrollCheckAll() {
+  var ck = document.getElementById('payrollCheckAll');
+  var rows = document.querySelectorAll('.payroll-row-cb');
+  rows.forEach(function(cb){ cb.checked = ck.checked; });
+}
+function updatePayrollCheckAll() {
+  var rows = document.querySelectorAll('.payroll-row-cb');
+  var checked = document.querySelectorAll('.payroll-row-cb:checked');
+  var ck = document.getElementById('payrollCheckAll');
+  if (!ck) return;
+  if (checked.length === 0) ck.checked = false;
+  else if (checked.length === rows.length) ck.checked = true;
+  else { ck.indeterminate = true; return; }
+  ck.indeterminate = false;
+}
+function getSelectedPayrollEmpCodes() {
+  var rows = document.querySelectorAll('.payroll-row-cb:checked');
+  var codes = [];
+  rows.forEach(function(cb){ codes.push(cb.dataset.emp); });
+  return codes;
+}
+
 async function commitPayroll() {
   if (_payrollCommitted) { _payrollMsg('รอบนี้ commit แล้ว','err'); return; }
   if (!_payrollSlips || _payrollSlips.length === 0) { _payrollMsg('ยังไม่มีข้อมูล preview','err'); return; }
   var p = _payrollPeriod(); if (!p) return;
-  if (!confirm('ยืนยัน commit รอบ ' + p.period_start + ' ถึง ' + p.period_end + ' (' + _payrollSlips.length + ' คน) ?\n\n⚠ หลัง commit — เบิกล่วงหน้า/งานช่าง จะถูก mark ปิดรอบ')) return;
-  _payrollMsg('กำลัง commit…');
+  // เลือกเฉพาะคนที่ติ๊ก
+  var selectedCodes = getSelectedPayrollEmpCodes();
+  if (selectedCodes.length === 0) { _payrollMsg('กรุณาติ๊กเลือกพนักงานที่ต้องการ commit','err'); return; }
+  var selectedSlips = _payrollSlips.filter(function(s){ return selectedCodes.indexOf(s.emp_code) >= 0; });
+  if (selectedSlips.length === 0) { _payrollMsg('ไม่พบ slip ตรงกับที่เลือก','err'); return; }
+  if (!confirm('ยืนยัน commit รอบ ' + p.period_start + ' ถึง ' + p.period_end + '\nเฉพาะ ' + selectedSlips.length + ' / ' + _payrollSlips.length + ' คนที่ติ๊กเลือก ?\n\n⚠ เบิกล่วงหน้า/งานช่าง ของคนเหล่านี้จะถูก mark ปิดรอบ')) return;
+  _payrollMsg('กำลัง commit ' + selectedSlips.length + ' คน…');
   try {
     var r = await fetch('/api/payroll/commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ period_start: p.period_start, period_end: p.period_end, payslips: _payrollSlips })
+      body: JSON.stringify({ period_start: p.period_start, period_end: p.period_end, payslips: selectedSlips })
     });
     var data = await r.json();
     if (!r.ok) { _payrollMsg('ผิดพลาด: ' + (data.error || r.status),'err'); return; }
