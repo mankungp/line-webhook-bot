@@ -379,30 +379,32 @@ function renderCalendar() {
       if (!firstIn) {
         badges += '<span class="day-badge att-miss">❌ ขาด</span> ';
       } else {
+        // 2026-05-15: เต็มวัน = 480 นาที (8 ชม.จริง), ช่วง 12:00-13:00 พักเที่ยง ไม่นับ
+        var FULL_DAY = 480;
         function tm(l){ var d=new Date(l.recordTime); return d.getHours()*60+d.getMinutes(); }
+        // ตัดช่วงพักเที่ยงออกจาก [a..b]
+        function workExcludeLunch(a, b) {
+          if (b <= a) return 0;
+          var L0 = 12*60, L1 = 13*60;
+          if (b <= L0 || a >= L1) return b - a;
+          var morning = Math.max(0, Math.min(b, L0) - a);
+          var afternoon = Math.max(0, b - Math.max(a, L1));
+          return morning + afternoon;
+        }
         var inMin = Math.max(tm(firstIn), 7*60+45);     // clamp 07:45
         var outMin = lastOut ? Math.min(tm(lastOut), 17*60) : null;  // clamp 17:00
-        // คำนวณ break time (ระหว่าง check_out → check_in ถัดไป)
-        var breakMin = 0;
-        for (var j=0; j<sorted.length-1; j++) {
-          if (sorted[j].type==='check_out' && sorted[j+1].type==='check_in') {
-            var gap = tm(sorted[j+1]) - tm(sorted[j]);
-            if (gap > 0 && gap < 12*60) breakMin += gap;
-          }
-        }
-        var excessBreak = Math.max(0, breakMin - 60);
         var workMin;
         if (outMin === null) {
-          workMin = (dk >= todayDk) ? 540 : 0;  // วันนี้ยังไม่หัก / วันที่ผ่านมาไม่สแกนออก→ขาด
+          workMin = (dk >= todayDk) ? FULL_DAY : 0;
         } else {
-          workMin = Math.max(0, outMin - inMin - excessBreak);
+          workMin = workExcludeLunch(inMin, outMin);
         }
-        var shortfall = Math.max(0, 540 - workMin);
+        var shortfall = Math.max(0, FULL_DAY - workMin);
         if (outMin === null && dk >= todayDk) {
           badges += '<span class="day-badge att-half">⏳ กำลังทำงาน</span> ';
         } else if (shortfall === 0) {
           badges += '<span class="day-badge att-pair">✅ เต็มวัน</span> ';
-        } else if (shortfall >= 540) {
+        } else if (shortfall >= FULL_DAY) {
           badges += '<span class="day-badge att-miss">❌ ขาด</span> ';
         } else if (shortfall >= 240) {
           badges += '<span class="day-badge att-half">⚠️ ครึ่งวัน หัก '+shortfall+'น.</span> ';
