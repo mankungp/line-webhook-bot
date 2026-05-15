@@ -597,7 +597,11 @@ function renderExpandPanel(sku) {
   actionsHtml += '</div>';
   var pendNote = hasPending ? '<div class="panel-status">🔵 Pending: '+(pendInfo&&pendInfo.type||'merge')+'</div>' : '';
 
-  epi.innerHTML = shopeeHtml + '</div><div class="panel-col">' + bsHtml + '</div><div class="panel-col">' + oursHtml + searchHtml + actionsHtml + pendNote + '</div>';
+  // 2026-05-15: แต่ละฝั่ง wrap ด้วย .panel-col — เดิมขาดฝั่ง Shopee จึงไม่ออก column
+  epi.innerHTML =
+    '<div class="panel-col">' + shopeeHtml + '</div>' +
+    '<div class="panel-col">' + bsHtml + '</div>' +
+    '<div class="panel-col">' + oursHtml + searchHtml + actionsHtml + pendNote + '</div>';
 }
 
 // ===== Search Our Products =====
