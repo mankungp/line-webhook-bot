@@ -368,39 +368,48 @@ var searchTimer = null;
 
 document.addEventListener('DOMContentLoaded', function(){ init(); });
 
-// ===== Init =====
+// ===== Init (2026-05-15 — เชื่อม API จริง) =====
 async function init() {
-  await loadMockData();  // TODO: replace with real API call
+  await acquireLock();
+  await loadFromAPI();
   render();
-  acquireLock();
   window.addEventListener('beforeunload', function(e) {
     var p = Object.keys(pendingMap).length;
     if(p > 0) { e.preventDefault(); e.returnValue = 'คุณยังมี '+p+' รายการ pending'; return e.returnValue; }
   });
-  window.addEventListener('unload', function(){ releaseLock(); });
+  window.addEventListener('pagehide', function(){ releaseLock(true); });
 }
 
-// ===== Mock Data =====
-async function loadMockData() {
-  // TODO: replace with GET /api/sku-merge/list
-  allItems = [];
-  for(var i=0; i<102; i++){
-    var sku = 'SKU-' + String(i+1).padStart(4,'0');
-    var item = {
-      sku: sku,
-      name: 'สินค้าตัวอย่าง #'+(i+1)+(i%3===0?' HONDA':' ISUZU'),
-      shopee: i%5===0 ? null : { stock: Math.floor(Math.random()*50), price: Math.floor(Math.random()*500)+20 },
-      bigseller: { stock: Math.floor(Math.random()*30) },
-      ours: i%4===0 ? null : { id: 1000+i, sku: sku, stock: Math.floor(Math.random()*20), name: 'ของเรา #'+(i+1) },
-      diff: 0,
-      link_status: i%4===0 ? 'unlinked' : (i%7===0 ? 'our_only' : 'auto-match'),
-      pending: null
-    };
-    if(item.ours && item.bigseller && Math.random()>0.7) item.diff = Math.floor(Math.random()*10)+1;
-    allItems.push(item);
+// ===== Real API: GET /api/sku-merge/list (server-side filter+paginate) =====
+async function loadFromAPI() {
+  try {
+    var q = (document.getElementById('searchInput') || {}).value || '';
+    var f = (document.getElementById('filterSelect') || {}).value || 'all';
+    var qs = 'page=' + curPage + '&perPage=' + perPage;
+    if (q.trim()) qs += '&q=' + encodeURIComponent(q.trim());
+    if (f && f !== 'all') qs += '&filter=' + encodeURIComponent(f);
+    var r = await fetch('/api/sku-merge/list?' + qs);
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
+    allItems = d.items || [];
+    filteredItems = allItems;
+    totalPages = Math.max(1, Math.ceil((d.total || 0) / (d.perPage || perPage)));
+    // sync pendingMap จาก server
+    pendingMap = {};
+    allItems.forEach(function(it){ if (it.pending) pendingMap[it.sku] = it.pending; });
+    var s = d.stats || {};
+    document.getElementById('statsBar').innerHTML =
+      'Pending: <strong id="pendingCount">' + (s.pending_count || 0) + '</strong> | ' +
+      'Matched: <strong>' + (s.matched || 0) + '</strong>/' + (s.mirror_total || 0) +
+      ' | Total: <strong>' + (s.total || 0) + '</strong>' +
+      ' | Diff: <strong style="color:#f97316;">' + (s.diff_gt_0 || 0) + '</strong>' +
+      ' | Our-only: ' + (s.our_only || 0);
+  } catch (e) {
+    console.error('loadFromAPI:', e);
+    toast('❌ โหลดข้อมูลไม่สำเร็จ: ' + e.message, 'error');
+    allItems = [];
+    filteredItems = [];
   }
-  // stats mock
-  document.getElementById('statsBar').innerHTML = 'Pending: <strong id="pendingCount">0</strong> | Matched: <strong>102</strong>/2010';
 }
 
 // ===== Filtering =====
