@@ -495,6 +495,7 @@ function render() {
     start = (curPage-1)*perPage;
     pageItems = allItems.slice(start, start + perPage);
   }
+  console.log("[DEBUG] render() curPage="+curPage+" totalPages="+totalPages+" allItems="+allItems.length+" pageItems="+pageItems.length+" isUsingApi="+isUsingApi);
   if(allItems.length===0){
     document.getElementById('skuTable').style.display='none';
     document.getElementById('paginationBar').style.display='none';
