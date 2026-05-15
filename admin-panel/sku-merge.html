@@ -408,6 +408,7 @@ async function loadFromAPI() {
       ' | Diff: <strong style="color:#f97316;">' + (s.diff_gt_0 || 0) + '</strong>' +
       ' | Our-only: ' + (s.our_only || 0);
     isUsingApi = true;
+    render();
   } catch (e) {
     console.error('loadFromAPI:', e);
     toast('⚠️ ใช้ข้อมูลทดสอบ (API ยังไม่พร้อม): ' + e.message, 'info');
@@ -495,7 +496,6 @@ function render() {
     start = (curPage-1)*perPage;
     pageItems = allItems.slice(start, start + perPage);
   }
-  console.log("[DEBUG] render() curPage="+curPage+" totalPages="+totalPages+" allItems="+allItems.length+" pageItems="+pageItems.length+" isUsingApi="+isUsingApi);
   if(allItems.length===0){
     document.getElementById('skuTable').style.display='none';
     document.getElementById('paginationBar').style.display='none';
@@ -577,16 +577,13 @@ function renderPagination() {
 }
 
 function goPage(p){
-  if(p<1 || p>totalPages) { alert('goPage: out of range p='+p+' totalPages='+totalPages); return; }
-  alert('goPage called p='+p+' curPage='+curPage+' isUsingApi='+isUsingApi+' totalPages='+totalPages);
+  if(p<1 || p>totalPages) return;
   curPage=p;
   // 2026-05-15: ถ้าเป็น API mode จะ reloadList() (server-paginated)
   // ถ้าเป็น mock mode (หรือ API ส่งทั้งหมดมา) จะ render() ตรงๆ
   if(isUsingApi) {
-    alert('reloadList()...');
     reloadList();
   } else {
-    alert('render()...');
     render();
   }
 }
