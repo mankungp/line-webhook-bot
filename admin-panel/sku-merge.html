@@ -485,16 +485,21 @@ function onSearch() {
 
 // ===== Render =====
 function render() {
-  // 2026-05-15: slice ตาม page — ถ้า server ส่งมา paginated แล้ว (allItems.length <= perPage) ก็ใช้ตรงๆ
   filteredItems = allItems;
   var tbody = document.getElementById('tableBody');
-  var start = (curPage-1)*perPage;
-  var pageItems = allItems.slice(start, start + perPage);
-  if(pageItems.length===0 && allItems.length>0){
-    // page ว่าง → กลับไปหน้าสุดท้าย
-    curPage = totalPages;
-    start = (curPage-1)*perPage;
+  var pageItems;
+  if(isUsingApi){
+    // API mode: server ส่งเฉพาะข้อมูลของหน้านี้มาแล้ว → ใช้ allItems ทั้งหมด
+    pageItems = allItems;
+  } else {
+    // Mock mode: client-side slice ตาม page
+    var start = (curPage-1)*perPage;
     pageItems = allItems.slice(start, start + perPage);
+    if(pageItems.length===0 && allItems.length>0){
+      curPage = totalPages;
+      start = (curPage-1)*perPage;
+      pageItems = allItems.slice(start, start + perPage);
+    }
   }
   if(allItems.length===0){
     document.getElementById('skuTable').style.display='none';
