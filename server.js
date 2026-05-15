@@ -216,7 +216,8 @@ function forwardWithCookie(method) {
           'content-type': 'application/json'
         }
       };
-      if (method !== 'GET' && method !== 'DELETE') {
+      // 2026-05-15: DELETE ของ HR (attendance/payroll) ต้องส่ง body { reason } ไปด้วย
+      if (method !== 'GET') {
         opts.body = JSON.stringify(req.body || {});
       }
       var r = await fetch(url, opts);
