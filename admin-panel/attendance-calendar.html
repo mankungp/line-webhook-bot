@@ -192,8 +192,8 @@ select.emp-select:focus { outline: none; border-color: var(--primary); }
     </div>
   </div>
   <div class="legend">
-    <span class="legend-item"><span class="legend-dot" style="background:#d4edda;"></span> ครบคู่</span>
-    <span class="legend-item"><span class="legend-dot" style="background:#fff3cd;"></span> ครึ่งวัน</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#d4edda;"></span> เต็มวัน / มาทำงาน</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fff3cd;"></span> ครึ่งวัน / กำลังทำงาน</span>
     <span class="legend-item"><span class="legend-dot" style="background:#f8d7da;"></span> ขาด</span>
     <span class="legend-item"><span class="legend-dot" style="background:#cce5ff;"></span> เบิกล่วงหน้า</span>
     <span class="legend-item"><span class="legend-dot" style="background:#e8daef;"></span> แก้ไขแล้ว</span>
@@ -345,11 +345,46 @@ function renderCalendar() {
     var logs=lbs[dk]||[], adv=abs[dk]||null;
     var badges='';
     if(!wk){
-      var ci=logs.filter(function(l){return l.type==='check_in';});
-      var co=logs.filter(function(l){return l.type==='check_out';});
-      if(ci.length>0&&co.length>0&&ci.length===co.length) badges+='<span class="day-badge att-pair">✅ ครบคู่</span> ';
-      else if(ci.length>0||co.length>0) badges+='<span class="day-badge att-half">⚠️ ครึ่งวัน</span> ';
-      else badges+='<span class="day-badge att-miss">❌ ขาด</span> ';
+      // 2026-05-15: คำนวณจาก first_in/last_out + clamp 07:45-17:00 + break 60min
+      var todayDk = new Date().toISOString().slice(0,10);
+      var sorted = logs.slice().sort(function(a,b){ return new Date(a.recordTime)-new Date(b.recordTime); });
+      var firstIn = sorted.find(function(l){return l.type==='check_in';});
+      var lastOut = null;
+      for(var i=sorted.length-1;i>=0;i--){ if(sorted[i].type==='check_out'){ lastOut=sorted[i]; break; } }
+      if (!firstIn) {
+        badges += '<span class="day-badge att-miss">❌ ขาด</span> ';
+      } else {
+        function tm(l){ var d=new Date(l.recordTime); return d.getHours()*60+d.getMinutes(); }
+        var inMin = Math.max(tm(firstIn), 7*60+45);     // clamp 07:45
+        var outMin = lastOut ? Math.min(tm(lastOut), 17*60) : null;  // clamp 17:00
+        // คำนวณ break time (ระหว่าง check_out → check_in ถัดไป)
+        var breakMin = 0;
+        for (var j=0; j<sorted.length-1; j++) {
+          if (sorted[j].type==='check_out' && sorted[j+1].type==='check_in') {
+            var gap = tm(sorted[j+1]) - tm(sorted[j]);
+            if (gap > 0 && gap < 12*60) breakMin += gap;
+          }
+        }
+        var excessBreak = Math.max(0, breakMin - 60);
+        var workMin;
+        if (outMin === null) {
+          workMin = (dk >= todayDk) ? 540 : 0;  // วันนี้ยังไม่หัก / วันที่ผ่านมาไม่สแกนออก→ขาด
+        } else {
+          workMin = Math.max(0, outMin - inMin - excessBreak);
+        }
+        var shortfall = Math.max(0, 540 - workMin);
+        if (outMin === null && dk >= todayDk) {
+          badges += '<span class="day-badge att-half">⏳ กำลังทำงาน</span> ';
+        } else if (shortfall === 0) {
+          badges += '<span class="day-badge att-pair">✅ เต็มวัน</span> ';
+        } else if (shortfall >= 540) {
+          badges += '<span class="day-badge att-miss">❌ ขาด</span> ';
+        } else if (shortfall >= 240) {
+          badges += '<span class="day-badge att-half">⚠️ ครึ่งวัน หัก '+shortfall+'น.</span> ';
+        } else {
+          badges += '<span class="day-badge att-pair">🟢 มาทำงาน หัก '+shortfall+'น.</span> ';
+        }
+      }
     }
     if(adv) badges+='<span class="day-badge advance">💰 เบิก</span> ';
     if(lk) badges+='<span class="day-badge lock-badge">🔒</span> ';
