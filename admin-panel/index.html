@@ -1373,8 +1373,8 @@ input:focus, textarea:focus, select:focus {
         <div><label>รอบจ่าย (วันที่)</label><input type="number" id="empPayDay" placeholder="เช่น 31"></div>
         <div><label>เงินเดือน</label><input type="number" id="empBaseSalary" step="0.01" value="0"></div>
         <div><label>รายวัน</label><input type="number" id="empDailyRate" step="0.01" value="0"></div>
-        <div><label>คอมขาย (%)</label><input type="number" id="empComm" step="0.1" value="0"></div>
-        <div><label>คอมช่าง (%)</label><input type="number" id="empTechComm" step="0.1" value="0"></div>
+        <div id="empCommWrap" style="display:none;"><label>คอมขาย (%)</label><input type="number" id="empComm" step="0.1" value="0"></div>
+        <div id="empTechCommWrap" style="display:none;"><label>คอมช่าง (%)</label><input type="number" id="empTechComm" step="0.1" value="0"></div>
         <div><label>เข้างาน</label><input type="time" id="empWorkStart" value="08:00"></div>
         <div><label>ออกงาน</label><input type="time" id="empWorkEnd" value="17:00"></div>
       </div>
@@ -1388,7 +1388,7 @@ input:focus, textarea:focus, select:focus {
           </div>
         </div>
         <label><input type="checkbox" id="empPaidLeave"> วันหยุดมีเงิน</label>
-        <label><input type="checkbox" id="empHasComm"> รับคอม</label>
+        <label><input type="checkbox" id="empHasComm" onchange="toggleCommissionFields()"> รับคอม</label>
         <label><input type="checkbox" id="empActive" checked> พนักงานปัจจุบัน</label>
       </div>
       <div style="margin-top:10px;"><label>หมายเหตุ</label><textarea id="empNote" rows="2" style="width:100%;"></textarea></div>
@@ -7431,6 +7431,20 @@ function renderEmployeesList() {
   document.getElementById('empBody').innerHTML = html;
 }
 
+// 2026-05-15: ติ๊ก รับคอม → โชว์ 2 ช่อง % คอม
+function toggleCommissionFields() {
+  var on = document.getElementById('empHasComm').checked;
+  var wraps = ['empCommWrap','empTechCommWrap'];
+  wraps.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = on ? '' : 'none';
+  });
+  if (!on) {
+    var c = document.getElementById('empComm'); if (c) c.value = 0;
+    var t = document.getElementById('empTechComm'); if (t) t.value = 0;
+  }
+}
+
 function toggleSocSecAmount() {
   var checked = document.getElementById('empSocSec').checked;
   document.getElementById('empSocSecAmountWrap').style.display = checked ? 'inline-flex' : 'none';
@@ -7451,6 +7465,7 @@ function openEmpModal() {
   ['empSocSec','empPaidLeave','empHasComm'].forEach(function(id){ document.getElementById(id).checked = false; });
   document.getElementById('empSocSecAmount').value = '';
   toggleSocSecAmount();
+  toggleCommissionFields();
   document.getElementById('empActive').checked = true;
   document.getElementById('empDeleteBtn').style.display = 'none';
   document.getElementById('empStatus').textContent = '';
@@ -7481,7 +7496,10 @@ function editEmployee(code) {
   document.getElementById('empSocSecAmount').value = e.social_security_amount != null ? e.social_security_amount : '';
   toggleSocSecAmount();
   document.getElementById('empPaidLeave').checked = !!e.has_paid_leave;
-  document.getElementById('empHasComm').checked = !!e.has_commission;
+  // อัพเดต: ถ้า has_commission false แต่ rate > 0 หรือมี technician_rate > 0 → ถือว่ารับคอม (เผื่อข้อมูลเก่า)
+  var hasCommEffective = !!e.has_commission || (Number(e.commission_rate)>0) || (Number(e.technician_commission_rate)>0);
+  document.getElementById('empHasComm').checked = hasCommEffective;
+  toggleCommissionFields();
   document.getElementById('empActive').checked = e.active !== false;
   document.getElementById('empNote').value = e.note || '';
   document.getElementById('empDeleteBtn').style.display = 'inline-block';
