@@ -307,6 +307,10 @@ app.put('/api/attendance/:id', forwardWithCookie('PUT'));
 app.delete('/api/attendance/:id', forwardWithCookie('DELETE'));
 app.post('/api/attendance/:id/restore', forwardWithCookie('POST'));
 app.get('/api/audit-log/hr', forwardWithCookie('GET'));
+// 2026-05-15: commission entries
+app.get('/api/commissions', forwardWithCookie('GET'));
+app.post('/api/commissions', forwardWithCookie('POST'));
+app.delete('/api/commissions/:id', forwardWithCookie('DELETE'));
 app.delete('/api/payroll/:id', forwardWithCookie('DELETE'));
 
 // Mobile attendance scan page (public — token required in query)

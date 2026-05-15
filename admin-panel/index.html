@@ -1915,6 +1915,51 @@ input:focus, textarea:focus, select:focus {
 </div>
 
 <!-- HR Audit Log Modal (2026-05-15) -->
+<!-- Commission Modal (2026-05-15) -->
+<div class="modal" id="commissionModal">
+  <div class="modal-content" style="max-width:560px;">
+    <button class="close-btn" onclick="closeCommissionModal()">×</button>
+    <h2>💰 คีย์ยอดขาย (คอมมิชชั่น)</h2>
+    <div id="comEmpInfo" style="background:#f0f9ff;border-left:3px solid #0a8;padding:10px;margin:12px 0;"></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="flex:1;min-width:160px;">
+        <label>วันที่ *</label>
+        <input type="date" id="comDate" style="width:100%;padding:8px;">
+      </div>
+      <div style="flex:1;min-width:160px;">
+        <label>ประเภท</label>
+        <select id="comType" style="width:100%;padding:8px;">
+          <option value="sales">🛒 ยอดขาย (commission_rate)</option>
+          <option value="tech">🔧 งานช่าง (technician_commission_rate)</option>
+        </select>
+      </div>
+    </div>
+    <div><label>ยอดขายรวม (บาท) *</label>
+      <input type="number" id="comSales" min="0" step="1" placeholder="เช่น 50000" style="width:100%;padding:8px;">
+    </div>
+    <div id="comPreview" style="margin-top:10px;padding:10px;background:#fff8e1;border-radius:6px;font-size:14px;"></div>
+    <div style="margin-top:10px;"><label>หมายเหตุ</label>
+      <input type="text" id="comNote" placeholder="เช่น ยอดขาย 1-15 พ.ค. 2569" style="width:100%;padding:8px;">
+    </div>
+    <div id="comStatus" style="margin-top:10px;"></div>
+    <hr style="margin:14px 0;">
+
+    <h3 style="margin:8px 0;font-size:15px;">📋 รายการย้อนหลัง</h3>
+    <div id="comHistoryWrap" style="max-height:200px;overflow-y:auto;">
+      <table class="data-table" style="font-size:12px;">
+        <thead><tr><th>วันที่</th><th>ประเภท</th><th>ยอดขาย</th><th>%</th><th>คอม</th><th>สถานะ</th><th></th></tr></thead>
+        <tbody id="comHistoryBody"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn btn-secondary" onclick="closeCommissionModal()">ปิด</button>
+      <button class="btn btn-primary" onclick="saveCommission()">💰 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="hrAuditModal">
   <div class="modal-content" style="max-width:900px;">
     <button class="close-btn" onclick="closeHrAuditModal()">×</button>
@@ -7377,7 +7422,9 @@ function renderEmployeesList() {
       html += '<td>' + (e.has_social_security ? '✅' : '—') + '</td>';
       html += '<td>' + comm + '</td>';
       html += '<td>' + (e.zk_user_id ? '<code>' + escapeHtml(String(e.zk_user_id)) + '</code>' : '<span style="color:#d80;">ไม่ได้ผูก</span>') + '</td>';
-      html += '<td><button class="btn btn-secondary btn-sm" onclick="editEmployee(\'' + escapeHtml(e.emp_code) + '\')">แก้ไข</button></td>';
+      var hasRate = (Number(e.commission_rate)>0) || (Number(e.technician_commission_rate)>0);
+      var comBtn = hasRate ? '<button class="btn btn-warning btn-sm" onclick="openCommissionModal(\'' + escapeHtml(e.emp_code) + '\')" style="margin-right:4px;">💰 คอม</button>' : '';
+      html += '<td>' + comBtn + '<button class="btn btn-secondary btn-sm" onclick="editEmployee(\'' + escapeHtml(e.emp_code) + '\')">แก้ไข</button></td>';
       html += '</tr>';
     });
   }
@@ -9107,6 +9154,126 @@ if (typeof _origShowPage_qrAtt === 'function') {
     return _origShowPage_qrAtt.apply(this, arguments);
   };
 }
+
+// ============ COMMISSION ENTRIES (2026-05-15) ============
+var _commissionEmp = null;
+var _commissionEmpData = null;
+
+async function openCommissionModal(empCode) {
+  _commissionEmp = empCode;
+  _commissionEmpData = (allEmployees || []).find(function(e){return e.emp_code===empCode;}) || null;
+
+  // ตั้งค่าเริ่มต้น
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('comDate').value = today;
+  document.getElementById('comSales').value = '';
+  document.getElementById('comNote').value = '';
+  document.getElementById('comStatus').innerHTML = '';
+  document.getElementById('comPreview').innerHTML = '';
+
+  // info
+  var e = _commissionEmpData || {};
+  var infoHtml = '<strong>' + (e.emp_code||'') + '</strong> ' + (e.name||'') +
+    '<br><small>commission_rate=' + (e.commission_rate||0) + '% | technician_commission_rate=' + (e.technician_commission_rate||0) + '%</small>';
+  document.getElementById('comEmpInfo').innerHTML = infoHtml;
+
+  // default type — พิจารณาจาก rate
+  var ts = document.getElementById('comType');
+  if (Number(e.technician_commission_rate)>0 && !(Number(e.commission_rate)>0)) ts.value='tech';
+  else ts.value='sales';
+
+  document.getElementById('commissionModal').classList.add('active');
+  refreshCommissionPreview();
+  loadCommissionHistory();
+}
+
+function closeCommissionModal() {
+  document.getElementById('commissionModal').classList.remove('active');
+}
+
+function refreshCommissionPreview() {
+  var e = _commissionEmpData; if (!e) return;
+  var type = document.getElementById('comType').value;
+  var rate = type==='tech' ? (Number(e.technician_commission_rate)||0) : (Number(e.commission_rate)||0);
+  var sales = Number(document.getElementById('comSales').value) || 0;
+  var commission = Math.round(sales * rate / 100 * 100) / 100;
+  document.getElementById('comPreview').innerHTML =
+    '<strong>คำนวณ:</strong> ' + sales.toLocaleString() + ' × ' + rate + '% = <strong style="color:#0a8;font-size:18px;">฿' + commission.toLocaleString() + '</strong>';
+}
+
+async function loadCommissionHistory() {
+  if (!_commissionEmp) return;
+  try {
+    var r = await fetch('/api/commissions?empCode=' + encodeURIComponent(_commissionEmp));
+    var d = await r.json();
+    var rows = (d.commissions||[]).map(function(c){
+      var status = c.is_paid_out
+        ? '<span style="color:#0a0;">✅ จ่ายแล้ว</span>'
+        : '<span style="color:#d80;">⏳ รอ</span>';
+      var del = c.is_paid_out ? '' : '<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteCommission(\'' + c.id + '\')">🗑️</button>';
+      var typeIcon = c.type==='tech' ? '🔧' : '🛒';
+      return '<tr>' +
+        '<td>' + c.date + '</td>' +
+        '<td>' + typeIcon + '</td>' +
+        '<td class="num">' + (Number(c.sales_amount)||0).toLocaleString() + '</td>' +
+        '<td>' + c.rate_percent + '%</td>' +
+        '<td class="num"><strong>฿' + (Number(c.commission_amount)||0).toLocaleString() + '</strong></td>' +
+        '<td>' + status + '</td>' +
+        '<td>' + del + '</td>' +
+      '</tr>';
+    }).join('');
+    document.getElementById('comHistoryBody').innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:#999;">— ยังไม่มีรายการ —</td></tr>';
+  } catch(e) {
+    document.getElementById('comHistoryBody').innerHTML = '<tr><td colspan="7" style="color:#d33;">❌ โหลดไม่สำเร็จ: ' + e.message + '</td></tr>';
+  }
+}
+
+async function saveCommission() {
+  if (!_commissionEmp) return;
+  var data = {
+    emp_code: _commissionEmp,
+    date: document.getElementById('comDate').value,
+    type: document.getElementById('comType').value,
+    sales_amount: Number(document.getElementById('comSales').value) || 0,
+    note: document.getElementById('comNote').value.trim()
+  };
+  if (data.sales_amount <= 0) {
+    document.getElementById('comStatus').innerHTML = '<span style="color:#d33;">❌ ยอดขายต้องมากกว่า 0</span>';
+    return;
+  }
+  try {
+    var r = await fetch('/api/commissions', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    var res = await r.json();
+    if (!r.ok || res.error) throw new Error(res.error || 'failed');
+    document.getElementById('comStatus').innerHTML = '<span style="color:#0a0;">✅ บันทึกแล้ว — คอม ฿' + (res.commission_amount||0).toLocaleString() + '</span>';
+    document.getElementById('comSales').value='';
+    document.getElementById('comNote').value='';
+    refreshCommissionPreview();
+    loadCommissionHistory();
+  } catch(e) {
+    document.getElementById('comStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
+}
+
+async function deleteCommission(id) {
+  if (!confirm('ลบรายการคอมนี้?')) return;
+  try {
+    var r = await fetch('/api/commissions/' + encodeURIComponent(id), { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({reason:'ลบจาก admin'}) });
+    var res = await r.json();
+    if (!r.ok || res.error) throw new Error(res.error || 'failed');
+    loadCommissionHistory();
+  } catch(e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+// bind preview events
+document.addEventListener('DOMContentLoaded', function(){
+  var s = document.getElementById('comSales');
+  var t = document.getElementById('comType');
+  if (s) s.addEventListener('input', refreshCommissionPreview);
+  if (t) t.addEventListener('change', refreshCommissionPreview);
+});
 
 // ============ HR AUDIT LOG (2026-05-15) ============
 function openHrAuditModal() {
