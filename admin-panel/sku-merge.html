@@ -554,19 +554,40 @@ function renderExpandPanel(sku) {
   var hasPending = sku in pendingMap;
   var pendInfo = pendingMap[sku] || null;
 
-  var shopeeHtml = '<h4>🛒 Shopee</h4>';
-  if(item.shopee){
-    shopeeHtml += '<div class="field">Stock: <strong>'+item.shopee.stock+'</strong></div>';
-    shopeeHtml += '<div class="field">Price: <strong>'+item.shopee.price+'฿</strong></div>';
-    if(item.shopee.product_name) shopeeHtml += '<div class="field">ชื่อ: '+esc(item.shopee.product_name)+'</div>';
+  var shOver = shopeeOverride[sku];
+  var sh = shOver || item.shopee;
+  var shopeeHtml = '<h4>🛒 Shopee (สต็อกตรงสุด)</h4>';
+  if(sh){
+    shopeeHtml += '<div class="field">Stock: <strong>'+(sh.stock!=null?sh.stock:'-')+'</strong></div>';
+    shopeeHtml += '<div class="field">Price: <strong>'+(sh.price!=null?sh.price+'฿':'-')+'</strong></div>';
+    var nameVal = sh.product_name || sh.shopee_product_name;
+    if(nameVal) shopeeHtml += '<div class="field">ชื่อ: '+esc(nameVal)+'</div>';
+    if(sh.shopee_item_id) shopeeHtml += '<div class="field"><small>item_id: '+esc(String(sh.shopee_item_id))+'</small></div>';
+    if(shOver) shopeeHtml += '<div class="field" style="color:#f97316;"><small>✏️ เปลี่ยนแล้ว <a href="javascript:void(0)" onclick="clearShopeeOverride(\''+sku+'\')">รีเซ็ต</a></small></div>';
   } else shopeeHtml += '<p style="color:var(--text-muted);font-size:12px;">ไม่มีข้อมูล</p>';
+  shopeeHtml += '<div class="search-our-box" style="margin-top:10px;">';
+  shopeeHtml += '<input type="text" placeholder="🔍 ค้น Shopee (SKU/ชื่อ)..." id="srch-sh-'+sku+'" oninput="onSearchShopee(\''+sku+'\')">';
+  shopeeHtml += '<div class="search-results" id="sres-sh-'+sku+'"></div>';
+  shopeeHtml += '</div>';
 
+  var bsOver = bsOverride[sku];
+  var bs = bsOver || item.bigseller;
+  var bsSkuLabel = bsOver ? bsOver.sku : sku;
   var bsHtml = '<h4>📦 BigSeller</h4>';
-  if(item.bigseller){
-    bsHtml += '<div class="field">Stock: <strong>'+item.bigseller.stock+'</strong></div>';
-    if(item.bigseller.sku_type) bsHtml += '<div class="field">Type: '+item.bigseller.sku_type+'</div>';
-    if(item.bigseller.category) bsHtml += '<div class="field">หมวด: '+item.bigseller.category+'</div>';
+  bsHtml += '<div class="field">SKU: <strong>'+esc(bsSkuLabel)+'</strong></div>';
+  if(bs){
+    var bsStockVal = bs.stock!=null ? bs.stock : (bs.bs_stock!=null ? bs.bs_stock : '-');
+    bsHtml += '<div class="field">Stock: <strong>'+bsStockVal+'</strong></div>';
+    var bsCat = bs.category || bs.bs_category;
+    if(bsCat) bsHtml += '<div class="field">หมวด: '+esc(bsCat)+'</div>';
+    var bsType = bs.sku_type || bs.bs_sku_type;
+    if(bsType) bsHtml += '<div class="field">Type: '+esc(bsType)+'</div>';
+    if(bsOver) bsHtml += '<div class="field" style="color:#f97316;"><small>✏️ เปลี่ยนแล้ว <a href="javascript:void(0)" onclick="clearBsOverride(\''+sku+'\')">รีเซ็ต</a></small></div>';
   } else bsHtml += '<p style="color:var(--text-muted);font-size:12px;">ไม่มีข้อมูล</p>';
+  bsHtml += '<div class="search-our-box" style="margin-top:10px;">';
+  bsHtml += '<input type="text" placeholder="🔍 ค้น BigSeller..." id="srch-bs-'+sku+'" oninput="onSearchBs(\''+sku+'\')">';
+  bsHtml += '<div class="search-results" id="sres-bs-'+sku+'"></div>';
+  bsHtml += '</div>';
 
   var oursHtml = '<h4>🏪 ระบบเรา</h4>';
   if(item.ours){
@@ -604,6 +625,84 @@ function renderExpandPanel(sku) {
     '<div class="panel-col">' + oursHtml + searchHtml + actionsHtml + pendNote + '</div>';
 }
 
+// ===== Override state (Shopee/BS) =====
+var shopeeOverride = {};
+var bsOverride = {};
+function selectShopeeOverride(sku, payload){ shopeeOverride[sku] = payload; toast('เลือก Shopee แล้ว', 'success'); renderExpandPanel(sku); }
+function clearShopeeOverride(sku){ delete shopeeOverride[sku]; renderExpandPanel(sku); }
+function selectBsOverride(sku, payload){ bsOverride[sku] = payload; toast('เลือก BS แล้ว', 'success'); renderExpandPanel(sku); }
+function clearBsOverride(sku){ delete bsOverride[sku]; renderExpandPanel(sku); }
+
+var searchTimersSh = {};
+var searchTimersBs = {};
+
+function onSearchShopee(sku){
+  clearTimeout(searchTimersSh[sku]);
+  searchTimersSh[sku] = setTimeout(async function(){
+    var inp = document.getElementById('srch-sh-'+sku);
+    if(!inp) return;
+    var q = inp.value.trim();
+    var resEl = document.getElementById('sres-sh-'+sku);
+    if(!q || !resEl){ if(resEl) resEl.innerHTML=''; return; }
+    var items = [];
+    try {
+      var r = await fetch('/api/sku-merge/search-shopee?q='+encodeURIComponent(q)+'&limit=15');
+      var d = await r.json();
+      items = d.items || [];
+    } catch(e){ console.error('search-sh', e); }
+    var html = '';
+    items.forEach(function(p){
+      var pStr = JSON.stringify({
+        shopee_item_id: String(p.shopee_item_id||''),
+        variation_id: p.shopee_variation_id || null,
+        sku: p.sku_ref||'',
+        product_name: (p.product_name||'').replace(/['"\\]/g, ''),
+        stock: Number(p.stock)||0,
+        price: Number(p.price)||0
+      }).replace(/"/g, '&quot;');
+      html += '<div class="search-result-item" data-sku="'+sku+'" data-p="'+pStr+'" onclick="selectShopeeOverride(this.dataset.sku, JSON.parse(this.dataset.p))">';
+      html += '<span style="background:#ee4d2d;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">🛒 Shopee</span>';
+      html += '<strong>'+esc(p.sku_ref||'')+'</strong> '+esc(p.product_name||'')+' <span style="color:#888;">(stock: '+(p.stock||0)+' / '+(p.price||0)+'฿)</span>';
+      html += '</div>';
+    });
+    if(!items.length) html += '<div style="padding:8px;color:var(--text-muted);font-size:12px;">ไม่พบ</div>';
+    resEl.innerHTML = html;
+  }, 300);
+}
+
+function onSearchBs(sku){
+  clearTimeout(searchTimersBs[sku]);
+  searchTimersBs[sku] = setTimeout(async function(){
+    var inp = document.getElementById('srch-bs-'+sku);
+    if(!inp) return;
+    var q = inp.value.trim();
+    var resEl = document.getElementById('sres-bs-'+sku);
+    if(!q || !resEl){ if(resEl) resEl.innerHTML=''; return; }
+    var items = [];
+    try {
+      var r = await fetch('/api/sku-merge/search-bs?q='+encodeURIComponent(q)+'&limit=15');
+      var d = await r.json();
+      items = d.items || [];
+    } catch(e){ console.error('search-bs', e); }
+    var html = '';
+    items.forEach(function(p){
+      var pStr = JSON.stringify({
+        sku: p.sku||'',
+        name: (p.name||'').replace(/['"\\]/g, ''),
+        stock: Number(p.bs_stock)||0,
+        category: p.bs_category||'',
+        sku_type: p.bs_sku_type||''
+      }).replace(/"/g, '&quot;');
+      html += '<div class="search-result-item" data-sku="'+sku+'" data-p="'+pStr+'" onclick="selectBsOverride(this.dataset.sku, JSON.parse(this.dataset.p))">';
+      html += '<span style="background:#ff6b00;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">📦 BS</span>';
+      html += '<strong>'+esc(p.sku||'')+'</strong> '+esc(p.name||'')+' <span style="color:#888;">(stock: '+(p.bs_stock||0)+')</span>';
+      html += '</div>';
+    });
+    if(!items.length) html += '<div style="padding:8px;color:var(--text-muted);font-size:12px;">ไม่พบ</div>';
+    resEl.innerHTML = html;
+  }, 300);
+}
+
 // ===== Search Our Products =====
 var searchTimers = {};
 function onSearchOur(sku){
@@ -639,40 +738,65 @@ function selectOurProduct(sku, prodId, prodSku, prodName){
   document.getElementById('stg-'+sku).disabled = false;
 }
 
-// ===== Stage Actions =====
-function stageMerge(sku){
+// ===== Stage Actions (real API + override) =====
+async function callStage(sku, type, extra){
+  try {
+    var body = Object.assign({ sku_ref: sku, type: type }, extra || {});
+    if (shopeeOverride[sku]) body.shopee_override = shopeeOverride[sku];
+    if (bsOverride[sku]) body.bs_override = bsOverride[sku];
+    var r = await fetch('/api/sku-merge/stage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
+    pendingMap[sku] = d.item || { type: type };
+    updatePending(d.pending_count);
+    return d;
+  } catch(e) {
+    toast('❌ ' + e.message, 'error');
+    throw e;
+  }
+}
+
+async function stageMerge(sku){
   var match = selectedOurProduct[sku];
   if(!match){ toast('กรุณาเลือกสินค้าในระบบเราก่อน','error'); return; }
-  // TODO: POST /api/sku-merge/stage { sku_ref, type:"merge", our_product_id: match.id }
-  pendingMap[sku] = { type:'merge', our_product_id: match.id, our_name: match.sku };
-  toast('✅ Stage: '+sku+' → '+match.sku, 'success');
-  updatePending();
-  render();
+  try {
+    await callStage(sku, 'merge', { our_product_id: match.id, our_sku: match.sku, our_name: match.name });
+    toast('✅ ผูก: '+sku+' → '+match.sku, 'success');
+    render();
+  } catch(_) {}
 }
 
-function stageCreateNew(sku){
-  // TODO: POST /api/sku-merge/stage { sku_ref, type:"create_new" }
-  pendingMap[sku] = { type:'create_new' };
-  toast('✅ Stage: '+sku+' (สร้างใหม่)', 'success');
-  updatePending();
-  render();
+async function stageCreateNew(sku){
+  try {
+    await callStage(sku, 'create_new');
+    toast('✅ สร้างใหม่: '+sku, 'success');
+    render();
+  } catch(_) {}
 }
 
-function stageSkip(sku){
-  // TODO: POST /api/sku-merge/stage { sku_ref, type:"skip" }
-  pendingMap[sku] = { type:'skip' };
-  toast('⏭️ Skip: '+sku, 'info');
-  updatePending();
-  render();
+async function stageSkip(sku){
+  try {
+    await callStage(sku, 'skip');
+    toast('⏭️ ข้าม: '+sku, 'info');
+    render();
+  } catch(_) {}
 }
 
-function unstageItem(sku){
-  // TODO: POST /api/sku-merge/unstage { sku_ref }
-  delete pendingMap[sku];
-  delete selectedOurProduct[sku];
-  toast('↩️ Unstage: '+sku, 'info');
-  updatePending();
-  render();
+async function unstageItem(sku){
+  try {
+    var r = await fetch('/api/sku-merge/unstage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sku_ref: sku }) });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
+    delete pendingMap[sku];
+    delete selectedOurProduct[sku];
+    delete shopeeOverride[sku];
+    delete bsOverride[sku];
+    updatePending(d.pending_count);
+    toast('↩️ ปลด: '+sku, 'info');
+    render();
+  } catch(e) {
+    toast('❌ ' + e.message, 'error');
+  }
 }
 
 // ===== Selected (Checkboxes) =====
@@ -699,24 +823,30 @@ function updatePending(){
   document.getElementById('footerPending').textContent = n;
 }
 
-// ===== Lock =====
+// ===== Lock (real API) =====
 async function acquireLock(){
-  // TODO: POST /api/sku-merge/lock (auto on page load)
-  isLocked = true;
-  updateLockUI();
+  try {
+    var r = await fetch('/api/sku-merge/lock', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    var d = await r.json();
+    if (r.status === 409) { toast('⚠️ ' + (d.error || 'ถูกล็อก'), 'error'); isLocked = false; }
+    else if (r.ok) isLocked = true;
+    updateLockUI();
+  } catch(e) { console.error('lock', e); }
 }
-async function releaseLock(){
-  // TODO: POST /api/sku-merge/unlock (on unload)
-  isLocked = false;
-}
-function toggleLock(){
-  if(isLocked){
-    // POST /api/sku-merge/unlock
+async function releaseLock(useBeacon){
+  try {
+    if (useBeacon && navigator.sendBeacon) {
+      var blob = new Blob(['{}'], { type:'application/json' });
+      navigator.sendBeacon('/api/sku-merge/unlock', blob);
+      isLocked = false; return;
+    }
+    await fetch('/api/sku-merge/unlock', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
     isLocked = false;
-  } else {
-    // POST /api/sku-merge/lock
-    isLocked = true;
-  }
+  } catch(_) {}
+}
+async function toggleLock(){
+  if(isLocked) await releaseLock();
+  else await acquireLock();
   updateLockUI();
 }
 function updateLockUI(){
@@ -732,44 +862,129 @@ function updateLockUI(){
 }
 
 // ===== Backup =====
-function manualBackup(){
-  toast('💾 กำลัง backup...', 'info');
-  // TODO: replace with real backup call
-  setTimeout(function(){ toast('💾 Backup เรียบร้อย', 'success'); }, 500);
+async function manualBackup(){
+  toast('💾 backup...', 'info');
+  try {
+    var r = await fetch('/api/sku-merge/manual-backup', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
+    toast('✅ Backup เรียบร้อย', 'success');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
 }
 
-// ===== Preview =====
-function openPreview(){
-  // TODO: GET /api/sku-merge/preview
-  toast('👁️ Preview (Phase D — กำลังพัฒนา)', 'info');
+// ===== Preview (real) =====
+async function openPreview(){
+  openModal('previewModal');
+  var body = document.getElementById('previewBody');
+  body.innerHTML = '<p class="loading">⏳ คำนวณ...</p>';
+  try {
+    var r = await fetch('/api/sku-merge/preview');
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
+    body.innerHTML = renderPreview(d);
+  } catch(e) { body.innerHTML = '<p style="color:#d33;">❌ ' + e.message + '</p>'; }
+}
+
+function renderPreview(d){
+  var changed = (d.diff && d.diff.products_changed) || [];
+  var added = (d.diff && d.diff.products_added) || [];
+  var skips = (d.diff && d.diff.skips) || [];
+  var blocked = d.blocked || [];
+  var html = '<div style="font-size:14px;">';
+  html += '<div style="background:#f0f9ff;border-left:3px solid #0a8;padding:10px;margin-bottom:14px;">';
+  html += '<strong>Pending</strong> ' + d.pending_count + ' | <strong>ไปแก้</strong> ' + changed.length + ' | <strong>สร้างใหม่</strong> ' + added.length + ' | <strong>ข้าม</strong> ' + skips.length;
+  html += '</div>';
+  if (blocked.length) {
+    html += '<div style="background:#fee;border-left:3px solid #d33;padding:10px;margin-bottom:14px;">';
+    html += '<strong>⚠ มีสินค้าติด active order:</strong> ' + esc(blocked.join(', '));
+    html += '</div>';
+  }
+  if (changed.length) {
+    html += '<h4>🔗 ไปแก้ ('+changed.length+')</h4><table class="data-table" style="font-size:13px;width:100%;"><thead><tr><th>SKU_ref</th><th>→ ระบบเรา</th><th>Shopee</th><th>BS</th></tr></thead><tbody>';
+    changed.forEach(function(c){
+      html += '<tr><td><code>'+esc(c.sku_ref)+'</code></td>';
+      html += '<td><strong>'+esc(c.product_sku)+'</strong></td>';
+      html += '<td>'+(c.new_channels && c.new_channels.shopee_main ? '✅' : '—')+'</td>';
+      html += '<td>'+(c.new_channels && c.new_channels.bigseller ? '✅' : '—')+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  if (added.length) {
+    html += '<h4>🆕 สร้างใหม่ ('+added.length+')</h4><ul style="font-size:13px;">';
+    added.forEach(function(a){ html += '<li><code>'+esc(a.sku_ref)+'</code> — '+esc(a.proposed_name||'')+'</li>'; });
+    html += '</ul>';
+  }
+  if (skips.length) {
+    html += '<h4>⏭️ ข้าม ('+skips.length+')</h4><ul style="font-size:13px;color:#666;">';
+    skips.forEach(function(s){ html += '<li><code>'+esc(s.sku_ref)+'</code></li>'; });
+    html += '</ul>';
+  }
+  html += '<div style="margin-top:14px;text-align:right;">';
+  if (blocked.length) {
+    html += '<button class="btn btn-secondary" disabled>⚠ ติด blocked</button>';
+  } else if (d.pending_count > 0) {
+    html += '<button class="btn btn-primary" onclick="openApply()" style="background:#0a8;">✅ Apply</button>';
+  }
+  html += '</div></div>';
+  return html;
 }
 
 // ===== Apply =====
 function openApply(){
-  document.getElementById('applyCount').textContent = Object.keys(selected).length;
+  closeModal('previewModal');
+  document.getElementById('applyCount').textContent = Object.keys(pendingMap).length;
+  document.getElementById('applyReason').value = '';
   openModal('applyModal');
 }
-function doApply(){
-  // TODO: POST /api/sku-merge/apply { reason, dry_run: false }
-  toast('✅ Apply (Phase D — กำลังพัฒนา)', 'info');
-  closeModal('previewModal');
-  closeModal('applyModal');
+async function doApply(){
+  var reason = document.getElementById('applyReason').value.trim();
+  if (!reason) { toast('กรุณาระบุเหตุผล', 'error'); return; }
+  var btn = document.getElementById('applyConfirmBtn');
+  if (btn) btn.disabled = true;
+  try {
+    var r = await fetch('/api/sku-merge/apply', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ reason: reason }) });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
+    var s = d.summary || {};
+    toast('✅ Apply สำเร็จ — ไปแก้ '+(s.changed_count||0)+' / สร้าง '+(s.added_count||0), 'success');
+    closeModal('applyModal');
+    pendingMap = {}; selectedOurProduct = {}; shopeeOverride = {}; bsOverride = {};
+    await reloadList();
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+  finally { if (btn) btn.disabled = false; }
 }
 
 // ===== Rollback =====
-function openRollback(){
-  // TODO: GET /api/sku-merge/status → last_apply
-  document.getElementById('rollbackInfo').innerHTML = '<p style="color:var(--text-muted);">⏳ กำลังโหลด...</p>';
+async function openRollback(){
+  document.getElementById('rollbackInfo').innerHTML = '<p style="color:var(--text-muted);">⏳ โหลด...</p>';
   openModal('rollbackModal');
-  // TODO: then call GET /api/sku-merge/preview or status
-  setTimeout(function(){
-    document.getElementById('rollbackInfo').innerHTML = '<p style="color:var(--text-muted);">Phase D — กำลังพัฒนา</p>';
-  }, 300);
+  try {
+    var r = await fetch('/api/sku-merge/status');
+    var d = await r.json();
+    if (!d.last_apply) { document.getElementById('rollbackInfo').innerHTML = '<p style="color:#888;">— ไม่มีประวัติ apply —</p>'; return; }
+    var la = d.last_apply;
+    if (la.rolled_back) { document.getElementById('rollbackInfo').innerHTML = '<p style="color:#888;">⏳ rollback ไปแล้ว</p>'; return; }
+    document.getElementById('rollbackInfo').innerHTML =
+      '<div style="background:#fff7ed;border-left:3px solid #f97316;padding:10px;">' +
+      '<strong>Batch:</strong> <code>' + esc(la.batch_id) + '</code><br>' +
+      '<strong>เมื่อ:</strong> ' + new Date(la.ts).toLocaleString('th-TH') + '<br>' +
+      '<strong>โดย:</strong> ' + esc(la.actor_name||'-') + '<br>' +
+      '<strong>สรุป:</strong> ไปแก้ ' + (la.summary.changed_count||0) + ' / สร้าง ' + (la.summary.added_count||0) +
+      '</div>';
+  } catch(e) { document.getElementById('rollbackInfo').innerHTML = '<p style="color:#d33;">❌ '+e.message+'</p>'; }
 }
-function doRollback(){
-  // TODO: POST /api/sku-merge/rollback { batch_id, reason }
-  toast('↩️ Rollback (Phase D)', 'info');
-  closeModal('rollbackModal');
+async function doRollback(){
+  var reason = document.getElementById('rollbackReason').value.trim();
+  if (!reason) { toast('กรุณาระบุเหตุผล', 'error'); return; }
+  if (!confirm('ยืนยัน rollback?')) return;
+  try {
+    var r = await fetch('/api/sku-merge/rollback', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ reason: reason }) });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
+    toast('↩️ Rollback สำเร็จ', 'success');
+    closeModal('rollbackModal');
+    await reloadList();
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
 }
 
 // ===== Modal Helpers =====

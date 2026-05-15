@@ -329,6 +329,8 @@ app.get('/api/commission-slips', forwardWithCookie('GET'));
 // 2026-05-15: SKU merge
 app.get('/api/sku-merge/list', forwardWithCookie('GET'));
 app.get('/api/sku-merge/search', forwardWithCookie('GET'));
+app.get('/api/sku-merge/search-shopee', forwardWithCookie('GET'));
+app.get('/api/sku-merge/search-bs', forwardWithCookie('GET'));
 app.get('/api/sku-merge/status', forwardWithCookie('GET'));
 app.get('/api/sku-merge/preview', forwardWithCookie('GET'));
 app.get('/api/sku-merge/history', forwardWithCookie('GET'));
