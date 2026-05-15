@@ -300,6 +300,13 @@ app.post('/api/attendance/verify-token', forwardWithCookie('POST'));
 app.post('/api/attendance/checkin', forwardWithCookie('POST'));
 app.post('/api/attendance/set-pin', forwardWithCookie('POST'));
 app.get('/api/attendance/active-employees', forwardWithCookie('GET'));
+// 2026-05-15: Calendar + Edit endpoints (ระบบแก้ไขย้อนหลัง)
+app.get('/api/attendance/calendar', forwardWithCookie('GET'));
+app.put('/api/attendance/:id', forwardWithCookie('PUT'));
+app.delete('/api/attendance/:id', forwardWithCookie('DELETE'));
+app.post('/api/attendance/:id/restore', forwardWithCookie('POST'));
+app.get('/api/audit-log/hr', forwardWithCookie('GET'));
+app.delete('/api/payroll/:id', forwardWithCookie('DELETE'));
 
 // Mobile attendance scan page (public — token required in query)
 app.get('/attendance/scan', (req, res) => {

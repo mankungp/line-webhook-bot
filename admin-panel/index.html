@@ -778,6 +778,12 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('qr-att')" data-page="qr-att" data-owner-only>
       <span class="icon">📱</span> <span>QR ลงเวลา</span>
     </a>
+    <a href="/admin/attendance-calendar.html" target="_blank">
+      <span class="icon">📅</span> <span>ปฏิทินลงเวลา</span>
+    </a>
+    <a onclick="openHrAuditModal()" data-owner-only>
+      <span class="icon">📜</span> <span>ประวัติแก้ไข HR</span>
+    </a>
     <a onclick="showPage('users')" data-page="users" data-owner-only>
       <span class="icon">👥</span> <span>ผู้ใช้ระบบ</span>
     </a>
@@ -1904,6 +1910,42 @@ input:focus, textarea:focus, select:focus {
     <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end;">
       <button class="btn btn-secondary" onclick="closeEditCustomerModal()">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveEditCustomer()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- HR Audit Log Modal (2026-05-15) -->
+<div class="modal" id="hrAuditModal">
+  <div class="modal-content" style="max-width:900px;">
+    <button class="close-btn" onclick="closeHrAuditModal()">×</button>
+    <h2>📜 ประวัติการแก้ไข HR</h2>
+    <p style="color:#666; font-size:13px; margin-top:4px;">บันทึกทุกการแก้ไข attendance / advance / payroll (เฉพาะ owner)</p>
+
+    <div style="display:flex; gap:8px; margin:12px 0; flex-wrap:wrap;">
+      <select id="hrAuditEmp" style="padding:6px 10px;">
+        <option value="">-- ทุกพนักงาน --</option>
+      </select>
+      <select id="hrAuditAction" style="padding:6px 10px;">
+        <option value="">-- ทุกการกระทำ --</option>
+        <option value="attendance_create">สร้าง attendance</option>
+        <option value="attendance_edit">แก้ attendance</option>
+        <option value="attendance_delete">ลบ attendance</option>
+        <option value="attendance_restore">กู้คืน attendance</option>
+        <option value="payroll_commit">commit payroll</option>
+        <option value="payroll_revert">revert payroll</option>
+        <option value="payroll_mark_paid">จ่ายเงิน</option>
+      </select>
+      <input type="date" id="hrAuditFrom" style="padding:6px 10px;">
+      <input type="date" id="hrAuditTo" style="padding:6px 10px;">
+      <button class="btn btn-primary btn-sm" onclick="loadHrAudit()">🔍 ค้นหา</button>
+    </div>
+
+    <div id="hrAuditStatus" style="margin:8px 0;"></div>
+    <div style="max-height:60vh; overflow-y:auto;">
+      <table class="data-table" style="font-size:13px;">
+        <thead><tr><th>เวลา</th><th>ผู้ทำ</th><th>การกระทำ</th><th>พนักงาน</th><th>เหตุผล</th><th></th></tr></thead>
+        <tbody id="hrAuditBody"><tr><td colspan="6" style="text-align:center; color:#999;">— กดค้นหาเพื่อดูประวัติ —</td></tr></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -9064,6 +9106,69 @@ if (typeof _origShowPage_qrAtt === 'function') {
     if (page !== 'qr-att') stopQrTimers();
     return _origShowPage_qrAtt.apply(this, arguments);
   };
+}
+
+// ============ HR AUDIT LOG (2026-05-15) ============
+function openHrAuditModal() {
+  document.getElementById('hrAuditModal').classList.add('active');
+  // load emp list
+  (async function() {
+    try {
+      var r = await fetch('/api/employees');
+      var data = await r.json();
+      var emps = Array.isArray(data) ? data : (data.employees || []);
+      var sel = document.getElementById('hrAuditEmp');
+      sel.innerHTML = '<option value="">-- ทุกพนักงาน --</option>';
+      emps.forEach(function(e) {
+        var name = e.nickname || e.name;
+        sel.innerHTML += '<option value="' + e.emp_code + '">' + e.emp_code + ' - ' + name + '</option>';
+      });
+    } catch(_) {}
+  })();
+}
+function closeHrAuditModal() { document.getElementById('hrAuditModal').classList.remove('active'); }
+
+async function loadHrAudit() {
+  var emp = document.getElementById('hrAuditEmp').value;
+  var act = document.getElementById('hrAuditAction').value;
+  var from = document.getElementById('hrAuditFrom').value;
+  var to = document.getElementById('hrAuditTo').value;
+  var qs = ['limit=200'];
+  if (emp) qs.push('empCode=' + encodeURIComponent(emp));
+  if (act) qs.push('action=' + encodeURIComponent(act));
+  if (from) qs.push('from=' + encodeURIComponent(from));
+  if (to) qs.push('to=' + encodeURIComponent(to));
+  document.getElementById('hrAuditStatus').innerHTML = 'กำลังโหลด...';
+  try {
+    var r = await fetch('/api/audit-log/hr?' + qs.join('&'));
+    var data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'failed');
+    var rows = (data.entries || []).map(function(e) {
+      var when = new Date(e.ts).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'});
+      var actLabel = ({
+        attendance_create: '➕ สร้าง attendance',
+        attendance_edit: '✏️ แก้ attendance',
+        attendance_delete: '🗑️ ลบ attendance',
+        attendance_restore: '↩️ กู้คืน',
+        payroll_commit: '💰 commit payroll',
+        payroll_revert: '↩️ revert payroll',
+        payroll_mark_paid: '✅ จ่ายเงิน'
+      })[e.action] || e.action;
+      var detail = JSON.stringify({ before: e.before, after: e.after }).replace(/</g, '&lt;').slice(0, 200);
+      return '<tr>' +
+        '<td>' + when + '</td>' +
+        '<td>' + (e.actor_name || e.actor || '-') + '</td>' +
+        '<td>' + actLabel + '</td>' +
+        '<td>' + (e.emp_code || '-') + '</td>' +
+        '<td style="max-width:300px; word-break:break-word;">' + (e.reason || '-') + '</td>' +
+        '<td><button class="btn btn-sm" onclick="alert(JSON.stringify(' + JSON.stringify(e).replace(/"/g, '&quot;') + ', null, 2))">🔍</button></td>' +
+        '</tr>';
+    }).join('');
+    document.getElementById('hrAuditBody').innerHTML = rows || '<tr><td colspan="6" style="text-align:center;color:#999;">— ไม่มีข้อมูล —</td></tr>';
+    document.getElementById('hrAuditStatus').innerHTML = '<span style="color:#0a0;">✅ พบ ' + (data.total || 0) + ' รายการ</span>';
+  } catch (e) {
+    document.getElementById('hrAuditStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
 }
 
 // ============ PAYROLL (Phase 3) ============
