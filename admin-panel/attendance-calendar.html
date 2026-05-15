@@ -470,9 +470,6 @@ function openDeleteModal(id){ delId=id; document.getElementById('deleteReason').
 
 async function confirmDeleteLog(){
   var reason=document.getElementById('deleteReason').value.trim();
-  if(!
-async function confirmDeleteLog(){
-  var reason=document.getElementById('deleteReason').value.trim();
   if(!reason){ toast('กรุณาระบุเหตุผลที่ลบ','error'); return; }
   closeModal('deleteModal');
   try {
