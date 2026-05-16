@@ -2262,7 +2262,8 @@ input:focus, textarea:focus, select:focus {
               <select id="pBrand" style="flex:1;">
                 <option value="">— ไม่ระบุ —</option>
               </select>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="addBrandInline()" title="เพิ่มยี่ห้อใหม่ในหมวดนี้">+ ยี่ห้อใหม่</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addBrandInline()" title="เพิ่มยี่ห้อใหม่ในหมวดนี้">+</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="openBrandModal()" title="จัดการยี่ห้อ/หมวดหมู่ย่อย">✏️</button>
             </div>
             <small style="color:#999;">เลือกหมวดก่อน — ยี่ห้อจะขึ้นตาม</small>
           </div>
@@ -2801,7 +2802,7 @@ function renderProducts(list) {
     html += '<div style="margin:5px 0;"><span class="badge badge-' + (p.category || 'other') + '" style="cursor:pointer;" onclick="openCategoryModal()" title="จัดการหมวดหมู่">' + getCatName(p.category) + '</span>';
     if (p.brandId) {
       var __b = __BRANDS.find(function(x){ return x.id === p.brandId; });
-      if (__b) html += ' <span class="badge" style="background:#e3f2fd;color:#1976d2;">' + (__b.icon ? __b.icon + ' ' : '') + escapeHtml(__b.name) + '</span>';
+      if (__b) html += ' <span class="badge" style="background:#e3f2fd;color:#1976d2;cursor:pointer;" onclick="openBrandModal()" title="จัดการยี่ห้อ/หมวดหมู่ย่อย">' + (__b.icon ? __b.icon + ' ' : '') + escapeHtml(__b.name) + '</span>';
     }
     html += '</div>';
     html += '<div class="product-price">' + numFormat(p.price) + ' บาท <small>/ ' + (p.unit || 'ชิ้น') + '</small></div>';
@@ -5131,6 +5132,161 @@ async function moveCategory(id, delta) {
   }
 }
 
+// ============ BRAND MODAL ============
+var brandModalCurrentCategory = '';
+
+function openBrandModal(categoryId) {
+  document.getElementById('brandModal').classList.add('active');
+  document.getElementById('brandModalNewName').value = '';
+  document.getElementById('brandModalAddStatus').textContent = '';
+  
+  // Populate category filter dropdown
+  var catFilter = document.getElementById('brandModalCategoryFilter');
+  var options = '<option value="">— เลือกหมวดหมู่ —</option>';
+  __CATS.forEach(function(c) {
+    options += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name || c.key || c.id) + '</option>';
+  });
+  catFilter.innerHTML = options;
+  
+  // Set category: from param, or from product form's category, or first
+  var targetCat = categoryId || '';
+  if (!targetCat) {
+    var pCatEl = document.getElementById('pCategory');
+    if (pCatEl && pCatEl.value) targetCat = pCatEl.value;
+  }
+  if (!targetCat && __CATS.length > 0) targetCat = __CATS[0].id;
+  
+  catFilter.value = targetCat;
+  brandModalCurrentCategory = targetCat;
+  reloadBrandList(targetCat);
+}
+
+function closeBrandModal() {
+  document.getElementById('brandModal').classList.remove('active');
+}
+
+async function reloadBrandList(categoryId) {
+  var box = document.getElementById('brandModalList');
+  if (!categoryId) {
+    box.innerHTML = '<div style="color:#999; padding:8px;">— เลือกหมวดหมู่ก่อน —</div>';
+    return;
+  }
+  brandModalCurrentCategory = categoryId;
+  box.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">⏳ กำลังโหลด...</div>';
+  
+  var filtered = __BRANDS.filter(function(b) { return b.categoryId === categoryId; });
+  filtered.sort(function(a, b) { return (a.order || 9999) - (b.order || 9999); });
+  
+  if (filtered.length === 0) {
+    box.innerHTML = '<div style="color:#999; padding:8px;">— ยังไม่มียี่ห้อในหมวดนี้ —</div>';
+    return;
+  }
+  
+  var html = '';
+  filtered.forEach(function(b) {
+    var safeId = String(b.id).replace(/'/g, "\\'");
+    html += '<div style="display:flex; gap:4px; padding:6px; border-bottom:1px solid #f0f0f0; align-items:center;">';
+    html += '<input type="text" class="brand-edit-name" value="' + escapeHtml(b.name) + '" data-id="' + escapeHtml(String(b.id)) + '" style="flex:2; padding:4px; border:1px solid #ddd; border-radius:4px;" placeholder="ชื่อ">';
+    html += '<input type="text" class="brand-edit-icon" value="' + escapeHtml(b.icon || '') + '" data-id="' + escapeHtml(String(b.id)) + '" style="flex:0 0 50px; padding:4px; border:1px solid #ddd; border-radius:4px;" placeholder="emoji" maxlength="5">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="saveBrand(\'' + safeId + '\')" title="บันทึก">💾</button>';
+    html += '<button class="btn btn-danger btn-sm" onclick="deleteBrand(\'' + safeId + '\')" title="ลบ">🗑️</button>';
+    html += '</div>';
+  });
+  box.innerHTML = html;
+}
+
+async function saveBrand(id) {
+  var nameInput = document.querySelector('.brand-edit-name[data-id="' + id + '"]');
+  var iconInput = document.querySelector('.brand-edit-icon[data-id="' + id + '"]');
+  if (!nameInput || !nameInput.value.trim()) {
+    alert('❌ ต้องใส่ชื่อยี่ห้อ');
+    return;
+  }
+  try {
+    var r = await fetch('/api/brands/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: nameInput.value.trim(),
+        icon: (iconInput ? iconInput.value : '').trim() || undefined
+      })
+    });
+    if (!r.ok) throw new Error('Save failed');
+    nameInput.style.border = '1px solid #0a0';
+    setTimeout(function(){ nameInput.style.border = '1px solid #ddd'; }, 1000);
+    await loadBrands();
+    // update dropdowns
+    var catEl = document.getElementById('pCategory');
+    if (catEl) populateBrandSelect(catEl.value, '');
+    populateBrandFilter();
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+async function deleteBrand(id) {
+  if (!confirm('ลบยี่ห้อนี้? (ถ้ามีสินค้าใช้ยี่ห้อนี้ จะต้องใช้ ?force=true เพื่อลบ และสินค้าจะถูก unset brand)')) return;
+  try {
+    var r = await fetch('/api/brands/' + encodeURIComponent(id) + '?force=true', { method: 'DELETE' });
+    if (!r.ok) {
+      if (r.status === 409) {
+        // brand in use — ask for force
+        var data = await r.json();
+        if (confirm('ยี่ห้อนี้ถูกใช้โดย ' + (data.productsCount || 0) + ' สินค้า' + (data.hint ? '\n\n' + data.hint : '') + '\n\nยืนยันลบ?')) {
+          r = await fetch('/api/brands/' + encodeURIComponent(id) + '?force=true', { method: 'DELETE' });
+          if (!r.ok) throw new Error('Delete failed');
+        } else {
+          return;
+        }
+      } else {
+        throw new Error('Delete failed (status ' + r.status + ')');
+      }
+    }
+    await loadBrands();
+    reloadBrandList(brandModalCurrentCategory);
+    var catEl = document.getElementById('pCategory');
+    if (catEl) populateBrandSelect(catEl.value, '');
+    populateBrandFilter();
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+async function addBrandFromModal() {
+  var name = document.getElementById('brandModalNewName').value.trim();
+  var cat = document.getElementById('brandModalCategoryFilter').value;
+  if (!name) {
+    document.getElementById('brandModalAddStatus').innerHTML = '<span style="color:#d33;">⚠️ ใส่ชื่อยี่ห้อ</span>';
+    return;
+  }
+  if (!cat) {
+    document.getElementById('brandModalAddStatus').innerHTML = '<span style="color:#d33;">⚠️ เลือกหมวดหมู่ก่อน</span>';
+    return;
+  }
+  document.getElementById('brandModalAddStatus').textContent = '⏳ กำลังบันทึก...';
+  try {
+    var r = await fetch('/api/brands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, categoryId: cat })
+    });
+    var data = await r.json();
+    if (data && data.error) {
+      document.getElementById('brandModalAddStatus').innerHTML = '<span style="color:#d33;">❌ ' + data.error + '</span>';
+      return;
+    }
+    document.getElementById('brandModalAddStatus').innerHTML = '<span style="color:#0a0;">✅ เพิ่มแล้ว</span>';
+    document.getElementById('brandModalNewName').value = '';
+    await loadBrands();
+    reloadBrandList(cat);
+    var catEl = document.getElementById('pCategory');
+    if (catEl) populateBrandSelect(catEl.value, data && data.id ? data.id : '');
+    populateBrandFilter();
+  } catch (e) {
+    document.getElementById('brandModalAddStatus').innerHTML = '<span style="color:#d33;">❌ ' + e.message + '</span>';
+  }
+}
+
 // Initial load
 loadBotCustomers();
 setInterval(loadBotCustomers, 30000);
@@ -5428,6 +5584,37 @@ setInterval(loadBotCustomers, 30000);
 
     <div style="margin-top:12px;">
       <button class="btn btn-secondary" style="width:100%;" onclick="closeCategoryModal()">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Brand Modal -->
+<div class="modal" id="brandModal">
+  <div class="modal-content" style="max-width: 520px; max-height: 90vh; overflow-y: auto;">
+    <button class="close-btn" onclick="closeBrandModal()">×</button>
+    <h2>🏷️ จัดการยี่ห้อ / หมวดหมู่ย่อย</h2>
+
+    <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px; margin: 12px 0;">
+      <h3 style="margin: 0 0 8px 0; font-size: 14px;">เลือกหมวดหมู่</h3>
+      <select id="brandModalCategoryFilter" onchange="reloadBrandList(this.value)" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ddd;">
+        <option value="">— เลือกหมวดหมู่ —</option>
+      </select>
+    </div>
+
+    <div style="border: 1px solid #eee; padding: 12px; border-radius: 8px;">
+      <h3 style="margin: 0 0 8px 0; font-size: 14px;">ยี่ห้อในหมวดนี้</h3>
+      <div id="brandModalList" style="max-height: 300px; overflow-y: auto;">
+        <div style="text-align:center;color:#999;padding:20px;">⏳ กำลังโหลด...</div>
+      </div>
+      <div style="margin-top:8px; display:flex; gap:6px;">
+        <input type="text" id="brandModalNewName" placeholder="ชื่อยี่ห้อใหม่" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ddd;">
+        <button class="btn btn-primary btn-sm" onclick="addBrandFromModal()">+ เพิ่ม</button>
+      </div>
+      <div id="brandModalAddStatus" style="font-size:12px; margin-top:4px;"></div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button class="btn btn-secondary" style="width:100%;" onclick="closeBrandModal()">ปิด</button>
     </div>
   </div>
 </div>
