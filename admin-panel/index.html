@@ -4747,7 +4747,8 @@ function searchCustomers(query) {
       matched.forEach(function(c) {
         var name = c.displayName || c.name || c.userId || 'ไม่ระบุ';
         var phone = c.phone || '';
-        html += '<div onclick="selectCustomer(\'' + (c.userId || '').replace(/\'/g, "\\'") + '\', ' + JSON.stringify(JSON.stringify({name:name, phone:phone, address:c.address||''})).replace(/"/g, '&quot;') + ')" style="padding:8px 10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
+        var custPayload = escapeAttr(JSON.stringify({ userId: c.userId || '', name: name, phone: phone, address: c.address || '' }));
+        html += '<div class="cust-search-result" data-payload="' + custPayload + '" style="padding:8px 10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
         html += '<div><strong>' + escapeHtml(name) + '</strong></div>';
         if (phone) html += '<div style="font-size:12px; color:#999;">' + escapeHtml(phone) + '</div>';
         html += '</div>';
@@ -4758,9 +4759,9 @@ function searchCustomers(query) {
   }, 300);
 }
 
-function selectCustomer(userId, dataJson) {
-  var data = JSON.parse(dataJson);
-  document.getElementById('oCustId').value = userId;
+function selectCustomer(payloadStr) {
+  var data = JSON.parse(payloadStr);
+  document.getElementById('oCustId').value = data.userId;
   document.getElementById('oCustName').value = data.name || '';
   document.getElementById('oCustPhone').value = data.phone || '';
   document.getElementById('oCustAddress').value = data.address || '';
@@ -4839,7 +4840,8 @@ function searchProductsForOrder(query) {
       matched.forEach(function(p) {
         var stockColor = (p.stock > 0) ? '#0a0' : '#d33';
         var tierPrice = pickPriceForTier(p, orderSelectedMemberTier || 'regular');
-        html += '<div onclick="addProductToOrder(' + p.id + ',' + tierPrice + ',' + (p.stock || 0) + ',' + JSON.stringify(JSON.stringify(p.name || '')).replace(/"/g, '&quot;') + ')" style="padding:10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
+        var pPayload = escapeAttr(JSON.stringify({ id: p.id, tierPrice: tierPrice, stock: p.stock || 0, name: p.name || '' }));
+        html += '<div class="o-search-result" data-payload="' + pPayload + '" style="padding:10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
         html += '<div style="display:flex; justify-content:space-between;">';
         html += '<div><strong>' + escapeHtml(p.name) + '</strong>';
         if (p.sku) html += ' <small style="color:#999;">' + escapeHtml(p.sku) + '</small>';
@@ -4855,8 +4857,7 @@ function searchProductsForOrder(query) {
   }, 200);
 }
 
-function addProductToOrder(productId, price, stock, nameJson) {
-  var name = JSON.parse(nameJson);
+function addProductToOrder(productId, price, stock, name) {
   var existing = orderItems.find(function(it){ return it.productId === productId; });
   if (existing) {
     existing.quantity += 1;
@@ -5739,7 +5740,7 @@ function _renderMemberSearchResults(boxId, list, onSelectFnName) {
       phones: phones,
       address: defAddr.address || ''
     }).replace(/"/g, '&quot;');
-    html += '<div onclick="' + onSelectFnName + '(&quot;' + payload.replace(/&quot;/g, '\\&quot;') + '&quot;)" style="padding:8px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f5f5f5&quot;" onmouseout="this.style.background=&quot;&quot;">';
+    html += '<div class="member-search-result" data-payload="' + payload + '" data-on-select="' + onSelectFnName + '" style="padding:8px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f5f5f5&quot;" onmouseout="this.style.background=&quot;&quot;">';
     html += '<div><strong>' + (tierBadge[m.tier] || '') + ' ' + escapeHtml(m.name || '') + '</strong> <small style="color:#999;">' + escapeHtml(m.memberCode || '') + '</small></div>';
     if (phones) html += '<div style="font-size:12px; color:#999;">' + escapeHtml(phones) + '</div>';
     html += '</div>';
@@ -6025,17 +6026,11 @@ function searchProductsForPos(query) {
       var html = '';
       matched.forEach(function(p) {
         var stockColor = (p.stock > 0) ? '#0a0' : '#d33';
-        var nameEsc = JSON.stringify(p.name || '').replace(/"/g, '&quot;');
-        // pass full product object for tier pricing
-        var prodEsc = JSON.stringify({
-          id: p.id, name: p.name, price: p.price || 0,
-          priceWholesale: p.priceWholesale || 0,
-          priceVip: p.priceVip || 0
-        }).replace(/"/g, '&quot;');
         // แสดงราคาตาม tier ปัจจุบันใน dropdown
         var tierPrice = pickPriceForTier(p, posSelectedMemberTier || 'regular');
         var tierLabel = ({ regular:'', wholesale:' (ราคาส่ง)', vip:' (ราคา VIP)' })[posSelectedMemberTier] || '';
-        html += '<div onclick="addToPosCart(' + p.id + ',' + tierPrice + ',' + (p.stock || 0) + ',' + nameEsc + ',' + prodEsc + ')" style="padding:12px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f0f9ff&quot;" onmouseout="this.style.background=&quot;&quot;">';
+        var posPayload = escapeAttr(JSON.stringify({ id: p.id, tierPrice: tierPrice, stock: p.stock || 0, name: p.name || '', product: { id: p.id, name: p.name, price: p.price||0, priceWholesale: p.priceWholesale||0, priceVip: p.priceVip||0 } }));
+        html += '<div class="pos-search-result" data-payload="' + posPayload + '" style="padding:12px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=&quot;#f0f9ff&quot;" onmouseout="this.style.background=&quot;&quot;">';
         html += '<div style="display:flex; justify-content:space-between;">';
         html += '<div><strong>' + escapeHtml(p.name) + '</strong>';
         if (p.sku) html += ' <small style="color:#999;">' + escapeHtml(p.sku) + '</small>';
@@ -6230,7 +6225,7 @@ document.addEventListener('DOMContentLoaded', function() {
     posSearch.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         var firstResult = document.querySelector('#posProductResults > div');
-        if (firstResult && firstResult.onclick) firstResult.click();
+        if (firstResult) firstResult.click();
       }
     });
   }
@@ -7023,6 +7018,47 @@ async function loadCameras() {
 document.addEventListener('click', function(e) {
   var m = document.getElementById('orderVideosModal');
   if (m && e.target === m) closeOrderVideosModal();
+});
+
+// ===== Event Delegation for Search Results (2026-05-16) =====
+document.addEventListener('click', function(e) {
+  // Order product search result
+  var oResult = e.target.closest('.o-search-result');
+  if (oResult) {
+    try {
+      var p = JSON.parse(oResult.getAttribute('data-payload'));
+      addProductToOrder(p.id, p.tierPrice, p.stock, p.name);
+    } catch(_) { console.warn('o-search-result parse fail', _); }
+    return;
+  }
+  // POS search result
+  var posResult = e.target.closest('.pos-search-result');
+  if (posResult) {
+    try {
+      var p = JSON.parse(posResult.getAttribute('data-payload'));
+      addToPosCart(p.id, p.tierPrice, p.stock, p.name, p.product);
+    } catch(_) { console.warn('pos-search-result parse fail', _); }
+    return;
+  }
+  // Customer search result
+  var custResult = e.target.closest('.cust-search-result');
+  if (custResult) {
+    try {
+      var p = JSON.parse(custResult.getAttribute('data-payload'));
+      selectCustomer(JSON.stringify({ userId: p.userId, name: p.name, phone: p.phone, address: p.address }));
+    } catch(_) { console.warn('cust-search-result parse fail', _); }
+    return;
+  }
+  // Member search result (generic — delegates to function named in data-on-select)
+  var memberResult = e.target.closest('.member-search-result');
+  if (memberResult) {
+    try {
+      var cb = memberResult.getAttribute('data-on-select');
+      var mPayload = memberResult.getAttribute('data-payload');
+      if (cb && window[cb]) window[cb](mPayload);
+    } catch(_) { console.warn('member-search-result parse fail', _); }
+    return;
+  }
 });
 
 // ============ AUTH (Phase 8) ============
