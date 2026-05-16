@@ -2247,9 +2247,12 @@ input:focus, textarea:focus, select:focus {
           </div>
           <div class="form-group">
             <label>หมวดหมู่ *</label>
-            <select id="pCategory" required onchange="onProductCategoryChange()">
-              <!-- populated by loadCategories() -->
-            </select>
+            <div style="display:flex; gap:6px;">
+              <select id="pCategory" required onchange="onProductCategoryChange()" style="flex:1;">
+                <!-- populated by loadCategories() -->
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="openCategoryModal()" title="จัดการหมวดหมู่">✏️</button>
+            </div>
           </div>
         </div>
         <div class="form-row">
@@ -2788,7 +2791,7 @@ function renderProducts(list) {
     }
     html += '<div class="product-name">' + escapeHtml(p.name) + '</div>';
     if (p.sku) html += '<div class="product-sku">' + escapeHtml(p.sku) + '</div>';
-    html += '<div style="margin:5px 0;"><span class="badge badge-' + (p.category || 'other') + '">' + getCatName(p.category) + '</span>';
+    html += '<div style="margin:5px 0;"><span class="badge badge-' + (p.category || 'other') + '" style="cursor:pointer;" onclick="openCategoryModal()" title="จัดการหมวดหมู่">' + getCatName(p.category) + '</span>';
     if (p.brandId) {
       var __b = __BRANDS.find(function(x){ return x.id === p.brandId; });
       if (__b) html += ' <span class="badge" style="background:#e3f2fd;color:#1976d2;">' + (__b.icon ? __b.icon + ' ' : '') + escapeHtml(__b.name) + '</span>';
