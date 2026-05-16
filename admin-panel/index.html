@@ -871,7 +871,7 @@ input:focus, textarea:focus, select:focus {
         <button class="btn btn-secondary btn-sm" onclick="clearBulkSelection()">ยกเลิก</button>
       </div>
       <div class="toolbar">
-        <input type="text" class="search-box" id="pSearchBox" placeholder="ค้นหาสินค้า / ยี่ห้อ..." onkeyup="loadProducts()">
+        <input type="text" class="search-box" id="pSearchBox" placeholder="ค้นหาสินค้า / ยี่ห้อ..." onkeyup="clearTimeout(this._d); this._d=setTimeout(loadProducts,350)">
         <select id="pCategoryFilter" onchange="onCategoryFilterChange()">
           <option value="">ทุกหมวดหมู่</option>
           <option value="agricultural">เครื่องเกษตร</option>
@@ -2709,12 +2709,18 @@ document.addEventListener('click', function(e) {
 
 // ============ PRODUCTS ============
 var products = [];
+var __abort = null;
 
 // Pagination state สำหรับ products page
 var pProductsState = { page: 1, limit: 200, total: 0, pages: 1, accumulated: [] };
 
 async function loadProducts(opts) {
   opts = opts || {};
+  // AbortController — cancel previous in-flight request
+  if (__abort) __abort.abort();
+  var ac = new AbortController();
+  __abort = ac;
+
   var append = opts.append === true;
   var search = encodeURIComponent(document.getElementById('pSearchBox').value);
   var category = document.getElementById('pCategoryFilter').value;
@@ -2734,7 +2740,7 @@ async function loadProducts(opts) {
   if (channelFilter) url += '&channelStatus=' + channelFilter;
 
   try {
-    var res = await fetch(url);
+    var res = await fetch(url, { signal: ac.signal });
     var data = await res.json();
     var batch = data.products || [];
     pProductsState.total = data.total || batch.length;
@@ -2750,6 +2756,7 @@ async function loadProducts(opts) {
     updateProductStats({ items: products, total: pProductsState.total });
     renderLoadMoreButton();
   } catch (e) {
+    if (e.name === 'AbortError') return;
     document.getElementById('productGrid').innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อ API ได้ - ตรวจสอบว่า Local API กำลังทำงานอยู่</div>';
   }
 }
