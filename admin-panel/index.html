@@ -800,7 +800,7 @@ input:focus, textarea:focus, select:focus {
 <div class="main">
 
   <!-- ============ BOT CONTROL PAGE ============ -->
-  <div id="page-bot" class="page">
+  <div id="page-bot" class="page" style="display:none;">
     <div class="page-header">
       <h2>🤖 Bot Control</h2>
       <p>ควบคุมการทำงานของ AI ผู้ช่วย</p>
@@ -2570,6 +2570,10 @@ function showPage(page) {
   if (page === 'reports') {
     if (!document.getElementById('rFrom').value) setReportPeriod('today');
     else loadAllReports();
+  }
+  // จำหน้าสุดท้ายไว้ (ยกเว้น bot)
+  if (page !== 'bot') {
+    try { localStorage.setItem('lastAdminPage', page); } catch(e) {}
   }
 }
 
@@ -7282,6 +7286,16 @@ async function checkAuth() {
     }
     renderUserInfo();
     applyRoleVisibility();
+    // remember last admin page
+    if (currentUser && currentUser.role !== 'technician') {
+      var lastPage = localStorage.getItem('lastAdminPage');
+      var validPages = ['products','orders','members','reports','cameras','hr','payroll','tech','bigseller','marketplace','qr-att','users','bot'];
+      if (lastPage && validPages.indexOf(lastPage) >= 0) {
+        showPage(lastPage);
+      } else {
+        showPage('products');
+      }
+    }
     return true;
   } catch (e) {
     window.location.href = '/admin/login';
