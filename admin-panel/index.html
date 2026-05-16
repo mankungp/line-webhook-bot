@@ -4386,6 +4386,7 @@ var productSearchTimer = null;
 function openOrderModal() {
   orderItems = [];
   orderSelectedMember = null;
+  orderSelectedMemberTier = 'regular';
   document.getElementById('orderModal').classList.add('active');
   document.getElementById('oCustId').value = '';
   document.getElementById('oCustName').value = '';
@@ -4837,7 +4838,8 @@ function searchProductsForOrder(query) {
       var html = '';
       matched.forEach(function(p) {
         var stockColor = (p.stock > 0) ? '#0a0' : '#d33';
-        html += '<div onclick="addProductToOrder(' + p.id + ',' + (p.price || 0) + ',' + (p.stock || 0) + ',' + JSON.stringify(JSON.stringify(p.name || '')).replace(/"/g, '&quot;') + ')" style="padding:10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
+        var tierPrice = pickPriceForTier(p, orderSelectedMemberTier || 'regular');
+        html += '<div onclick="addProductToOrder(' + p.id + ',' + tierPrice + ',' + (p.stock || 0) + ',' + JSON.stringify(JSON.stringify(p.name || '')).replace(/"/g, '&quot;') + ')"' style="padding:10px; cursor:pointer; border-bottom:1px solid #eee;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'\'">';
         html += '<div style="display:flex; justify-content:space-between;">';
         html += '<div><strong>' + escapeHtml(p.name) + '</strong>';
         if (p.sku) html += ' <small style="color:#999;">' + escapeHtml(p.sku) + '</small>';
@@ -5717,6 +5719,7 @@ async function deleteMemberConfirm() {
 // ===== Member search shared (POS + Order) =====
 var posSelectedMember = null;
 var orderSelectedMember = null;
+var orderSelectedMemberTier = 'regular';
 var memberSearchTimer = null;
 
 function _renderMemberSearchResults(boxId, list, onSelectFnName) {
@@ -5840,6 +5843,7 @@ function selectMemberForOrder(payloadStr) {
   var data;
   try { data = JSON.parse(payloadStr); } catch (e) { return; }
   orderSelectedMember = data.id;
+  orderSelectedMemberTier = data.tier || 'regular';
   document.getElementById('oCustResults').style.display = 'none';
   document.getElementById('oCustSearch').value = data.name + ' (' + data.code + ')';
   document.getElementById('oCustId').value = ''; // member ไม่ใช่ LINE userId
