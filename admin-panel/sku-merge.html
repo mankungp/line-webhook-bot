@@ -256,8 +256,8 @@ table.sku-table tr.row-expanded td { background: #e6f7f0; }
     <option value="new">new</option>
     <option value="pending">pending</option>
   </select>
-  <button class="btn btn-sm btn-secondary" onclick="manualBackup()">💾 Backup</button>
-  <span class="stats" id="statsBar">Pending: <strong id="statsPendingCount">0</strong> | Matched: <strong>0</strong>/2010</span>
+  <button class="btn btn-sm btn-secondary" id="backupBtn" onclick="manualBackup()">💾 Backup</button>
+  <span class="stats" id="statsBar">Pending: <strong id="pendingCount">0</strong> | Matched: <strong>0</strong>/2010</span>
 </div>
 
 <!-- Table -->
@@ -371,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function(){ init(); });
 
 // ===== Init (2026-05-15 — เชื่อม API จริง) =====
 async function init() {
+  // reloadList already defined as function declaration above (hoist-safe)
   await acquireLock();
   await loadFromAPI();
   render();
@@ -401,7 +402,7 @@ async function loadFromAPI() {
     allItems.forEach(function(it){ if (it.pending) pendingMap[it.sku] = it.pending; });
     var s = d.stats || {};
     document.getElementById('statsBar').innerHTML =
-      'Pending: <strong id="statsPendingCount">' + (s.pending_count || 0) + '</strong> | ' +
+      'Pending: <strong id="pendingCount">' + (s.pending_count || 0) + '</strong> | ' +
       'Matched: <strong>' + (s.matched || 0) + '</strong>/' + (s.mirror_total || 0) +
       ' | Total: <strong>' + (s.total || 0) + '</strong>' +
       ' | Diff: <strong style="color:#f97316;">' + (s.diff_gt_0 || 0) + '</strong>' +
@@ -417,8 +418,8 @@ async function loadFromAPI() {
   }
 }
 
-// ---- reloadList (alias — เปลี่ยนเป็น function ป้องกัน hoisting issue) ----
-function reloadList() { loadFromAPI(); }
+// ---- reloadList (alias — set in init after loadFromAPI exists) ----
+function reloadList() { return loadFromAPI(); }
 
 // ===== Mock Data (fallback ถ้า API ยังไม่พร้อม) =====
 function loadMockData() {
@@ -442,7 +443,7 @@ function loadMockData() {
   serverTotal = allItems.length;
   totalPages = Math.max(1, Math.ceil(serverTotal / perPage));
   document.getElementById('statsBar').innerHTML =
-    'Pending: <strong id="statsPendingCount">0</strong> | ' +
+    'Pending: <strong id="pendingCount">0</strong> | ' +
     'Matched: <strong>' + (allItems.filter(function(it){return it.link_status==='auto-match';}).length) + '</strong>/' + allItems.length;
   isUsingApi = false;
 }
@@ -537,8 +538,8 @@ function render() {
     var displayName = item.name || (item.shopee && item.shopee.product_name) || (item.ours && item.ours.name) || '—';
     // SKU ฝั่งเรา — แสดงถ้าต่างจาก sku_ref
     var ourSkuCell = item.ours && item.ours.sku && item.ours.sku !== item.sku ? '<br><small style="color:#0a8855;">เรา: '+esc(item.ours.sku)+'</small>' : '';
-    html += '<tr id="row-'+item.sku+'" onclick="toggleExpand(\''+item.sku+'\')">';
-    html += '<td onclick="event.stopPropagation()"><input type="checkbox" class="row-check" data-sku="'+item.sku+'" '+checked+' onchange="updateSelected()"></td>';
+    html += '<tr class="sku-row toggle-expand" data-sku="'+escAttr(item.sku)+'">';
+    html += '<td onclick="event.stopPropagation()"><input type="checkbox" class="row-check" data-sku="'+escAttr(item.sku)+'" '+checked+' onchange="updateSelected()"></td>';
     html += '<td><strong>'+esc(item.sku)+'</strong>'+ourSkuCell+'</td>';
     html += '<td>'+esc(displayName)+'</td>';
     html += '<td>'+shopeeStr+'</td>';
@@ -549,7 +550,7 @@ function render() {
     html += '<td style="font-size:18px;text-align:center;cursor:pointer;">'+expandIcon(item, hasPending)+'</td>';
     html += '</tr>';
     // Expand panel (hidden by default)
-    html += '<tr class="expand-panel" id="ep-'+item.sku+'"><td colspan="9"><div class="expand-panel-inner" id="epi-'+item.sku+'">';
+    html += '<tr class="expand-panel" id="ep-'+elId(item.sku)+'"><td colspan="9"><div class="expand-panel-inner" id="epi-'+elId(item.sku)+'">';
     html += '</div></td></tr>';
   }
   tbody.innerHTML = html;
@@ -576,7 +577,8 @@ function expandIcon(item, hasPending){
 }
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escapeAttr(s){ return String(s||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+function escAttr(s){ return esc(s).replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+function elId(s){ return String(s||'').replace(/[^\w\-]/g,'_'); }
 
 // ===== Pagination =====
 function renderPagination() {
@@ -609,7 +611,8 @@ function jumpPage(){
 
 // ===== Expand Panel =====
 function toggleExpand(sku) {
-  var ep = document.getElementById('ep-'+sku);
+  var safeId = elId(sku);
+  var ep = document.getElementById('ep-'+safeId);
   if(!ep) return;
   var isOpen = ep.classList.contains('open');
   // Close all
@@ -624,7 +627,9 @@ function toggleExpand(sku) {
 function renderExpandPanel(sku) {
   var item = allItems.find(function(i){ return i.sku===sku; });
   if(!item) return;
-  var epi = document.getElementById('epi-'+sku);
+  var safeSku = escAttr(sku);
+  var safeElId = elId(sku);
+  var epi = document.getElementById('epi-'+safeElId);
   var hasPending = sku in pendingMap;
   var pendInfo = pendingMap[sku] || null;
 
@@ -637,11 +642,11 @@ function renderExpandPanel(sku) {
     var nameVal = sh.product_name || sh.shopee_product_name;
     if(nameVal) shopeeHtml += '<div class="field">ชื่อ: '+esc(nameVal)+'</div>';
     if(sh.shopee_item_id) shopeeHtml += '<div class="field"><small>item_id: '+esc(String(sh.shopee_item_id))+'</small></div>';
-    if(shOver) shopeeHtml += '<div class="field" style="color:#f97316;"><small>✏️ เปลี่ยนแล้ว <a href="javascript:void(0)" onclick="clearShopeeOverride(\''+sku+'\')">รีเซ็ต</a></small></div>';
+    if(shOver) shopeeHtml += '<div class="field" style="color:#f97316;"><small>✏️ เปลี่ยนแล้ว <a href="javascript:void(0)" data-sku="'+safeSku+'" class="clear-shopee-override">รีเซ็ต</a></small></div>';
   } else shopeeHtml += '<p style="color:var(--text-muted);font-size:12px;">ไม่มีข้อมูล</p>';
   shopeeHtml += '<div class="search-our-box" style="margin-top:10px;">';
-  shopeeHtml += '<input type="text" placeholder="🔍 ค้น Shopee (SKU/ชื่อ)..." id="srch-sh-'+sku+'" oninput="onSearchShopee(\''+sku+'\')">';
-  shopeeHtml += '<div class="search-results" id="sres-sh-'+sku+'"></div>';
+  shopeeHtml += '<input type="text" placeholder="🔍 ค้น Shopee (SKU/ชื่อ)..." class="srch-sh-input" data-sku="'+safeSku+'" id="srch-sh-'+safeElId+'">';
+  shopeeHtml += '<div class="search-results" data-parent-sku="'+safeSku+'" id="sres-sh-'+safeElId+'"></div>';
   shopeeHtml += '</div>';
 
   var bsOver = bsOverride[sku];
@@ -656,11 +661,11 @@ function renderExpandPanel(sku) {
     if(bsCat) bsHtml += '<div class="field">หมวด: '+esc(bsCat)+'</div>';
     var bsType = bs.sku_type || bs.bs_sku_type;
     if(bsType) bsHtml += '<div class="field">Type: '+esc(bsType)+'</div>';
-    if(bsOver) bsHtml += '<div class="field" style="color:#f97316;"><small>✏️ เปลี่ยนแล้ว <a href="javascript:void(0)" onclick="clearBsOverride(\''+sku+'\')">รีเซ็ต</a></small></div>';
+    if(bsOver) bsHtml += '<div class="field" style="color:#f97316;"><small>✏️ เปลี่ยนแล้ว <a href="javascript:void(0)" data-sku="'+safeSku+'" class="clear-bs-override">รีเซ็ต</a></small></div>';
   } else bsHtml += '<p style="color:var(--text-muted);font-size:12px;">ไม่มีข้อมูล</p>';
   bsHtml += '<div class="search-our-box" style="margin-top:10px;">';
-  bsHtml += '<input type="text" placeholder="🔍 ค้น BigSeller..." id="srch-bs-'+sku+'" oninput="onSearchBs(\''+sku+'\')">';
-  bsHtml += '<div class="search-results" id="sres-bs-'+sku+'"></div>';
+  bsHtml += '<input type="text" placeholder="🔍 ค้น BigSeller..." class="srch-bs-input" data-sku="'+safeSku+'" id="srch-bs-'+safeElId+'">';
+  bsHtml += '<div class="search-results" data-parent-sku="'+safeSku+'" id="sres-bs-'+safeElId+'"></div>';
   bsHtml += '</div>';
 
   var oursHtml = '<h4>🏪 ระบบเรา</h4>';
@@ -676,18 +681,18 @@ function renderExpandPanel(sku) {
 
   // Search box for our products
   var searchHtml = '<div class="search-our-box">';
-  searchHtml += '<input type="text" placeholder="🔍 ค้นในระบบเรา (SKU/ชื่อ/บาร์โค้ด)..." id="srch-'+sku+'" oninput="onSearchOur(\''+sku+'\')">';
-  searchHtml += '<div class="search-results" id="sres-'+sku+'"></div>';
+  searchHtml += '<input type="text" placeholder="🔍 ค้นในระบบเรา (SKU/ชื่อ/บาร์โค้ด)..." class="srch-our-input" data-sku="'+safeSku+'" id="srch-'+safeElId+'">';
+  searchHtml += '<div class="search-results" data-parent-sku="'+safeSku+'" id="sres-'+safeElId+'"></div>';
   searchHtml += '</div>';
 
   var actionsHtml = '<div class="panel-actions">';
   if(!hasPending){
-    actionsHtml += '<button class="btn btn-sm btn-success" onclick="stageMerge(\''+sku+'\')" id="stg-'+sku+'" disabled>✓ ผูก 3 ฝั่ง</button> ';
-    actionsHtml += '<button class="btn btn-sm btn-primary" onclick="stageCreateNew(\''+sku+'\')">🆕 สร้างใหม่</button> ';
-    actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="stageSkip(\''+sku+'\')">🗑️ ข้าม</button>';
+    actionsHtml += '<button class="btn btn-sm btn-success btn-stage-merge" data-sku="'+safeSku+'" id="stg-'+safeElId+'" disabled>✓ ผูก 3 ฝั่ง</button> ';
+    actionsHtml += '<button class="btn btn-sm btn-primary btn-stage-create" data-sku="'+safeSku+'">🆕 สร้างใหม่</button> ';
+    actionsHtml += '<button class="btn btn-sm btn-secondary btn-stage-skip" data-sku="'+safeSku+'">🗑️ ข้าม</button>';
   } else {
     actionsHtml += '<span class="badge badge-pending">🔵 Pending</span> ';
-    actionsHtml += '<button class="btn btn-sm btn-secondary" onclick="unstageItem(\''+sku+'\')">↩️ ปลด</button>';
+    actionsHtml += '<button class="btn btn-sm btn-secondary btn-unstage" data-sku="'+safeSku+'">↩️ ปลด</button>';
   }
   actionsHtml += '</div>';
   var pendNote = hasPending ? '<div class="panel-status">🔵 Pending: '+(pendInfo&&pendInfo.type||'merge')+'</div>' : '';
@@ -712,11 +717,12 @@ var searchTimersBs = {};
 
 function onSearchShopee(sku){
   clearTimeout(searchTimersSh[sku]);
+  var safeElId = elId(sku);
   searchTimersSh[sku] = setTimeout(async function(){
-    var inp = document.getElementById('srch-sh-'+sku);
+    var inp = document.getElementById('srch-sh-'+safeElId);
     if(!inp) return;
     var q = inp.value.trim();
-    var resEl = document.getElementById('sres-sh-'+sku);
+    var resEl = document.getElementById('sres-sh-'+safeElId);
     if(!q || !resEl){ if(resEl) resEl.innerHTML=''; return; }
     var items = [];
     try {
@@ -733,8 +739,8 @@ function onSearchShopee(sku){
         product_name: (p.product_name||'').replace(/['"\\]/g, ''),
         stock: Number(p.stock)||0,
         price: Number(p.price)||0
-      }).replace(/"/g, '&quot;');
-      html += '<div class="search-result-item" data-sku="'+sku+'" data-p="'+pStr+'" onclick="selectShopeeOverride(this.dataset.sku, JSON.parse(this.dataset.p))">';
+      });
+      html += '<div class="search-result-item sel-shopee" data-parent-sku="'+sku+'" data-payload="'+escAttr(pStr)+'">';
       html += '<span style="background:#ee4d2d;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">🛒 Shopee</span>';
       html += '<strong>'+esc(p.sku_ref||'')+'</strong> '+esc(p.product_name||'')+' <span style="color:#888;">(stock: '+(p.stock||0)+' / '+(p.price||0)+'฿)</span>';
       html += '</div>';
@@ -746,11 +752,12 @@ function onSearchShopee(sku){
 
 function onSearchBs(sku){
   clearTimeout(searchTimersBs[sku]);
+  var safeElId = elId(sku);
   searchTimersBs[sku] = setTimeout(async function(){
-    var inp = document.getElementById('srch-bs-'+sku);
+    var inp = document.getElementById('srch-bs-'+safeElId);
     if(!inp) return;
     var q = inp.value.trim();
-    var resEl = document.getElementById('sres-bs-'+sku);
+    var resEl = document.getElementById('sres-bs-'+safeElId);
     if(!q || !resEl){ if(resEl) resEl.innerHTML=''; return; }
     var items = [];
     try {
@@ -766,8 +773,8 @@ function onSearchBs(sku){
         stock: Number(p.bs_stock)||0,
         category: p.bs_category||'',
         sku_type: p.bs_sku_type||''
-      }).replace(/"/g, '&quot;');
-      html += '<div class="search-result-item" data-sku="'+sku+'" data-p="'+pStr+'" onclick="selectBsOverride(this.dataset.sku, JSON.parse(this.dataset.p))">';
+      });
+      html += '<div class="search-result-item sel-bigseller" data-parent-sku="'+sku+'" data-payload="'+escAttr(pStr)+'">';
       html += '<span style="background:#ff6b00;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">📦 BS</span>';
       html += '<strong>'+esc(p.sku||'')+'</strong> '+esc(p.name||'')+' <span style="color:#888;">(stock: '+(p.bs_stock||0)+')</span>';
       html += '</div>';
@@ -781,9 +788,10 @@ function onSearchBs(sku){
 var searchTimers = {};
 function onSearchOur(sku){
   clearTimeout(searchTimers[sku]);
+  var safeElId = elId(sku);
   searchTimers[sku] = setTimeout(async function(){
-    var q = document.getElementById('srch-'+sku).value.trim();
-    var resEl = document.getElementById('sres-'+sku);
+    var q = document.getElementById('srch-'+safeElId).value.trim();
+    var resEl = document.getElementById('sres-'+safeElId);
     if(!q){ resEl.innerHTML=''; return; }
     var items = [];
     try {
@@ -793,8 +801,8 @@ function onSearchOur(sku){
     } catch(e) { console.error('search err', e); }
     var html = '';
     items.forEach(function(p){
-      var safeName = escapeAttr(p.name||'');
-      html += '<div class="search-result-item" onclick="selectOurProduct(\''+sku+'\','+p.id+',\''+esc(p.sku)+'\',\''+safeName+'\')">';
+      var payload = JSON.stringify({ id: p.id, sku: p.sku, name: p.name || '' });
+      html += '<div class="search-result-item sel-our-product" data-parent-sku="'+sku+'" data-payload="'+escAttr(payload)+'">';
       html += '<span style="background:#0a8855;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">🏪 เรา</span>';
       html += '<strong>'+esc(p.sku)+'</strong> — '+esc(p.name)+' <span style="color:#888;">(stock: '+(p.stock||0)+')</span>';
       html += '</div>';
@@ -807,9 +815,13 @@ function onSearchOur(sku){
 var selectedOurProduct = {};
 function selectOurProduct(sku, prodId, prodSku, prodName){
   selectedOurProduct[sku] = { id: prodId, sku: prodSku, name: prodName || prodSku };
-  document.getElementById('srch-'+sku).value = prodSku;
-  document.getElementById('sres-'+sku).innerHTML = '';
-  document.getElementById('stg-'+sku).disabled = false;
+  var safeElId = elId(sku);
+  var inp = document.getElementById('srch-'+safeElId);
+  if (inp) inp.value = prodSku;
+  var resEl = document.getElementById('sres-'+safeElId);
+  if (resEl) resEl.innerHTML = '';
+  var stgBtn = document.getElementById('stg-'+safeElId);
+  if (stgBtn) stgBtn.disabled = false;
 }
 
 // ===== Stage Actions (real API + override) =====
@@ -893,8 +905,10 @@ function updateSelected(){
 
 function updatePending(){
   var n = Object.keys(pendingMap).length;
-  var pe = document.getElementById('pendingCount') || document.getElementById('statsPendingCount');
-  if(pe) pe.textContent = n;
+  var el = document.getElementById('pendingCount');
+  if (el) el.textContent = n;
+  var el2 = document.getElementById('statsPendingCount');
+  if (el2) el2.textContent = n;
   document.getElementById('footerPending').textContent = n;
 }
 
@@ -938,8 +952,8 @@ function updateLockUI(){
 
 // ===== Backup =====
 async function manualBackup(){
-  var btn = document.querySelector('button[onclick*="manualBackup"]');
-  if(btn) btn.disabled = true;
+  var btn = document.getElementById('backupBtn');
+  if (btn) btn.disabled = true;
   toast('💾 backup...', 'info');
   try {
     var r = await fetch('/api/sku-merge/manual-backup', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
@@ -947,7 +961,7 @@ async function manualBackup(){
     if (!r.ok || d.error) throw new Error(d.error || 'HTTP ' + r.status);
     toast('✅ Backup เรียบร้อย', 'success');
   } catch(e) { toast('❌ ' + e.message, 'error'); }
-  finally { if(btn) btn.disabled = false; }
+  finally { if (btn) btn.disabled = false; }
 }
 
 // ===== Preview (real) =====
@@ -1077,6 +1091,71 @@ function toast(msg,type){
   if(toastTimer) clearTimeout(toastTimer);
   toastTimer=setTimeout(function(){ el.classList.remove('show'); },3000);
 }
+
+// ===== Event Delegation (P0#2 fix: เปลี่ยนจาก inline onclick → data-* attributes) =====
+document.addEventListener('click', function(e) {
+  // Toggle expand
+  var expandRow = e.target.closest('.toggle-expand');
+  if (expandRow) {
+    var sku = expandRow.getAttribute('data-sku');
+    toggleExpand(sku);
+    return;
+  }
+
+  // Stage actions
+  var stageMergeBtn = e.target.closest('.btn-stage-merge');
+  if (stageMergeBtn) { stageMerge(stageMergeBtn.getAttribute('data-sku')); return; }
+  var stageCreateBtn = e.target.closest('.btn-stage-create');
+  if (stageCreateBtn) { stageCreateNew(stageCreateBtn.getAttribute('data-sku')); return; }
+  var stageSkipBtn = e.target.closest('.btn-stage-skip');
+  if (stageSkipBtn) { stageSkip(stageSkipBtn.getAttribute('data-sku')); return; }
+  var unstageBtn = e.target.closest('.btn-unstage');
+  if (unstageBtn) { unstageItem(unstageBtn.getAttribute('data-sku')); return; }
+
+  // Select our product (search results)
+  var ourResult = e.target.closest('.sel-our-product');
+  if (ourResult) {
+    var sku = ourResult.getAttribute('data-parent-sku');
+    try {
+      var p = JSON.parse(ourResult.getAttribute('data-payload'));
+      selectOurProduct(sku, p.id, p.sku, p.name);
+    } catch(_) {}
+    return;
+  }
+
+  // Select Shopee override
+  var shResult = e.target.closest('.sel-shopee');
+  if (shResult) {
+    try {
+      var p = JSON.parse(shResult.getAttribute('data-payload'));
+      selectShopeeOverride(shResult.getAttribute('data-parent-sku'), p);
+    } catch(_) {}
+    return;
+  }
+
+  // Clear override links
+  var bsResult = e.target.closest('.sel-bigseller');
+  if (bsResult) {
+    try {
+      var p = JSON.parse(bsResult.getAttribute('data-payload'));
+      selectBsOverride(bsResult.getAttribute('data-parent-sku'), p);
+    } catch(_) {}
+    return;
+  }
+
+  // Clear override links
+  var clearSh = e.target.closest('.clear-shopee-override');
+  if (clearSh) { clearShopeeOverride(clearSh.getAttribute('data-sku')); return; }
+  var clearBs = e.target.closest('.clear-bs-override');
+  if (clearBs) { clearBsOverride(clearBs.getAttribute('data-sku')); return; }
+});
+
+// ===== Input delegation (แทน inline oninput) =====
+document.addEventListener('input', function(e) {
+  if (e.target.matches('.srch-our-input')) onSearchOur(e.target.getAttribute('data-sku'));
+  else if (e.target.matches('.srch-sh-input')) onSearchShopee(e.target.getAttribute('data-sku'));
+  else if (e.target.matches('.srch-bs-input')) onSearchBs(e.target.getAttribute('data-sku'));
+});
 </script>
 </body>
 </html>
