@@ -840,27 +840,42 @@ function buildTechJobApproveFlex(job) {
 
 // ============ BUILD CONTEXT ============
 
-async function buildStoreContext() {
+async function buildStoreContext(userMessage) {
   var storeInfo = await getStoreInfo().catch(function() { return null; });
-  var allProducts = await getProducts().catch(function() { return null; });
 
   var ctx = '';
   if (storeInfo) {
-    ctx += 'Name: ' + (storeInfo.name || 'Kerdkarnkaset') + '\n';
-    if (storeInfo.address) ctx += 'Address: ' + storeInfo.address + '\n';
-    if (storeInfo.phone) ctx += 'Phone: ' + storeInfo.phone + '\n';
-    if (storeInfo.openHours) ctx += 'Hours: ' + storeInfo.openHours + '\n';
+    ctx += 'ชื่อร้าน: ' + (storeInfo.name || 'เกิดการเกษตร') + '\n';
+    if (storeInfo.address) ctx += 'ที่อยู่: ' + storeInfo.address + '\n';
+    if (storeInfo.phone) ctx += 'โทร: ' + storeInfo.phone + '\n';
+    if (storeInfo.openHours) ctx += 'เวลาเปิด: ' + storeInfo.openHours + '\n';
   }
-  if (allProducts && Array.isArray(allProducts)) {
-    ctx += '\nProducts:\n';
-    var topProducts = allProducts.slice(0, 20);
-    for (var i = 0; i < topProducts.length; i++) {
-      var p = topProducts[i];
-      ctx += '- ' + p.name + ' | Price: ' + p.price + ' THB';
-      if (p.stock !== undefined) ctx += ' | Stock: ' + p.stock;
-      if (p.category) ctx += ' | ' + p.category;
-      ctx += '\n';
+
+  // ค้นหาสินค้าตาม keyword จาก userMessage
+  try {
+    var searchUrl = LOCAL_API_BASE + '/api/products?limit=15';
+    if (userMessage && userMessage.trim().length > 0) {
+      searchUrl += '&search=' + encodeURIComponent(userMessage.trim());
     }
+    var res = await fetch(searchUrl);
+    var data = await res.json();
+    var products = Array.isArray(data) ? data : (data.products || data.data || []);
+    if (products.length > 0) {
+      ctx += '\nสินค้าที่เกี่ยวข้อง:\n';
+      for (var i = 0; i < products.length; i++) {
+        var p = products[i];
+        ctx += '- ' + p.name;
+        if (p.sku) ctx += ' (SKU: ' + p.sku + ')';
+        ctx += ' | ราคา: ' + p.price + ' บาท';
+        if (p.stock !== undefined) ctx += ' | สต็อก: ' + p.stock;
+        if (p.category) ctx += ' | หมวด: ' + p.category;
+        ctx += '\n';
+      }
+    } else {
+      ctx += '\n(ไม่พบสินค้าที่ตรงกับคำถาม)\n';
+    }
+  } catch (e) {
+    console.error('[CONTEXT] product search error:', e.message);
   }
 
   console.log('[CONTEXT] Length:', ctx.length);
@@ -1056,7 +1071,7 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
         }
 
         // Normal conversation
-        var storeContext = await buildStoreContext();
+        var storeContext = await buildStoreContext(userMessage);
         var replyText = await callGroqAPI(userMessage, storeContext, 'normal');
 
         await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
