@@ -576,9 +576,30 @@ async function pingCustomer(userId) {
   } catch (err) {}
 }
 
-// ============ GROQ API ============
 
-async function callGroqAPI(userMessage, storeContext, commandType) {
+// ============ CHAT HISTORY HELPERS ============
+
+async function getChatHistory(userId) {
+  try {
+    var res = await fetch(LOCAL_API_BASE + '/api/chat-history/' + encodeURIComponent(userId));
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (e) { return []; }
+}
+
+async function saveChatHistory(userId, userMessage, botReply) {
+  try {
+    await adminFetch(LOCAL_API_BASE + '/api/chat-history/' + encodeURIComponent(userId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userMessage: userMessage, botReply: botReply })
+    });
+  } catch (e) { console.error('[HISTORY] save error:', e.message); }
+}
+
+// ============ GEMINI API ============
+
+async function callGroqAPI(userMessage, storeContext, commandType, userId) {
   console.log('[GEMINI] Calling Gemini Flash API...');
 
   var systemPrompt = '';
@@ -592,7 +613,15 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
     systemPrompt = 'คุณคือผู้ช่วย AI ของร้านเกิดการเกษตร จำหน่ายอุปกรณ์การเกษตร อะไหล่มอเตอร์ไซค์ และอะไหล่เครื่องตัดหญ้า\n\nกฎการตอบ:\n- ตอบภาษาไทย ใช้ภาษาพูดธรรมชาติ\n- แสดงแต่ละสินค้าแบบนี้:\n\n🔹 [ชื่อสินค้า]\n   ราคา: X บาท | คงเหลือ: X ชิ้น\n\n- ถ้าสต็อก = 0 ให้บอกว่า "หมดชั่วคราว"\n- ถ้าไม่พบสินค้าให้บอกตรงๆ ห้ามแต่งเอง\n- ใช้ข้อมูลจาก Store info เท่านั้น\n\nStore info:\n' + storeContext;
   }
 
-  var fullPrompt = systemPrompt + '\n\nUser: ' + userMessage;
+  // build multi-turn contents (history + current message)
+  var contents = [];
+  if (commandType === 'normal' && userId) {
+    var history = await getChatHistory(userId);
+    for (var h = 0; h < history.length; h++) {
+      contents.push({ role: history[h].role, parts: [{ text: history[h].content }] });
+    }
+  }
+  contents.push({ role: 'user', parts: [{ text: systemPrompt + '\n\nUser: ' + userMessage }] });
 
   try {
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_API_KEY;
@@ -600,7 +629,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: fullPrompt }] }],
+        contents: contents,
         generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
       }),
     });
@@ -1083,7 +1112,10 @@ async function processWebhookEvents(events) {
 
         // Normal conversation — parallel fetch เพื่อเร็วขึ้น
         var storeContext = await buildStoreContext(userMessage);
-        var replyText = await callGroqAPI(userMessage, storeContext, 'normal');
+        var replyText = await callGroqAPI(userMessage, storeContext, 'normal', userId);
+
+        // บันทึก history
+        saveChatHistory(userId, userMessage, replyText).catch(function(){});
 
         // ใช้ push แทน reply — ไม่มี timeout 1 นาที
         await pushTextToLine(userId, replyText);
