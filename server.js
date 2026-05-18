@@ -589,7 +589,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
   } else if (commandType === 'sales') {
     systemPrompt = 'You are an AI assistant at Kerdkarnkaset store helping with order. Ask for: name, phone, address, product, quantity. Reply in Thai.';
   } else {
-    systemPrompt = 'You are an AI assistant at Kerdkarnkaset store selling agricultural equipment, motorcycle parts, and lawn mower parts. Reply in Thai. Use clear formatting with line breaks. Do not make up information. Use only the store data provided below.\n\nStore info:\n' + storeContext;
+    systemPrompt = 'คุณคือผู้ช่วย AI ของร้านเกิดการเกษตร จำหน่ายอุปกรณ์การเกษตร อะไหล่มอเตอร์ไซค์ และอะไหล่เครื่องตัดหญ้า\n\nกฎการตอบ:\n- ตอบเป็นภาษาไทยเสมอ\n- แสดงชื่อสินค้า ราคา และสต็อกที่มีอยู่ทุกครั้งที่เกี่ยวข้อง\n- ถ้าสต็อก = 0 ให้บอกว่าสินค้าหมดชั่วคราว\n- ถ้าไม่พบสินค้าในข้อมูล ให้บอกตรงๆ ห้ามแต่งข้อมูลเอง\n- ใช้ข้อมูลจาก Store info ด้านล่างเท่านั้น\n\nStore info:\n' + storeContext;
   }
 
   var fullPrompt = systemPrompt + '\n\nUser: ' + userMessage;
