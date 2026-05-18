@@ -587,6 +587,15 @@ async function getChatHistory(userId) {
   } catch (e) { return []; }
 }
 
+async function getMemberTier(userId) {
+  try {
+    var res = await fetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(userId));
+    if (!res.ok) return null;
+    var member = await res.json();
+    return member.tier || null;
+  } catch (e) { return null; }
+}
+
 async function saveChatHistory(userId, userMessage, botReply) {
   try {
     await adminFetch(LOCAL_API_BASE + '/api/chat-history/' + encodeURIComponent(userId), {
@@ -869,7 +878,7 @@ function buildTechJobApproveFlex(job) {
 
 // ============ BUILD CONTEXT ============
 
-async function buildStoreContext(userMessage) {
+async function buildStoreContext(userMessage, userId) {
   var searchUrl = LOCAL_API_BASE + '/api/products?limit=15';
   if (userMessage && userMessage.trim().length > 0) {
     searchUrl += '&search=' + encodeURIComponent(userMessage.trim());
@@ -878,11 +887,13 @@ async function buildStoreContext(userMessage) {
   // parallel fetch — store info + products พร้อมกัน
   var results = await Promise.allSettled([
     getStoreInfo(),
-    fetch(searchUrl).then(function(r) { return r.json(); })
+    fetch(searchUrl).then(function(r) { return r.json(); }),
+    userId ? getMemberTier(userId) : Promise.resolve(null)
   ]);
 
   var storeInfo = results[0].status === 'fulfilled' ? results[0].value : null;
   var productsData = results[1].status === 'fulfilled' ? results[1].value : null;
+  var memberTier = results[2] && results[2].status === 'fulfilled' ? results[2].value : null;
 
   var ctx = '';
   if (storeInfo) {
@@ -896,11 +907,13 @@ async function buildStoreContext(userMessage) {
     var products = Array.isArray(productsData) ? productsData : (productsData.products || productsData.data || []);
     if (products.length > 0) {
       ctx += '\nสินค้าที่เกี่ยวข้อง:\n';
+      if (memberTier === 'vip') ctx += '(ราคา VIP)\n';
       for (var i = 0; i < products.length; i++) {
         var p = products[i];
+        var displayPrice = (memberTier === 'vip' && p.priceVip) ? p.priceVip : p.price;
         ctx += '- ' + p.name;
         if (p.sku) ctx += ' (SKU: ' + p.sku + ')';
-        ctx += ' | ราคา: ' + p.price + ' บาท';
+        ctx += ' | ราคา: ' + displayPrice + ' บาท';
         if (p.stock !== undefined) ctx += ' | สต็อก: ' + p.stock;
         ctx += '\n';
       }
@@ -1111,7 +1124,7 @@ async function processWebhookEvents(events) {
         }
 
         // Normal conversation — parallel fetch เพื่อเร็วขึ้น
-        var storeContext = await buildStoreContext(userMessage);
+        var storeContext = await buildStoreContext(userMessage, userId);
         var replyText = await callGroqAPI(userMessage, storeContext, 'normal', userId);
 
         // บันทึก history
