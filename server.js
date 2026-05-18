@@ -841,7 +841,19 @@ function buildTechJobApproveFlex(job) {
 // ============ BUILD CONTEXT ============
 
 async function buildStoreContext(userMessage) {
-  var storeInfo = await getStoreInfo().catch(function() { return null; });
+  var searchUrl = LOCAL_API_BASE + '/api/products?limit=15';
+  if (userMessage && userMessage.trim().length > 0) {
+    searchUrl += '&search=' + encodeURIComponent(userMessage.trim());
+  }
+
+  // parallel fetch — store info + products พร้อมกัน
+  var results = await Promise.allSettled([
+    getStoreInfo(),
+    fetch(searchUrl).then(function(r) { return r.json(); })
+  ]);
+
+  var storeInfo = results[0].status === 'fulfilled' ? results[0].value : null;
+  var productsData = results[1].status === 'fulfilled' ? results[1].value : null;
 
   var ctx = '';
   if (storeInfo) {
@@ -851,15 +863,8 @@ async function buildStoreContext(userMessage) {
     if (storeInfo.openHours) ctx += 'เวลาเปิด: ' + storeInfo.openHours + '\n';
   }
 
-  // ค้นหาสินค้าตาม keyword จาก userMessage
-  try {
-    var searchUrl = LOCAL_API_BASE + '/api/products?limit=15';
-    if (userMessage && userMessage.trim().length > 0) {
-      searchUrl += '&search=' + encodeURIComponent(userMessage.trim());
-    }
-    var res = await fetch(searchUrl);
-    var data = await res.json();
-    var products = Array.isArray(data) ? data : (data.products || data.data || []);
+  if (productsData) {
+    var products = Array.isArray(productsData) ? productsData : (productsData.products || productsData.data || []);
     if (products.length > 0) {
       ctx += '\nสินค้าที่เกี่ยวข้อง:\n';
       for (var i = 0; i < products.length; i++) {
@@ -868,14 +873,11 @@ async function buildStoreContext(userMessage) {
         if (p.sku) ctx += ' (SKU: ' + p.sku + ')';
         ctx += ' | ราคา: ' + p.price + ' บาท';
         if (p.stock !== undefined) ctx += ' | สต็อก: ' + p.stock;
-        if (p.category) ctx += ' | หมวด: ' + p.category;
         ctx += '\n';
       }
     } else {
       ctx += '\n(ไม่พบสินค้าที่ตรงกับคำถาม)\n';
     }
-  } catch (e) {
-    console.error('[CONTEXT] product search error:', e.message);
   }
 
   console.log('[CONTEXT] Length:', ctx.length);
@@ -977,14 +979,23 @@ async function handleCommand(msg, replyToken, userId) {
 
 // ============ WEBHOOK ENDPOINT ============
 
-app.post('/webhook', verifyLineSignature, async function(req, res) {
+app.post('/webhook', verifyLineSignature, function(req, res) {
   console.log('[WEBHOOK] Incoming webhook event');
 
+  var events = req.body.events;
+  // ตอบ LINE 200 OK ทันที — ไม่รอประมวลผล
+  res.status(200).json({ status: 'ok' });
+
+  if (!events || events.length === 0) return;
+
+  // process แบบ async background
+  processWebhookEvents(events).catch(function(e) {
+    console.error('[WEBHOOK] Error:', e.message, e.stack);
+  });
+});
+
+async function processWebhookEvents(events) {
   try {
-    var events = req.body.events;
-    if (!events || events.length === 0) {
-      return res.status(200).json({ status: 'ok' });
-    }
 
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
@@ -1070,11 +1081,12 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
           continue;
         }
 
-        // Normal conversation
+        // Normal conversation — parallel fetch เพื่อเร็วขึ้น
         var storeContext = await buildStoreContext(userMessage);
         var replyText = await callGroqAPI(userMessage, storeContext, 'normal');
 
-        await replyToLine(replyToken, [{ type: 'text', text: replyText }]);
+        // ใช้ push แทน reply — ไม่มี timeout 1 นาที
+        await pushTextToLine(userId, replyText);
 
       } else if (event.type === 'postback') {
         var replyToken = event.replyToken;
@@ -1135,13 +1147,10 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
       }
     }
 
-    res.status(200).json({ status: 'ok' });
-
   } catch (error) {
-    console.error('[WEBHOOK] Error:', error.message, error.stack);
-    res.status(500).json({ error: 'Internal error', detail: error.message });
+    console.error('[WEBHOOK] processWebhookEvents error:', error.message, error.stack);
   }
-});
+}
 
 // Helper: push plain text to LINE
 async function pushTextToLine(toUserId, text) {
