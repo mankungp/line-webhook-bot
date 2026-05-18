@@ -601,8 +601,7 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: fullPrompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
-        thinkingConfig: { thinkingBudget: 0 }
+        generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
       }),
     });
 
