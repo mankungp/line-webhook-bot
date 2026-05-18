@@ -641,7 +641,7 @@ async function callGroqAPI(userMessage, storeContext, commandType, userId) {
         contents: contents,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 1500,
+          maxOutputTokens: 3000,
           thinkingConfig: { thinkingBudget: -1 }
         }
       }),
