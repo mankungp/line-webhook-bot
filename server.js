@@ -619,7 +619,7 @@ async function callGroqAPI(userMessage, storeContext, commandType, userId) {
   } else if (commandType === 'sales') {
     systemPrompt = 'You are an AI assistant at Kerdkarnkaset store helping with order. Ask for: name, phone, address, product, quantity. Reply in Thai.';
   } else {
-    systemPrompt = 'คุณคือผู้ช่วย AI ของร้านเกิดการเกษตร จำหน่ายอุปกรณ์การเกษตร อะไหล่มอเตอร์ไซค์ และอะไหล่เครื่องตัดหญ้า\n\nกฎการตอบ:\n- ตอบภาษาไทย ใช้ภาษาพูดธรรมชาติ\n- แสดงแต่ละสินค้าแบบนี้:\n\n🔹 [ชื่อสินค้า]\n   ราคา: X บาท | คงเหลือ: X ชิ้น\n\n- ถ้าสต็อก = 0 ให้บอกว่า "หมดชั่วคราว"\n- ถ้าไม่พบสินค้าให้บอกตรงๆ ห้ามแต่งเอง\n- ใช้ข้อมูลจาก Store info เท่านั้น\n\nStore info:\n' + storeContext;
+    systemPrompt = 'คุณคือผู้ช่วย AI ของร้านเกิดการเกษตร จำหน่ายอุปกรณ์การเกษตร อะไหล่มอเตอร์ไซค์ และอะไหล่เครื่องตัดหญ้า\n\nกฎการตอบ:\n- ตอบภาษาไทย ใช้ภาษาพูดธรรมชาติเป็นกันเอง\n- ตรวจ customer_tier ใน Store info แล้วปรับการตอบ:\n  vip -> ขึ้นต้น "นี่คือรายการราคา VIP สำหรับคุณครับ 🌟" และใช้ราคา VIP ตลอด\n  wholesale -> ขึ้นต้น "นี่คือราคาสำหรับลูกค้าส่งครับ"\n  ไม่มี tier -> ตอบปกติ\n- แสดงแต่ละสินค้าแบบนี้:\n\n🔹 [ชื่อสินค้า]\n   ราคา: X บาท | คงเหลือ: X ชิ้น\n\n- ถ้าสต็อก = 0 ให้บอกว่า "หมดชั่วคราว"\n- ถ้าไม่พบสินค้าให้บอกตรงๆ ห้ามแต่งเอง\n- ใช้ข้อมูลจาก Store info เท่านั้น\n\nStore info:\n' + storeContext;
   }
 
   // build multi-turn contents (history + current message)
@@ -896,6 +896,14 @@ async function buildStoreContext(userMessage, userId) {
   var memberTier = results[2] && results[2].status === 'fulfilled' ? results[2].value : null;
 
   var ctx = '';
+  // tier info for Gemini
+  if (memberTier === 'vip') {
+    ctx += 'customer_tier: VIP\n';
+  } else if (memberTier === 'wholesale') {
+    ctx += 'customer_tier: wholesale\n';
+  } else if (memberTier) {
+    ctx += 'customer_tier: ' + memberTier + '\n';
+  }
   if (storeInfo) {
     ctx += 'ชื่อร้าน: ' + (storeInfo.name || 'เกิดการเกษตร') + '\n';
     if (storeInfo.address) ctx += 'ที่อยู่: ' + storeInfo.address + '\n';
