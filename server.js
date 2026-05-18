@@ -242,6 +242,8 @@ function forwardWithCookie(method) {
 }
 
 app.get('/api/users', forwardWithCookie('GET'));
+app.put('/api/users/:id', forwardWithCookie('PUT'));
+app.delete('/api/users/:id', forwardWithCookie('DELETE'));
 app.put('/api/users/:lineUserId', forwardWithCookie('PUT'));
 app.delete('/api/users/:lineUserId', forwardWithCookie('DELETE'));
 
