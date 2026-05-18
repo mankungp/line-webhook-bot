@@ -577,6 +577,41 @@ async function pingCustomer(userId) {
 }
 
 
+
+// ============ STAFF HELPERS ============
+
+async function getStaffUsers() {
+  try {
+    var res = await fetch(LOCAL_API_BASE + '/api/users');
+    if (!res.ok) return [];
+    var data = await res.json();
+    // data อาจเป็น object {userId: {...}} หรือ array
+    var users = Array.isArray(data) ? data : Object.values(data);
+    return users.filter(function(u) { return u.lineUserId; });
+  } catch (e) { return []; }
+}
+
+async function getStaffRole(lineUserId) {
+  var users = await getStaffUsers();
+  var u = users.find(function(u) { return u.lineUserId === lineUserId; });
+  return u ? u.role : null;
+}
+
+async function isStaffUser(lineUserId) {
+  var role = await getStaffRole(lineUserId);
+  return role === 'owner' || role === 'manager';
+}
+
+async function notifyStaff(message) {
+  var users = await getStaffUsers();
+  var targets = users.filter(function(u) {
+    return (u.role === 'owner' || u.role === 'manager') && u.lineUserId;
+  });
+  for (var i = 0; i < targets.length; i++) {
+    await pushTextToLine(targets[i].lineUserId, message).catch(function(){});
+  }
+}
+
 // ============ CHAT HISTORY HELPERS ============
 
 async function getChatHistory(userId) {
@@ -941,8 +976,9 @@ async function buildStoreContext(userMessage, userId) {
 // ============ COMMAND HANDLERS ============
 
 async function handleCommand(msg, replyToken, userId) {
+  var _isStaff = await isStaffUser(userId);
   function isAdmin(uid) {
-    return uid === ADMIN_USER_ID;
+    return _isStaff;
   }
 
   // !admin - toggle global bot mode (admin only)
@@ -1015,6 +1051,38 @@ async function handleCommand(msg, replyToken, userId) {
     if (storeInfo.phone) lines.push({ type: 'text', text: 'Phone: ' + storeInfo.phone });
     if (storeInfo.openHours) lines.push({ type: 'text', text: 'Hours: ' + storeInfo.openHours });
     await replyToLine(replyToken, lines);
+    return true;
+  }
+
+
+  // !bot on <userId> / !bot off <userId> — staff only
+  if (msg.indexOf('!bot ') === 0) {
+    if (!_isStaff) {
+      await replyToLine(replyToken, [{ type: 'text', text: '❌ ไม่มีสิทธิ์' }]);
+      return true;
+    }
+    var parts = msg.split(' ');
+    var action = parts[1]; // on/off
+    var targetId = parts[2] || userId; // ถ้าไม่ระบุ = ตัวเอง
+    try {
+      if (action === 'off') {
+        var r = await adminFetch(LOCAL_API_BASE + '/api/customer-mode/' + encodeURIComponent(targetId), {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ botOff: true })
+        });
+        await replyToLine(replyToken, [{ type: 'text', text: '🔕 ปิด bot สำหรับ ' + targetId + ' แล้ว' }]);
+      } else if (action === 'on') {
+        var r = await adminFetch(LOCAL_API_BASE + '/api/customer-mode/' + encodeURIComponent(targetId), {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ botOff: false })
+        });
+        await replyToLine(replyToken, [{ type: 'text', text: '🔔 เปิด bot สำหรับ ' + targetId + ' แล้ว' }]);
+      } else {
+        await replyToLine(replyToken, [{ type: 'text', text: 'ใช้: !bot on/off <userId>' }]);
+      }
+    } catch (e) {
+      await replyToLine(replyToken, [{ type: 'text', text: '❌ Error: ' + e.message }]);
+    }
     return true;
   }
 
@@ -1132,6 +1200,28 @@ async function processWebhookEvents(events) {
         // Check if customer bot is OFF
         if (adminStatus.customerModes && adminStatus.customerModes[userId] === true) {
           console.log('[BOT] Customer', userId, 'bot OFF - not responding');
+          continue;
+        }
+
+
+        // ตรวจ keyword ขอคุยกับแอดมิน
+        var adminKeywords = ['คุยกับแอดมิน','ขอคุยกับคน','ติดต่อพนักงาน','ขอคุยกับพนักงาน','คุยกับพนักงาน','แอดมิน','admin please','speak to human'];
+        var wantsAdmin = adminKeywords.some(function(k) { return userMessage.toLowerCase().includes(k); });
+        if (wantsAdmin) {
+          // ปิด bot สำหรับ user นี้
+          await adminFetch(LOCAL_API_BASE + '/api/customer-mode/' + encodeURIComponent(userId), {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ botOff: true })
+          }).catch(function(){});
+          // ตอบลูกค้า
+          await pushTextToLine(userId, 'รับทราบค่ะ กำลังแจ้งพนักงานให้เข้ามาดูแลนะคะ 🙏\nรอสักครู่ค่ะ');
+          // แจ้ง owner/manager
+          var memberInfo = '';
+          try {
+            var mRes = await fetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(userId));
+            if (mRes.ok) { var m = await mRes.json(); memberInfo = ' (' + (m.name || userId) + ')'; }
+          } catch(e){}
+          await notifyStaff('🔔 ลูกค้า' + memberInfo + ' ขอคุยกับพนักงาน\nUserID: ' + userId + '\nข้อความ: "' + userMessage + '"\n\nพิมพ์ !bot on ' + userId + ' เพื่อเปิด bot กลับ');
           continue;
         }
 
