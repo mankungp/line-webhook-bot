@@ -242,8 +242,22 @@ function forwardWithCookie(method) {
 }
 
 app.get('/api/users', forwardWithCookie('GET'));
-app.put('/api/users/:id', forwardWithCookie('PUT'));
-app.delete('/api/users/:id', forwardWithCookie('DELETE'));
+app.put('/api/users/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/users/' + req.params.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/users/:id', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/users/' + req.params.id, { method: 'DELETE' });
+    res.status(r.status).json(await r.json());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // ============ HR / EMPLOYEES / ATTENDANCE PROXIES ============
 app.get('/api/employees', forwardWithCookie('GET'));
