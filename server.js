@@ -639,7 +639,11 @@ async function callGroqAPI(userMessage, storeContext, commandType, userId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: contents,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1500,
+          thinkingConfig: { thinkingBudget: -1 }
+        }
       }),
     });
 
