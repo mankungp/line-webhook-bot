@@ -1142,8 +1142,8 @@ app.post('/webhook', verifyLineSignature, async function(req, res) {
     res.status(200).json({ status: 'ok' });
 
   } catch (error) {
-    console.error('[WEBHOOK] Error:', error.message);
-    res.status(500).json({ error: 'Internal error' });
+    console.error('[WEBHOOK] Error:', error.message, error.stack);
+    res.status(500).json({ error: 'Internal error', detail: error.message });
   }
 });
 
