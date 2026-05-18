@@ -2147,6 +2147,7 @@ input:focus, textarea:focus, select:focus {
               <th>Role</th>
               <th class="num">คอม %</th>
               <th>เข้าล่าสุด</th>
+              <th style="text-align:center;">แจ้ง LINE</th>
               <th></th>
             </tr>
           </thead>
@@ -7494,11 +7495,34 @@ function renderAdminUsersList() {
       html += '<td><span style="color:' + (roleColor[u.role] || '#999') + ';font-weight:600;">' + (roleLabel[u.role] || escapeHtml(u.role || '?')) + '</span></td>';
       html += '<td class="num">' + commText + '</td>';
       html += '<td style="font-size:12px; color:#999;">' + escapeHtml(lastLogin) + '</td>';
+      if ((u.role === 'owner' || u.role === 'manager') && lineId) {
+        var notifyOn = u.lineNotify !== false;
+        var notifyLabel = notifyOn ? '🔔 เปิด' : '🔕 ปิด';
+        var notifyStyle = notifyOn ? 'background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;' : 'background:#fafafa;color:#999;border:1px solid #ddd;';
+        html += '<td style="text-align:center;"><button style="' + notifyStyle + 'padding:4px 10px;border-radius:12px;cursor:pointer;font-size:12px;" onclick="toggleLineNotify(\'' + escapeHtml(lineId) + '\', ' + notifyOn + ')">' + notifyLabel + '</button></td>';
+      } else {
+        html += '<td></td>';
+      }
       html += '<td><button class="btn btn-secondary btn-sm" onclick="editUser(\'' + escapeHtml(lineId) + '\')">แก้ไข</button></td>';
       html += '</tr>';
     });
   }
   document.getElementById('usersBody').innerHTML = html;
+}
+
+async function toggleLineNotify(lineUserId, currentOn) {
+  var newVal = !currentOn;
+  try {
+    var r = await fetch('/api/users/' + encodeURIComponent(lineUserId), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': window._adminToken || '' },
+      body: JSON.stringify({ lineNotify: newVal })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await loadAdminUsers();
+  } catch(e) {
+    alert('แก้ไขไม่ได้: ' + e.message);
+  }
 }
 
 function editUser(lineUserId) {

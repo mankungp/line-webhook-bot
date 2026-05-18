@@ -605,7 +605,7 @@ async function isStaffUser(lineUserId) {
 async function notifyStaff(message) {
   var users = await getStaffUsers();
   var targets = users.filter(function(u) {
-    return (u.role === 'owner' || u.role === 'manager') && u.lineUserId;
+    return (u.role === 'owner' || u.role === 'manager') && u.lineUserId && u.lineNotify !== false;
   });
   for (var i = 0; i < targets.length; i++) {
     await pushTextToLine(targets[i].lineUserId, message).catch(function(){});
