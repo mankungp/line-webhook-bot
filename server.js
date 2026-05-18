@@ -592,41 +592,38 @@ async function callGroqAPI(userMessage, storeContext, commandType) {
     systemPrompt = 'You are an AI assistant at Kerdkarnkaset store selling agricultural equipment, motorcycle parts, and lawn mower parts. Reply in Thai. Use clear formatting with line breaks. Do not make up information. Use only the store data provided below.\n\nStore info:\n' + storeContext;
   }
 
+  var fullPrompt = systemPrompt + '\n\nUser: ' + userMessage;
+
   try {
-    var response = await fetch(GROQ_API_URL, {
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_API_KEY;
+    var response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + GROQ_API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+        thinkingConfig: { thinkingBudget: 0 }
       }),
     });
 
-    console.log('[GROQ] Response status:', response.status);
+    console.log('[GEMINI] Response status:', response.status);
 
     if (!response.ok) {
       var errorText = await response.text();
-      console.error('[GROQ] API Error:', response.status, errorText);
-      throw new Error('Groq API error: ' + response.status);
+      console.error('[GEMINI] API Error:', response.status, errorText);
+      throw new Error('Gemini API error: ' + response.status);
     }
 
     var data = await response.json();
-    var reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
-      ? data.choices[0].message.content
+    var reply = (data.candidates && data.candidates[0] && data.candidates[0].content &&
+                 data.candidates[0].content.parts && data.candidates[0].content.parts[0])
+      ? data.candidates[0].content.parts[0].text
       : 'ขอโทษค่ะ ตอบไม่ได้ในตอนนี้';
-    console.log('[GROQ] Reply:', reply.substring(0, 100));
+    console.log('[GEMINI] Reply:', reply.substring(0, 100));
     return reply;
 
   } catch (error) {
-    console.error('[GROQ] Exception:', error.message);
+    console.error('[GEMINI] Exception:', error.message);
     throw error;
   }
 }
