@@ -7499,7 +7499,7 @@ function renderAdminUsersList() {
         var notifyOn = u.lineNotify !== false;
         var notifyLabel = notifyOn ? '🔔 เปิด' : '🔕 ปิด';
         var notifyStyle = notifyOn ? 'background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;' : 'background:#fafafa;color:#999;border:1px solid #ddd;';
-        html += '<td style="text-align:center;"><button class="btn-line-notify" data-uid="' + escapeHtml(lineId) + '" data-notify="' + notifyOn + '" style="' + notifyStyle + 'padding:4px 10px;border-radius:12px;cursor:pointer;font-size:12px;">' + notifyLabel + '</button></td>';
+        html += '<td style="text-align:center;"><button class="btn-line-notify" onclick="toggleLineNotify(\'' + escapeHtml(lineId) + '\',' + notifyOn + ')" data-uid="' + escapeHtml(lineId) + '" data-notify="' + notifyOn + '" style="' + notifyStyle + 'padding:4px 10px;border-radius:12px;cursor:pointer;font-size:12px;">' + notifyLabel + '</button></td>';
       } else {
         html += '<td></td>';
       }
@@ -7510,14 +7510,15 @@ function renderAdminUsersList() {
   document.getElementById('usersBody').innerHTML = html;
 }
 
+// DEPRECATED: now using inline onclick
 // event delegation สำหรับ btn-line-notify (ป้องกัน CSP block inline onclick)
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('.btn-line-notify');
-  if (!btn) return;
-  var uid = btn.dataset.uid;
-  var currentOn = btn.dataset.notify === 'true';
-  toggleLineNotify(uid, currentOn);
-});
+// document.addEventListener('click', function(e) {
+//   var btn = e.target.closest('.btn-line-notify');
+//   if (!btn) return;
+//   var uid = btn.dataset.uid;
+//   var currentOn = btn.dataset.notify === 'true';
+//   toggleLineNotify(uid, currentOn);
+// });
 
 async function toggleLineNotify(lineUserId, currentOn) {
   var newVal = !currentOn;
