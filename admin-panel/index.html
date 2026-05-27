@@ -1584,7 +1584,7 @@ input:focus, textarea:focus, select:focus {
   <div id="page-bigseller" class="page" style="display:none;" data-perm="products:read">
     <div class="page-header">
       <h2>📈 BigSeller Sync</h2>
-      <p>Mirror stock จาก BigSeller (Shopee/TikTok/Lazada) — read-only ตอนนี้ ไม่กระทบ stock จริง</p>
+      <p>Mirror stock + push stock กลับ BigSeller (Shopee/TikTok/Lazada) พร้อมสถานะ bot ล่าสุด</p>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
@@ -1597,6 +1597,7 @@ input:focus, textarea:focus, select:focus {
         <span id="bsPushStatus" style="margin-left:auto;padding:6px 10px;border-radius:4px;font-size:12px;"></span>
       </div>
       <div id="bsStatusMsg" style="margin-top:8px;font-size:13px;color:#666;"></div>
+      <div id="bsOpsStatus" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;"></div>
     </div>
 
     <div id="bsStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;"></div>
@@ -9145,8 +9146,55 @@ async function loadBigsellerStatus() {
     if (d.lastPullError) {
       document.getElementById('bsStatusMsg').innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(d.lastPullError) + '</span>';
     } else {
-      document.getElementById('bsStatusMsg').textContent = '';
+      var h = d.health || {};
+      var healthColor = h.level === 'error' ? '#d32f2f' : (h.level === 'warning' ? '#e65100' : '#2e7d32');
+      var healthText = h.level === 'error' ? 'ต้องตรวจ' : (h.level === 'warning' ? 'มีคำเตือน' : 'ปกติ');
+      document.getElementById('bsStatusMsg').innerHTML =
+        '<span style="color:' + healthColor + ';font-weight:600;">Phase 3: ' + healthText + '</span>' +
+        ((h.problems && h.problems.length) ? ' · ' + escapeHtml(h.problems.join(', ')) : '') +
+        ((h.warnings && h.warnings.length) ? ' · ' + escapeHtml(h.warnings.join(', ')) : '');
     }
+
+    function relTime(iso) {
+      if (!iso) return '—';
+      var diff = Date.now() - new Date(iso).getTime();
+      if (!isFinite(diff)) return '—';
+      var min = Math.max(0, Math.round(diff / 60000));
+      if (min < 60) return min + ' นาทีที่แล้ว';
+      var hr = Math.round(min / 60);
+      if (hr < 48) return hr + ' ชม.ที่แล้ว';
+      return new Date(iso).toLocaleString('th-TH');
+    }
+    function sourceLine(sum) {
+      sum = sum || {};
+      return 'Shopee ' + (sum.shopee || 0) + ' · TikTok ' + (sum.tiktok || 0) + ' · Lazada ' + (sum.lazada || 0) + ' · Unknown ' + (sum.unknown || 0);
+    }
+    function opsCard(title, main, sub, color) {
+      return '<div style="border:1px solid #eee;border-left:3px solid ' + color + ';border-radius:6px;padding:9px;background:#fff;">' +
+        '<div style="font-size:11px;color:#666;margin-bottom:3px;">' + title + '</div>' +
+        '<div style="font-size:14px;font-weight:700;color:' + color + ';">' + main + '</div>' +
+        '<div style="font-size:11px;color:#777;margin-top:3px;line-height:1.35;">' + sub + '</div></div>';
+    }
+    var lp = d.lastPush || {};
+    var pushMain = lp.result || (lp.endedAt ? 'success' : '—');
+    var pushSub = 'ล่าสุด ' + relTime(lp.endedAt || lp.startedAt) + '<br>In ' + (lp.push_in || 0) + ' / Out ' + (lp.push_out || 0);
+    var outSum = lp.source_summary && (lp.source_summary.processed_out || lp.source_summary.push_out);
+    var inSum = lp.source_summary && (lp.source_summary.processed_in || lp.source_summary.push_in);
+    pushSub += '<br>' + escapeHtml(sourceLine(inSum || outSum));
+    var op = d.lastOrderPull || {};
+    var opSub = 'ล่าสุด ' + relTime(op.at) + '<br>import ' + (op.imported || 0) + ' · skip ' + (op.skipped || 0) + ' · error ' + (op.errors || 0);
+    opSub += '<br>' + escapeHtml(sourceLine(op.sourceSummary));
+    var ap = d.lastApprove && d.lastApprove.data;
+    var apSub = d.lastApprove ? ('ล่าสุด ' + relTime(d.lastApprove.mtime)) : 'ยังไม่มี apply report';
+    if (ap) apSub += '<br>In ' + ((ap.in && ap.in.approved) || 0) + ' / Out ' + ((ap.out && ap.out.approved) || 0);
+    var lockSub = d.lock && d.lock.exists ? ('มี lock อายุ ' + Math.round((d.lock.age_ms || 0) / 60000) + ' นาที') : 'ไม่มี push.lock ค้าง';
+    var clickFail = d.reports && d.reports.click_failure && d.reports.click_failure.exists;
+    if (clickFail) lockSub += '<br>มี click failure ล่าสุด: ' + relTime(d.reports.click_failure.mtime);
+    document.getElementById('bsOpsStatus').innerHTML =
+      opsCard('Stock Push', escapeHtml(pushMain), pushSub, pushMain === 'success' ? '#2e7d32' : '#e65100') +
+      opsCard('Order Import', op.ok === false ? 'error' : 'ok', opSub, op.ok === false ? '#d32f2f' : '#1976d2') +
+      opsCard('Approve', ap ? 'apply' : '—', apSub, ap ? '#2e7d32' : '#777') +
+      opsCard('Lock / Click', (d.lock && d.lock.exists) ? 'locked' : (clickFail ? 'warning' : 'clear'), lockSub, (d.lock && d.lock.exists) || clickFail ? '#e65100' : '#2e7d32');
 
     var stats = d.stats || {};
     function card(label, val, color) {
