@@ -1592,12 +1592,17 @@ input:focus, textarea:focus, select:focus {
         <button class="btn btn-primary" onclick="bigsellerPullNow()">🔄 Pull ตอนนี้</button>
         <button class="btn btn-secondary" onclick="loadBigseller()">↻ รีเฟรช</button>
         <button class="btn btn-secondary" onclick="bigsellerBulkAutoLink()" title="ผูกอัตโนมัติตาม confidence">🔗 Auto-link</button>
+        <button class="btn btn-secondary" onclick="bigsellerHealthCheck()">🩺 ตรวจสุขภาพ</button>
+        <button class="btn btn-secondary" onclick="bigsellerClearStaleLock()">🔓 ล้าง lock ค้าง</button>
+        <button class="btn btn-secondary" onclick="bigsellerLoadReports()">📋 Reports</button>
+        <button class="btn btn-secondary" onclick="bigsellerPendingAudit()">🧾 Pending audit</button>
         <span id="bsQueuePill" style="margin-left:auto;"></span>
         <span id="bsLastPull" style="color:#666;font-size:13px;">—</span>
         <span id="bsPushStatus" style="margin-left:auto;padding:6px 10px;border-radius:4px;font-size:12px;"></span>
       </div>
       <div id="bsStatusMsg" style="margin-top:8px;font-size:13px;color:#666;"></div>
       <div id="bsOpsStatus" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;"></div>
+      <div id="bsReportsPanel" style="display:none;margin-top:10px;font-size:12px;line-height:1.45;"></div>
     </div>
 
     <div id="bsStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;"></div>
@@ -9211,6 +9216,101 @@ async function loadBigsellerStatus() {
       card('เรามี—BigSeller ไม่', stats.our_only, '#0288d1');
   } catch (e) {
     document.getElementById('bsStatusMsg').innerHTML = '<span style="color:#d33;">❌ โหลด status ไม่สำเร็จ: ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+function bsRelTime(iso) {
+  if (!iso) return '—';
+  var diff = Date.now() - new Date(iso).getTime();
+  if (!isFinite(diff)) return '—';
+  var min = Math.max(0, Math.round(diff / 60000));
+  if (min < 60) return min + ' นาทีที่แล้ว';
+  var hr = Math.round(min / 60);
+  if (hr < 48) return hr + ' ชม.ที่แล้ว';
+  return new Date(iso).toLocaleString('th-TH');
+}
+
+async function bigsellerHealthCheck() {
+  var panel = document.getElementById('bsReportsPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<div class="card" style="padding:10px;">กำลังตรวจสุขภาพ BigSeller...</div>';
+  try {
+    var r = await fetch('/api/bigseller/health-check', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'health-check failed');
+    var h = (d.status && d.status.health) || (d.result || {});
+    panel.innerHTML = '<div class="card" style="padding:10px;border-left:3px solid ' + (h.level === 'ok' ? '#2e7d32' : '#e65100') + ';">' +
+      '<strong>Health: ' + escapeHtml(h.level || 'ok') + '</strong><br>' +
+      'Problems: ' + escapeHtml((h.problems || []).join(', ') || '-') + '<br>' +
+      'Warnings: ' + escapeHtml((h.warnings || []).join(', ') || '-') + '</div>';
+    loadBigsellerStatus();
+  } catch (e) {
+    panel.innerHTML = '<div class="card" style="padding:10px;color:#d33;">❌ ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function bigsellerClearStaleLock() {
+  if (!confirm('ล้าง push.lock เฉพาะกรณี stale เท่านั้น?')) return;
+  try {
+    var r = await fetch('/api/bigseller/clear-stale-lock', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.reason || d.error || 'clear lock failed');
+    alert(d.cleared ? '✅ ล้าง lock แล้ว' : '✅ ไม่มี lock ค้าง');
+    loadBigsellerStatus();
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+async function bigsellerLoadReports() {
+  var panel = document.getElementById('bsReportsPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<div class="card" style="padding:10px;">กำลังโหลด reports...</div>';
+  try {
+    var r = await fetch('/api/bigseller/reports?limit=10');
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'reports failed');
+    var rows = (d.push_history || []).map(function(x) {
+      var at = x.endedAt || x.at || x.startedAt;
+      return '<tr><td style="padding:6px;">' + escapeHtml(bsRelTime(at)) + '</td>' +
+        '<td style="padding:6px;">' + escapeHtml(x.result || '-') + '</td>' +
+        '<td style="padding:6px;text-align:right;">' + ((x.push_in || 0) + '/' + (x.push_out || 0)) + '</td>' +
+        '<td style="padding:6px;">' + escapeHtml(x.source || '-') + '</td></tr>';
+    }).join('');
+    var approveRows = (d.approve || []).slice(0, 5).map(function(x) {
+      var data = x.data || {};
+      return '<div style="padding:4px 0;border-top:1px solid #eee;">' + escapeHtml(bsRelTime(x.mtime)) +
+        ' · In ' + (((data.in || {}).approved) || 0) + ' / Out ' + (((data.out || {}).approved) || 0) + '</div>';
+    }).join('');
+    panel.innerHTML = '<div class="card" style="padding:10px;">' +
+      '<strong>Push history</strong>' +
+      '<div style="overflow:auto;margin-top:6px;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:6px;">เวลา</th><th style="text-align:left;padding:6px;">ผล</th><th style="text-align:right;padding:6px;">In/Out</th><th style="text-align:left;padding:6px;">Source</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="4" style="padding:8px;color:#999;">ไม่มี history</td></tr>') + '</tbody></table></div>' +
+      '<div style="margin-top:10px;"><strong>Approve ล่าสุด</strong>' + (approveRows || '<div style="color:#999;">ไม่มี apply report</div>') + '</div>' +
+      (d.click_failure ? '<div style="margin-top:8px;color:#d33;">Click failure: ' + escapeHtml(d.click_failure.action || d.click_failure.error || 'พบรายงาน') + '</div>' : '') +
+      '</div>';
+  } catch (e) {
+    panel.innerHTML = '<div class="card" style="padding:10px;color:#d33;">❌ ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function bigsellerPendingAudit() {
+  var panel = document.getElementById('bsReportsPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<div class="card" style="padding:10px;">กำลังโหลด pending audit...</div>';
+  try {
+    var r = await fetch('/api/bigseller/pending-audit');
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'pending audit failed');
+    panel.innerHTML = '<div class="card" style="padding:10px;border-left:3px solid #e65100;">' +
+      '<strong>Pending audit</strong><br>' +
+      'Stock-In hint: ' + (d.staleStockInHint || 0) + '<br>' +
+      'Stock-Out hint: ' + (d.staleStockOutHint || 0) + '<br>' +
+      '<span style="color:#777;">' + escapeHtml(d.note || '') + '</span><br>' +
+      '<a href="' + escapeAttr(d.adminUrl || 'https://www.bigseller.com') + '" target="_blank">เปิด BigSeller pending page</a>' +
+      '</div>';
+  } catch (e) {
+    panel.innerHTML = '<div class="card" style="padding:10px;color:#d33;">❌ ' + escapeHtml(e.message) + '</div>';
   }
 }
 

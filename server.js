@@ -1675,6 +1675,43 @@ app.post('/api/bigseller/pull-now', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/bigseller/health-check', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/health-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/bigseller/clear-stale-lock', async function(req, res) {
+  try {
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/clear-stale-lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/bigseller/reports', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/reports' + (qs ? '?' + qs : ''));
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/bigseller/pending-audit', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/pending-audit');
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/bigseller/suggest', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
