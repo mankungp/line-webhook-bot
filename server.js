@@ -133,6 +133,15 @@ app.get('/health', function(req, res) {
   res.json({ status: 'ok', service: 'LINE Bot', timestamp: new Date().toISOString() });
 });
 
+app.get('/api/health', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/health');
+    res.status(r.status).json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ AUTH PROXY (Phase 8) ============
 
 app.get('/auth/login', async function(req, res) {

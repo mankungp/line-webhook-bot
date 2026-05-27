@@ -775,6 +775,9 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read" data-hide-for="technician">
       <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
     </a>
+    <a onclick="showPage('ops')" data-page="ops" data-owner-only data-hide-for="technician">
+      <span class="icon">🧭</span> <span>สถานะระบบ</span>
+    </a>
     <a onclick="showPage('qr-att')" data-page="qr-att" data-owner-only>
       <span class="icon">📱</span> <span>QR ลงเวลา</span>
     </a>
@@ -1757,6 +1760,37 @@ input:focus, textarea:focus, select:focus {
     </div>
   </div>
 
+  <!-- ============ OPS STATUS PAGE ============ -->
+  <div id="page-ops" class="page" style="display:none;">
+    <div class="page-header">
+      <h2>🧭 สถานะระบบ</h2>
+      <p>ดูภาพรวม sync, bot, tunnel, backup, stock movement และแหล่งที่มาของออเดอร์</p>
+    </div>
+    <div class="card">
+      <div class="toolbar" style="justify-content:space-between;align-items:center;">
+        <div style="font-weight:600;">ภาพรวมระบบ</div>
+        <div style="display:flex;gap:8px;align-items:center;"><span id="opsLastUpdate" style="font-size:12px;color:#777;"></span><button class="btn btn-secondary" onclick="loadOpsDashboard()">รีเฟรช</button><button class="btn btn-primary" onclick="opsManualBackup()">สำรองข้อมูลตอนนี้</button></div>
+      </div>
+      <div id="opsStatusGrid" class="stats-row"><div class="stat-card"><div class="stat-number">-</div><div class="stat-label">กำลังโหลด</div></div></div>
+      <div id="opsBackupStatus" style="margin-top:10px;font-size:13px;color:#666;"></div>
+    </div>
+    <div class="card">
+      <div class="toolbar" style="align-items:flex-end;">
+        <div class="form-group" style="min-width:160px;margin-bottom:0;"><label>Stock movement</label><select id="opsMoveType" onchange="loadOpsMovements()"><option value="">ทุกประเภท</option><option value="sale">ขาย / ตัดออก</option><option value="rollback">คืน stock</option><option value="add">เพิ่ม</option><option value="remove">ลด</option><option value="adjust">ปรับยอด</option></select></div>
+        <div class="form-group" style="min-width:160px;margin-bottom:0;"><label>Source</label><input type="text" id="opsMoveSource" placeholder="pos / shopee-sync" onkeyup="clearTimeout(this._d);this._d=setTimeout(loadOpsMovements,300)"></div>
+        <div class="form-group" style="min-width:160px;margin-bottom:0;"><label>เลขออเดอร์</label><input type="text" id="opsMoveOrderNo" placeholder="ORD / LZD" onkeyup="clearTimeout(this._d);this._d=setTimeout(loadOpsMovements,300)"></div>
+        <button class="btn btn-secondary" onclick="loadOpsMovements()">ค้นหา</button>
+      </div>
+      <div id="opsMovementSummary" style="font-size:13px;color:#666;margin:8px 0;"></div>
+      <div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>เวลา</th><th>สินค้า</th><th>ประเภท</th><th>จำนวน</th><th>ก่อน</th><th>หลัง</th><th>ที่มา</th><th>ออเดอร์</th></tr></thead><tbody id="opsMovementBody"><tr><td colspan="8" class="empty-state">กำลังโหลด...</td></tr></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="toolbar" style="justify-content:space-between;align-items:center;"><div style="font-weight:600;">Order source</div><button class="btn btn-secondary" onclick="loadOpsOrderSources()">รีเฟรช</button></div>
+      <div id="opsSourceGrid" class="stats-row"></div>
+      <div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Source</th><th>จำนวน</th><th>ยอดขาย</th><th>เฉลี่ย/บิล</th><th>บิลล่าสุด</th></tr></thead><tbody id="opsSourceBody"><tr><td colspan="5" class="empty-state">กำลังโหลด...</td></tr></tbody></table></div>
+    </div>
+  </div>
+
 <div id="page-qr-att" class="page" style="display:none;" data-owner-only>
   <div class="page-header">
     <h2>📱 QR ลงเวลา</h2>
@@ -2626,6 +2660,7 @@ function showPage(page) {
   if (page === 'hr') loadHr();
   if (page === 'payroll') initPayrollPage();
   if (page === 'marketplace') loadMarketplace();
+  if (page === 'ops') loadOpsDashboard();
   if (page === 'bigseller') loadBigseller();
   if (page === 'qr-att') loadQrAttendance();
   if (page === 'users') loadLoginQr();
@@ -2784,7 +2819,7 @@ var products = [];
 var __abort = null;
 
 // Pagination state สำหรับ products page
-var pProductsState = { page: 1, limit: 200, total: 0, pages: 1, accumulated: [] };
+var pProductsState = { page: 1, limit: 200, total: 0, pages: 1, accumulated: [], stats: null };
 
 async function loadProducts(opts) {
   opts = opts || {};
@@ -2804,7 +2839,7 @@ async function loadProducts(opts) {
   if (!append) pProductsState.page = 1;
   var brandEl = document.getElementById('pBrandFilter');
   var brandId = brandEl ? brandEl.value : '';
-  var url = '/api/products?limit=' + pProductsState.limit + '&page=' + pProductsState.page;
+  var url = '/api/products?limit=' + pProductsState.limit + '&page=' + pProductsState.page + '&stats=1';
   if (search) url += '&search=' + search;
   if (category) url += '&category=' + category;
   if (brandId) url += '&brandId=' + encodeURIComponent(brandId);
@@ -2817,6 +2852,7 @@ async function loadProducts(opts) {
     var batch = data.products || [];
     pProductsState.total = data.total || batch.length;
     pProductsState.pages = data.pages || 1;
+    pProductsState.stats = data.stats || null;
 
     if (append) {
       pProductsState.accumulated = pProductsState.accumulated.concat(batch);
@@ -2825,7 +2861,7 @@ async function loadProducts(opts) {
     }
     products = pProductsState.accumulated;
     renderProducts(products);
-    updateProductStats({ items: products, total: pProductsState.total });
+    updateProductStats({ items: products, total: pProductsState.total, stats: pProductsState.stats });
     renderLoadMoreButton();
   } catch (e) {
     if (e.name === 'AbortError') return;
@@ -3019,20 +3055,22 @@ async function openPushChannelModal(productId) {
 }
 
 function updateProductStats(arg) {
-  // รองรับทั้ง array (old) หรือ {items, total} (new)
   var list = Array.isArray(arg) ? arg : (arg.items || []);
   var realTotal = Array.isArray(arg) ? list.length : (arg.total || list.length);
-  var inStock = 0;
-  var agri = 0, moto = 0;
-  list.forEach(function(p) {
-    if (p.stock > 0) inStock++;
-    if (p.category === 'agricultural') agri++;
-    if (p.category === 'motorcycle') moto++;
-  });
+  var stats = (!Array.isArray(arg) && arg.stats) ? arg.stats : null;
+  if (stats) {
+    document.getElementById('pstat-total').textContent = stats.total || 0;
+    document.getElementById('pstat-stock').textContent = stats.inStock || 0;
+    document.getElementById('pstat-agri').textContent = (stats.categories && stats.categories.agricultural) || 0;
+    document.getElementById('pstat-moto').textContent = (stats.categories && stats.categories.motorcycle) || 0;
+    return;
+  }
+  var inStock = 0, agri = 0, moto = 0;
+  list.forEach(function(p) { if (p.stock > 0) inStock++; if (p.category === 'agricultural') agri++; if (p.category === 'motorcycle') moto++; });
   document.getElementById('pstat-total').textContent = realTotal;
-  document.getElementById('pstat-stock').textContent = inStock + (list.length < realTotal ? '+' : '');
-  document.getElementById('pstat-agri').textContent = agri + (list.length < realTotal ? '+' : '');
-  document.getElementById('pstat-moto').textContent = moto + (list.length < realTotal ? '+' : '');
+  document.getElementById('pstat-stock').textContent = inStock;
+  document.getElementById('pstat-agri').textContent = agri;
+  document.getElementById('pstat-moto').textContent = moto;
 }
 
 // ----- Channels & Variants config -----
@@ -3443,8 +3481,8 @@ function renderImageGallery(productId, images, mainUrl) {
       '<img src="' + escapeHtml(url) + '" style="width:100%;height:100%;object-fit:cover;display:block;">' +
       (productId ? (
         '<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);display:flex;justify-content:space-between;padding:2px;">' +
-          '<button type="button" onclick="setMainImage(' + productId + ',\'' + url + '\')" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;" title="ตั้งเป็นรูปหลัก">' + (isMain?'⭐':'☆') + '</button>' +
-          '<button type="button" onclick="deleteProductImage(' + productId + ',\'' + url + '\')" style="background:none;border:none;color:#fff;cursor:pointer;font-size:13px;" title="ลบ">🗑️</button>' +
+          '<button type="button" class="product-image-action" data-action="main" data-pid="' + productId + '" data-url="' + escapeAttr(url) + '" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;" title="ตั้งเป็นรูปหลัก">' + (isMain?'⭐':'☆') + '</button>' +
+          '<button type="button" class="product-image-action" data-action="delete" data-pid="' + productId + '" data-url="' + escapeAttr(url) + '" style="background:none;border:none;color:#fff;cursor:pointer;font-size:13px;" title="ลบ">🗑️</button>' +
         '</div>'
       ) : '') +
       '</div>';
@@ -3727,7 +3765,7 @@ async function syncLazadaOrders() {
 function renderOrders(list) {
   var tbody = document.getElementById('ordersBody');
   if (!list || list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">ยังไม่มีออร์เดอร์</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">ยังไม่มีออร์เดอร์</td></tr>';
     return;
   }
   var html = '';
@@ -3872,10 +3910,15 @@ async function markPaid(id) {
 }
 
 async function cancelOrder(id) {
-  if (!confirm('ยืนยันยกเลิกออร์เดอร์?')) return;
+  var o = (orders || []).find(function(x) { return x.id == id; });
+  var extra = o && o.stockDeducted ? '\n\nระบบจะคืน stock ของรายการในออเดอร์นี้อัตโนมัติ' : '';
+  var reason = prompt('ยืนยันยกเลิกออร์เดอร์?' + extra + '\n\nระบุเหตุผล (optional):', '');
+  if (reason === null) return;
   try {
-    await fetch('/api/orders/' + id + '/cancel', { method: 'POST' });
+    await fetch('/api/orders/' + id + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason }) });
     loadOrders();
+    if (typeof loadProducts === 'function') loadProducts();
+    if (typeof loadOpsDashboard === 'function') loadOpsDashboard();
   } catch (e) { alert('เกิดข้อผิดพลาด'); }
 }
 
@@ -5359,6 +5402,15 @@ async function addBrandFromModal() {
   }
 }
 
+// ============ OPS STATUS ============
+function opsRelTime(iso) { if (!iso) return '-'; var t = new Date(iso).getTime(); if (!isFinite(t)) return '-'; var min = Math.round((Date.now() - t) / 60000); if (min < 1) return 'เมื่อสักครู่'; if (min < 60) return min + ' นาทีที่แล้ว'; var hr = Math.round(min / 60); if (hr < 48) return hr + ' ชม.ที่แล้ว'; return new Date(iso).toLocaleString('th-TH'); }
+function opsStatusCard(label, value, detail, ok) { var color = ok ? '#0a8' : '#c62828'; return '<div class="stat-card" style="border-left:4px solid ' + color + ';"><div class="stat-number" style="font-size:22px;color:' + color + ';">' + escapeHtml(value) + '</div><div class="stat-label">' + escapeHtml(label) + '</div><div style="font-size:12px;color:#777;margin-top:4px;">' + escapeHtml(detail || '') + '</div></div>'; }
+async function loadOpsDashboard() { var el = document.getElementById('opsLastUpdate'); if (el) el.textContent = 'กำลังโหลด...'; await Promise.all([loadOpsStatus(), loadOpsMovements(), loadOpsOrderSources()]); if (el) el.textContent = 'อัปเดต ' + new Date().toLocaleTimeString('th-TH'); }
+async function loadOpsStatus() { var grid = document.getElementById('opsStatusGrid'); var backup = document.getElementById('opsBackupStatus'); if (!grid) return; try { var results = await Promise.allSettled([fetch('/api/health').then(function(r){ return r.json(); }), fetch('/api/bigseller/status').then(function(r){ return r.json(); }), fetch('/api/sku-merge/status').then(function(r){ return r.json(); }), fetch('/api/sku-merge/history?limit=20').then(function(r){ return r.json(); })]); var health = results[0].status === 'fulfilled' ? results[0].value : null; var bs = results[1].status === 'fulfilled' ? results[1].value : null; var sku = results[2].status === 'fulfilled' ? results[2].value : null; var hist = results[3].status === 'fulfilled' ? results[3].value : null; var cards = ''; cards += opsStatusCard('Local API', health && health.local_api && health.local_api.running ? 'เปิด' : 'ตรวจไม่ได้', health && health.local_api ? ('uptime ' + (health.local_api.uptime_seconds || 0) + 's') : 'ไม่มีข้อมูล', !!(health && health.local_api && health.local_api.running)); cards += opsStatusCard('Bot', health && health.telegram_bot && health.telegram_bot.running ? 'เปิด' : 'ปิด/ไม่พร้อม', health && health.telegram_bot ? (health.telegram_bot.lastPollError || 'polling ok') : 'ไม่มีข้อมูล', !!(health && health.telegram_bot && health.telegram_bot.running && !health.telegram_bot.lastPollError)); cards += opsStatusCard('Tunnel', health && health.cloudflare_tunnel && health.cloudflare_tunnel.running ? 'เปิด' : 'ปิด', health && health.cloudflare_tunnel ? ('pid ' + (health.cloudflare_tunnel.pid || '-')) : 'ไม่มีข้อมูล', !!(health && health.cloudflare_tunnel && health.cloudflare_tunnel.running)); var pullAt = bs && (bs.lastPulledAt || (bs.lastReport && bs.lastReport.at) || (bs.reports && bs.reports.pull && bs.reports.pull.mtime)); var pushAt = bs && bs.lastPush && (bs.lastPush.endedAt || bs.lastPush.finishedAt || bs.lastPush.at); var bsOk = !!bs && ((bs.health && bs.health.ok !== false) || bs.lastPullStatus === 'success' || bs.ok === true); cards += opsStatusCard('BigSeller Sync', bsOk ? 'พร้อม' : 'มีปัญหา', 'pull ' + opsRelTime(pullAt) + ' / push ' + opsRelTime(pushAt), bsOk); var entries = (hist && hist.entries) || []; var lastBak = entries.find(function(e) { return e.action === 'manual_backup' || e.backup_paths; }); cards += opsStatusCard('Backup', lastBak ? 'มี backup' : 'ยังไม่พบ', lastBak ? opsRelTime(lastBak.at || lastBak.createdAt) : 'กดสำรองข้อมูลได้', !!lastBak); grid.innerHTML = cards; if (backup) backup.textContent = sku && sku.lock ? ('SKU merge lock: ' + (sku.lock.actor_name || sku.lock.actor || '-')) : 'SKU merge: ไม่มี lock ค้าง'; } catch (e) { grid.innerHTML = '<div class="empty-state">โหลดสถานะระบบไม่ได้: ' + escapeHtml(e.message) + '</div>'; } }
+async function opsManualBackup() { if (!confirm('สำรอง products + BigSeller mirror ตอนนี้?')) return; var box = document.getElementById('opsBackupStatus'); if (box) box.textContent = 'กำลังสำรองข้อมูล...'; try { var r = await fetch('/api/sku-merge/manual-backup', { method: 'POST' }); var d = await r.json(); if (!r.ok || d.error) throw new Error(d.error || ('HTTP ' + r.status)); if (box) box.textContent = 'สำรองแล้ว: products + mirror'; loadOpsStatus(); } catch (e) { if (box) box.textContent = 'สำรองไม่สำเร็จ: ' + e.message; } }
+async function loadOpsMovements() { var body = document.getElementById('opsMovementBody'); var summary = document.getElementById('opsMovementSummary'); if (!body) return; var qs = ['limit=120','envelope=1']; var type = document.getElementById('opsMoveType').value; var source = document.getElementById('opsMoveSource').value.trim(); var orderNo = document.getElementById('opsMoveOrderNo').value.trim(); if (type) qs.push('type=' + encodeURIComponent(type)); if (source) qs.push('source=' + encodeURIComponent(source)); if (orderNo) qs.push('orderNo=' + encodeURIComponent(orderNo)); try { var r = await fetch('/api/stock-movements?' + qs.join('&')); var d = await r.json(); var list = d.movements || d || []; if (summary) summary.textContent = 'พบทั้งหมด ' + (d.total != null ? d.total : list.length) + ' movement, แสดง ' + list.length + ' รายการล่าสุด'; if (!list.length) { body.innerHTML = '<tr><td colspan="8" class="empty-state">ไม่พบ movement</td></tr>'; return; } body.innerHTML = list.map(function(m) { return '<tr><td>' + escapeHtml(new Date(m.createdAt || 0).toLocaleString('th-TH')) + '</td><td>' + escapeHtml(m.productName || String(m.productId || '-')) + '</td><td>' + escapeHtml(m.type || '-') + '</td><td class="num">' + numFormat(m.quantity || 0) + '</td><td class="num">' + numFormat(m.balanceBefore || 0) + '</td><td class="num">' + numFormat(m.balanceAfter || 0) + '</td><td>' + escapeHtml(m.source || '-') + '</td><td>' + escapeHtml(m.orderNo || '-') + '</td></tr>'; }).join(''); } catch (e) { body.innerHTML = '<tr><td colspan="8" class="empty-state">โหลด movement ไม่ได้</td></tr>'; } }
+async function loadOpsOrderSources() { var body = document.getElementById('opsSourceBody'); var grid = document.getElementById('opsSourceGrid'); if (!body) return; try { var r = await fetch('/api/orders'); var list = await r.json(); var by = {}; (Array.isArray(list) ? list : []).forEach(function(o) { var s = o.source || 'manual'; if (!by[s]) by[s] = { source: s, count: 0, revenue: 0, latest: '' }; by[s].count += 1; if (o.status !== 'cancelled') by[s].revenue += parseFloat(o.total) || 0; if (!by[s].latest || String(o.createdAt || '') > by[s].latest) by[s].latest = o.createdAt || ''; }); var rows = Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return b.count - a.count; }); if (grid) grid.innerHTML = rows.slice(0, 5).map(function(x) { return opsStatusCard(x.source, String(x.count), numFormat(x.revenue) + ' บาท', true); }).join(''); if (!rows.length) { body.innerHTML = '<tr><td colspan="5" class="empty-state">ยังไม่มีออเดอร์</td></tr>'; return; } body.innerHTML = rows.map(function(x) { return '<tr><td>' + sourceBadge(x.source) + '</td><td class="num">' + x.count + '</td><td class="num">' + numFormat(x.revenue) + '</td><td class="num">' + numFormat(x.count ? x.revenue / x.count : 0) + '</td><td>' + escapeHtml(opsRelTime(x.latest)) + '</td></tr>'; }).join(''); } catch (e) { body.innerHTML = '<tr><td colspan="5" class="empty-state">โหลด order source ไม่ได้</td></tr>'; } }
+
 // Initial load
 loadBotCustomers();
 setInterval(loadBotCustomers, 30000);
@@ -6208,6 +6260,7 @@ function selectMemberForOrder(payloadStr) {
     <div id="posStatus" style="margin: 8px 0; font-size:14px; min-height:18px;"></div>
 
     <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary" style="flex:1; padding:14px; font-size:16px;" onclick="clearPosCart()">เคลียร์</button>
       <button class="btn btn-secondary" style="flex:1; padding:14px; font-size:16px;" onclick="closePosModal()">ยกเลิก</button>
       <button class="btn btn-primary" style="flex:2; padding:14px; font-size:16px; background:#0a8;" onclick="submitPos()">💾 บันทึก + พิมพ์</button>
     </div>
@@ -6356,6 +6409,7 @@ function renderPosCart() {
     html += '<button onclick="posQtyChange(' + idx + ',-1)" style="width:32px; height:32px; border:1px solid #ddd; background:white; border-radius:4px; cursor:pointer; font-size:18px;">−</button>';
     html += '<input type="number" value="' + it.quantity + '" min="1" oninput="posQtySet(' + idx + ',this.value)" style="width:50px; text-align:center; padding:4px; border:1px solid #ddd; border-radius:4px;">';
     html += '<button onclick="posQtyChange(' + idx + ',1)" style="width:32px; height:32px; border:1px solid #ddd; background:white; border-radius:4px; cursor:pointer; font-size:18px;">+</button>';
+    html += '<input type="number" value="' + it.price + '" min="0" step="any" oninput="posPriceSet(' + idx + ',this.value)" title="ราคา/หน่วย" style="width:78px; text-align:right; padding:4px; border:1px solid #ddd; border-radius:4px;">';
     html += '<div style="min-width:80px; text-align:right; font-weight:bold; font-size:14px;">' + numFormat(it.quantity * it.price) + '</div>';
     html += '<button onclick="posRemoveItem(' + idx + ')" style="width:28px; height:28px; background:#fee; color:#d33; border:none; border-radius:4px; cursor:pointer; font-size:14px;">×</button>';
     html += '</div>';
@@ -6370,7 +6424,20 @@ function posQtyChange(idx, delta) {
 }
 function posQtySet(idx, val) {
   posCart[idx].quantity = Math.max(1, parseInt(val) || 1);
+  renderPosCart();
   updatePosTotal();
+}
+function posPriceSet(idx, val) {
+  posCart[idx].price = Math.max(0, parseFloat(val) || 0);
+  updatePosTotal();
+}
+function clearPosCart() {
+  if (posCart.length && !confirm('เคลียร์ตะกร้า POS?')) return;
+  posCart = [];
+  renderPosCart();
+  updatePosTotal();
+  var s = document.getElementById('posProductSearch');
+  if (s) s.focus();
 }
 function posRemoveItem(idx) {
   posCart.splice(idx, 1);
@@ -7418,6 +7485,14 @@ document.addEventListener('click', function(e) {
     } catch(_) { console.warn('cust-search-result parse fail', _); }
     return;
   }
+  var imageAction = e.target.closest('.product-image-action');
+  if (imageAction) {
+    var pid = parseInt(imageAction.getAttribute('data-pid'), 10);
+    var url = imageAction.getAttribute('data-url') || '';
+    if (imageAction.getAttribute('data-action') === 'main') setMainImage(pid, url);
+    else deleteProductImage(pid, url);
+    return;
+  }
   // Member search result (generic — delegates to function named in data-on-select)
   var memberResult = e.target.closest('.member-search-result');
   if (memberResult) {
@@ -7457,7 +7532,7 @@ async function checkAuth() {
     // remember last admin page
     if (currentUser && currentUser.role !== 'technician') {
       var lastPage = localStorage.getItem('lastAdminPage');
-      var validPages = ['products','orders','members','reports','cameras','hr','payroll','tech','bigseller','marketplace','qr-att','users','bot'];
+      var validPages = ['products','orders','members','reports','cameras','hr','payroll','tech','bigseller','marketplace','ops','qr-att','users','bot'];
       if (lastPage && validPages.indexOf(lastPage) >= 0) {
         showPage(lastPage);
       } else {
