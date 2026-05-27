@@ -3819,7 +3819,9 @@ function renderOrders(list) {
     if (!isDraft && !isMarketplace && o.stockDeducted && o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'shipped') {
       html += '<button class="btn btn-sm" style="background:#ff9800;color:#fff;" onclick="revertOrderToDraft(' + o.id + ')" title="คืน stock + กลับไปร่าง แก้ไขได้">⏪ ย้อนไปร่าง</button> ';
     }
-    if (o.status !== 'cancelled' && o.status !== 'completed') {
+    // POS / inventory-bot sales are created as completed immediately, but staff still
+    // need to cancel test or mistaken sales and restore stock.
+    if (o.status !== 'cancelled' && !isMarketplace) {
       html += '<button class="btn btn-danger btn-sm" onclick="cancelOrder(' + o.id + ')">ยกเลิก</button>';
     }
     html += '</td></tr>';
@@ -3915,11 +3917,16 @@ async function cancelOrder(id) {
   var reason = prompt('ยืนยันยกเลิกออร์เดอร์?' + extra + '\n\nระบุเหตุผล (optional):', '');
   if (reason === null) return;
   try {
-    await fetch('/api/orders/' + id + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason }) });
+    var r = await fetch('/api/orders/' + id + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason }) });
+    if (!r.ok) {
+      var d = {};
+      try { d = await r.json(); } catch(e) {}
+      throw new Error(d.error && (d.error.message || d.error.code) || d.error || 'HTTP ' + r.status);
+    }
     loadOrders();
     if (typeof loadProducts === 'function') loadProducts();
     if (typeof loadOpsDashboard === 'function') loadOpsDashboard();
-  } catch (e) { alert('เกิดข้อผิดพลาด'); }
+  } catch (e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
 }
 
 // ============ EDIT DRAFT ITEMS (แก้ items ของ draft) ============

@@ -2189,8 +2189,12 @@ app.post('/api/orders/:id/paid', async function(req, res) {
 
 app.post('/api/orders/:id/cancel', async function(req, res) {
   try {
-    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/cancel', { method: 'POST' });
-    res.json(await r.json());
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
