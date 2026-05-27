@@ -2383,9 +2383,30 @@ app.post('/api/members/:id/recalc-stats', async function(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(req.body || {})
       });
-      res.json(await r.json());
+      res.status(r.status).json(await r.json());
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
+});
+
+// Stock movement audit proxy
+app.get('/api/stock-movements', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await fetch(LOCAL_API_BASE + '/api/stock-movements' + (qs ? '?' + qs : ''));
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/stock-movements', async function(req, res) {
+  try {
+    var qs = req.url.split('?')[1] || '';
+    var r = await adminFetch(LOCAL_API_BASE + '/api/stock-movements' + (qs ? '?' + qs : ''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {})
+    });
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Import LINE customers (admin)
