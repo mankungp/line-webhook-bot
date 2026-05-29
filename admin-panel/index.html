@@ -10323,7 +10323,7 @@ function updatePayrollModeHint() {
   var el = document.getElementById('payrollModeHint');
   if (!el) return;
   if (isPayrollSettlementMode()) {
-    el.textContent = 'โหมดเบิกก่อนสิ้นเดือน: พนักงานเงินเดือนจะคิดตามสัดส่วน 30 วัน, ไม่นับวันที่หลังวันสิ้นรอบเป็นวันขาด และรวมโควต้าวันหยุดคงเหลือ';
+    el.textContent = 'โหมดเบิก/ปิดงวดก่อนสิ้นเดือน: พนักงานเงินเดือนใช้ฐานเงินเดือนเต็ม และนับวันที่หลังตัดรอบไปใช้โควต้าวันหยุด';
   } else {
     el.textContent = '';
   }
@@ -10649,7 +10649,7 @@ async function commitPayroll() {
   if (selectedCodes.length === 0) { _payrollMsg('กรุณาติ๊กเลือกพนักงานที่ต้องการ commit','err'); return; }
   var selectedSlips = _payrollSlips.filter(function(s){ return selectedCodes.indexOf(s.emp_code) >= 0; });
   if (selectedSlips.length === 0) { _payrollMsg('ไม่พบ slip ตรงกับที่เลือก','err'); return; }
-  var modeText = isPayrollSettlementMode() ? '\nโหมด: เบิก/ปิดงวดก่อนสิ้นเดือน (รายเดือนคิดตามสัดส่วน 30 วัน)' : '';
+  var modeText = isPayrollSettlementMode() ? '\nโหมด: เบิก/ปิดงวดก่อนสิ้นเดือน (ใช้ฐานเงินเดือนเต็ม + วันหลังตัดรอบนับเข้าโควต้า)' : '';
   if (!confirm('ยืนยัน commit รอบ ' + p.period_start + ' ถึง ' + p.period_end + modeText + '\nเฉพาะ ' + selectedSlips.length + ' / ' + _payrollSlips.length + ' คนที่ติ๊กเลือก ?\n\n⚠ เบิกล่วงหน้า/งานช่าง ของคนเหล่านี้จะถูก mark ปิดรอบ')) return;
   _payrollMsg('กำลัง commit ' + selectedSlips.length + ' คน…');
   try {
@@ -10661,7 +10661,7 @@ async function commitPayroll() {
         period_end: p.period_end,
         settlement: isPayrollSettlementMode(),
         prorate_monthly: isPayrollSettlementMode(),
-        payslips: selectedSlips
+        emp_codes: selectedCodes
       })
     });
     var data = await r.json();
