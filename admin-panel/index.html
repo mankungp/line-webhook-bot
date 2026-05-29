@@ -1249,6 +1249,13 @@ input:focus, textarea:focus, select:focus {
           <button class="btn btn-secondary btn-sm" onclick="pingZk()">📡 Test เครื่อง</button>
           <span id="zkStatus" style="font-size:13px; color:#666;"></span>
         </div>
+        <div class="toolbar" style="margin-bottom:0; border-top:1px solid var(--border); padding-top:12px;">
+          <button class="btn btn-secondary btn-sm" onclick="pollHikvisionNow()" id="hikPollBtn">⚡ Poll Hikvision</button>
+          <button class="btn btn-success btn-sm" onclick="startHikvisionPoller()" id="hikStartBtn">▶ Start poller</button>
+          <button class="btn btn-danger btn-sm" onclick="stopHikvisionPoller()" id="hikStopBtn">⏹ Stop poller</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadHikvisionStatus()">รีเฟรชสถานะ</button>
+          <span id="hikvisionStatus" style="font-size:13px; color:#666;"></span>
+        </div>
       </div>
       <div class="card">
         <div class="toolbar">
@@ -1500,11 +1507,17 @@ input:focus, textarea:focus, select:focus {
           <button class="btn btn-secondary btn-sm" onclick="setPayrollPreset('first-half')">ครึ่งเดือนแรก</button>
           <button class="btn btn-secondary btn-sm" onclick="setPayrollPreset('second-half')">ครึ่งเดือนหลัง</button>
           <button class="btn btn-secondary btn-sm" onclick="setPayrollPreset('whole-month')">ทั้งเดือนนี้</button>
+          <button class="btn btn-secondary btn-sm" onclick="setPayrollPreset('settlement-today')">เบิกถึงวันนี้</button>
         </div>
+        <label style="display:flex; gap:6px; align-items:center; font-size:13px; color:#444;">
+          <input type="checkbox" id="paySettlementMode" onchange="updatePayrollModeHint()">
+          เบิก/ปิดงวดก่อนสิ้นเดือน
+        </label>
         <div style="flex:1;"></div>
         <button class="btn btn-primary" onclick="loadPayrollPreview()">🔍 คำนวณ Preview</button>
         <button class="btn btn-secondary btn-sm" onclick="loadPayrollList()">📜 สลิปที่ commit แล้ว</button>
       </div>
+      <div id="payrollModeHint" style="margin-top:8px; font-size:12px; color:#777;"></div>
       <div id="payrollMsg" style="margin-top:8px; font-size:13px;"></div>
     </div>
 
@@ -7901,7 +7914,7 @@ function switchHrTab(name) {
   document.querySelectorAll('#page-hr .tab-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.hrtab === name); });
   document.querySelectorAll('.hr-tab').forEach(function(t){ t.style.display = 'none'; });
   document.getElementById('hrtab-' + name).style.display = 'block';
-  if (name === 'attendance') { var f = document.getElementById('attFrom'); if (!f.value) { var d = new Date(); var t = d.toISOString().slice(0,10); f.value = t; document.getElementById('attTo').value = t; } loadAttendance(); pingZk(); }
+  if (name === 'attendance') { var f = document.getElementById('attFrom'); if (!f.value) { var d = new Date(); var t = d.toISOString().slice(0,10); f.value = t; document.getElementById('attTo').value = t; } loadAttendance(); pingZk(); loadHikvisionStatus(); }
   if (name === 'advances') loadAdvances();
   if (name === 'jobs') {
     loadActiveJobsList();
@@ -8186,6 +8199,92 @@ async function syncAttendance() {
     el.innerHTML = '<span style="color:#0a0;">✅ Sync แล้ว — เครื่องมี ' + d.deviceTotal + ' รายการ, เพิ่มใหม่ ' + d.added + '</span>';
     loadAttendance();
   } catch (e) { el.innerHTML = '<span style="color:#d33;">❌ ' + escapeHtml(e.message) + '</span>'; }
+}
+
+function renderHikvisionStatus(d) {
+  var el = document.getElementById('hikvisionStatus');
+  if (!el) return;
+  var startBtn = document.getElementById('hikStartBtn');
+  var stopBtn = document.getElementById('hikStopBtn');
+  if (startBtn) startBtn.disabled = !!(d && d.running);
+  if (stopBtn) stopBtn.disabled = !(d && d.running);
+  if (!d || !d.config_loaded) {
+    el.innerHTML = '<span style="color:#999;">Hikvision: ยังไม่ได้ตั้งค่า</span>';
+    return;
+  }
+  var device = escapeHtml(d.device || 'Hikvision');
+  var last = d.last_polled_at ? new Date(d.last_polled_at).toLocaleTimeString('th-TH') : '-';
+  if (d.device_offline || d.health === 'offline') {
+    el.innerHTML = '<span style="color:#d97706;">🟠 Hikvision offline: ' + device + ' · poller ' + (d.running ? 'เปิด' : 'หยุด') + ' · ล่าสุด ' + last + ' · ' + escapeHtml(d.last_error || 'ติดต่อกล้องไม่ได้') + '</span>';
+  } else if (d.health === 'error') {
+    el.innerHTML = '<span style="color:#d33;">🔴 Hikvision error: ' + escapeHtml(d.last_error || 'unknown') + ' · poller ' + (d.running ? 'เปิด' : 'หยุด') + '</span>';
+  } else {
+    el.innerHTML = '<span style="color:#0a0;">🟢 Hikvision พร้อม: ' + device + ' · poller ' + (d.running ? 'เปิด' : 'หยุด') + ' · ล่าสุด ' + last + '</span>';
+  }
+}
+
+async function loadHikvisionStatus() {
+  var el = document.getElementById('hikvisionStatus');
+  if (el) el.textContent = '⏳ ตรวจ Hikvision...';
+  try {
+    var r = await fetch('/api/hikvision/status');
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || ('HTTP ' + r.status));
+    renderHikvisionStatus(d);
+  } catch (e) {
+    if (el) el.innerHTML = '<span style="color:#d33;">❌ อ่านสถานะ Hikvision ไม่ได้: ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+async function pollHikvisionNow() {
+  var el = document.getElementById('hikvisionStatus');
+  var btn = document.getElementById('hikPollBtn');
+  if (btn) btn.disabled = true;
+  if (el) el.textContent = '⏳ Poll Hikvision...';
+  try {
+    var r = await fetch('/api/hikvision/poll', { method: 'POST' });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    if (d.offline) {
+      el.innerHTML = '<span style="color:#d97706;">🟠 กล้อง offline: ' + escapeHtml(d.error || 'ติดต่อกล้องไม่ได้') + ' (API ยังทำงานปกติ)</span>';
+    } else if (d.error) {
+      el.innerHTML = '<span style="color:#d33;">🔴 Hikvision error: ' + escapeHtml(d.error) + '</span>';
+    } else {
+      el.innerHTML = '<span style="color:#0a0;">✅ Poll สำเร็จ · เพิ่มใหม่ ' + (d.added || 0) + ' รายการ</span>';
+      loadAttendance();
+    }
+    setTimeout(loadHikvisionStatus, 500);
+  } catch (e) {
+    if (el) el.innerHTML = '<span style="color:#d33;">❌ Poll ไม่สำเร็จ: ' + escapeHtml(e.message) + '</span>';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function startHikvisionPoller() {
+  var el = document.getElementById('hikvisionStatus');
+  if (el) el.textContent = '⏳ เริ่ม poller...';
+  try {
+    var r = await fetch('/api/hikvision/start', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ intervalMs: 30000 }) });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || ('HTTP ' + r.status));
+    renderHikvisionStatus(d.status || d);
+  } catch (e) {
+    if (el) el.innerHTML = '<span style="color:#d33;">❌ Start poller ไม่ได้: ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+async function stopHikvisionPoller() {
+  var el = document.getElementById('hikvisionStatus');
+  if (el) el.textContent = '⏳ หยุด poller...';
+  try {
+    var r = await fetch('/api/hikvision/stop', { method: 'POST' });
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || ('HTTP ' + r.status));
+    renderHikvisionStatus(d.status || d);
+  } catch (e) {
+    if (el) el.innerHTML = '<span style="color:#d33;">❌ Stop poller ไม่ได้: ' + escapeHtml(e.message) + '</span>';
+  }
 }
 
 async function loadAttendance() {
@@ -10187,6 +10286,7 @@ function initPayrollPage() {
   if (!s.value && !e.value) setPayrollPreset('first-half');
   // โหลด holidays ของเดือนปัจจุบัน
   try { loadHolidaysForMonth(); } catch (err) { console.warn('holidays init', err); }
+  updatePayrollModeHint();
 }
 
 function setPayrollPreset(kind) {
@@ -10198,9 +10298,35 @@ function setPayrollPreset(kind) {
   var s, e;
   if (kind === 'first-half') { s = new Date(y,m,1); e = new Date(y,m,15); }
   else if (kind === 'second-half') { s = new Date(y,m,16); e = new Date(y,m+1,0); }
+  else if (kind === 'settlement-today') {
+    s = new Date(y,m,1);
+    e = now;
+    var mode = document.getElementById('paySettlementMode');
+    if (mode) mode.checked = true;
+  }
   else { s = new Date(y,m,1); e = new Date(y,m+1,0); }
   document.getElementById('payPeriodStart').value = fmt(s);
   document.getElementById('payPeriodEnd').value = fmt(e);
+  updatePayrollModeHint();
+}
+
+function isPayrollSettlementMode() {
+  var el = document.getElementById('paySettlementMode');
+  return !!(el && el.checked);
+}
+
+function payrollCalcParams() {
+  return isPayrollSettlementMode() ? '&settlement=1&prorate_monthly=1' : '';
+}
+
+function updatePayrollModeHint() {
+  var el = document.getElementById('payrollModeHint');
+  if (!el) return;
+  if (isPayrollSettlementMode()) {
+    el.textContent = 'โหมดเบิกก่อนสิ้นเดือน: พนักงานเงินเดือนจะคิดตามสัดส่วน 30 วัน และไม่นับวันที่หลังวันสิ้นรอบเป็นวันขาด';
+  } else {
+    el.textContent = '';
+  }
 }
 
 function _payrollMsg(text, kind) {
@@ -10295,13 +10421,13 @@ async function loadPayrollPreview() {
   var p = _payrollPeriod(); if (!p) return;
   _payrollMsg('กำลังคำนวณ…');
   try {
-    var r = await fetch('/api/payroll/preview-all?period_start=' + p.period_start + '&period_end=' + p.period_end);
+    var r = await fetch('/api/payroll/preview-all?period_start=' + p.period_start + '&period_end=' + p.period_end + payrollCalcParams());
     var data = await r.json();
     if (!r.ok) { _payrollMsg('ผิดพลาด: ' + (data.error || r.status),'err'); return; }
     _payrollSlips = data.payslips || [];
     _payrollCommitted = false;
     renderPayrollTable(_payrollSlips, false);
-    _payrollMsg('คำนวณ preview — ' + _payrollSlips.length + ' คน (ยังไม่ commit)','ok');
+    _payrollMsg('คำนวณ preview — ' + _payrollSlips.length + ' คน (ยังไม่ commit)' + (isPayrollSettlementMode() ? ' · โหมดเบิกก่อนสิ้นเดือน' : ''),'ok');
   } catch (e) {
     _payrollMsg('Error: ' + e.message,'err');
   }
@@ -10430,7 +10556,13 @@ async function previewPayslipPdf(empCode, ps, pe) {
     var r = await fetch('/api/payroll/preview-pdf', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ emp_code: empCode, period_start: ps, period_end: pe })
+      body: JSON.stringify({
+        emp_code: empCode,
+        period_start: ps,
+        period_end: pe,
+        settlement: isPayrollSettlementMode(),
+        prorate_monthly: isPayrollSettlementMode()
+      })
     });
     if (!r.ok) {
       var err = await r.json().catch(()=>({error:'HTTP '+r.status}));
@@ -10501,13 +10633,20 @@ async function commitPayroll() {
   if (selectedCodes.length === 0) { _payrollMsg('กรุณาติ๊กเลือกพนักงานที่ต้องการ commit','err'); return; }
   var selectedSlips = _payrollSlips.filter(function(s){ return selectedCodes.indexOf(s.emp_code) >= 0; });
   if (selectedSlips.length === 0) { _payrollMsg('ไม่พบ slip ตรงกับที่เลือก','err'); return; }
-  if (!confirm('ยืนยัน commit รอบ ' + p.period_start + ' ถึง ' + p.period_end + '\nเฉพาะ ' + selectedSlips.length + ' / ' + _payrollSlips.length + ' คนที่ติ๊กเลือก ?\n\n⚠ เบิกล่วงหน้า/งานช่าง ของคนเหล่านี้จะถูก mark ปิดรอบ')) return;
+  var modeText = isPayrollSettlementMode() ? '\nโหมด: เบิก/ปิดงวดก่อนสิ้นเดือน (รายเดือนคิดตามสัดส่วน 30 วัน)' : '';
+  if (!confirm('ยืนยัน commit รอบ ' + p.period_start + ' ถึง ' + p.period_end + modeText + '\nเฉพาะ ' + selectedSlips.length + ' / ' + _payrollSlips.length + ' คนที่ติ๊กเลือก ?\n\n⚠ เบิกล่วงหน้า/งานช่าง ของคนเหล่านี้จะถูก mark ปิดรอบ')) return;
   _payrollMsg('กำลัง commit ' + selectedSlips.length + ' คน…');
   try {
     var r = await fetch('/api/payroll/commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ period_start: p.period_start, period_end: p.period_end, payslips: selectedSlips })
+      body: JSON.stringify({
+        period_start: p.period_start,
+        period_end: p.period_end,
+        settlement: isPayrollSettlementMode(),
+        prorate_monthly: isPayrollSettlementMode(),
+        payslips: selectedSlips
+      })
     });
     var data = await r.json();
     if (!r.ok) { _payrollMsg('ผิดพลาด: ' + (data.error || r.status),'err'); return; }
