@@ -10531,7 +10531,7 @@ function showPayslip(idOrCode) {
   html += '<tr style="font-weight:bold; border-top:1px solid #ddd;"><td>รวมรายได้</td><td class="num">' + _fmt(s.gross) + '</td></tr>';
   if (s.time_deduction > 0) {
     var timeParts = [];
-    if (Number(s.half_day_days || 0) > 0) timeParts.push('ครึ่งวัน ' + s.half_day_days + ' วัน (' + (s.half_day_deduct_minutes || 0) + ' นาที)');
+    if (Number(s.half_day_deduct_minutes || 0) > 0) timeParts.push('ครึ่งวัน ' + s.half_day_days + ' วัน (' + (s.half_day_deduct_minutes || 0) + ' นาที)');
     if (Number(s.late_minutes || 0) > 0) timeParts.push('สาย/ออกก่อน ' + s.late_minutes + ' นาที');
     if (Number(s.early_minutes || 0) > 0) timeParts.push('ออกก่อน ' + s.early_minutes + ' นาที');
     if (Number(s.excess_break_minutes || 0) > 0) timeParts.push('พักเกิน ' + s.excess_break_minutes + ' นาที');
