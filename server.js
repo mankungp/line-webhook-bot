@@ -1889,6 +1889,15 @@ app.get('/api/products', async function(req, res) {
   }
 });
 
+app.get('/api/products/:id', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/products/' + encodeURIComponent(req.params.id));
+    res.status(r.status).json(await r.json());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/products', async function(req, res) {
   try {
     var r = await adminFetch(LOCAL_API_BASE + '/api/products', {
