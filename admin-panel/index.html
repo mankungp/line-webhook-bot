@@ -10486,13 +10486,17 @@ function renderPayrollTable(slips, committed) {
       else if (s.leave_info.excess_days > 0) bonusCell = '<span style="color:#c0392b;">-' + _fmt(s.leave_info.leave_excess_deduction) + '</span>';
       else bonusCell = '0';
     }
+    var workedCell = s.days_worked + '/' + s.days_in_period;
+    if (Number(s.half_day_days || 0) > 0) {
+      workedCell += '<br><small style="color:#d97706;">ครึ่งวัน ' + s.half_day_days + ' วัน</small>';
+    }
     // checkbox เฉพาะตอนยังไม่ commit — ถ้า commit แล้วไม่ต้องมี
     var cbCell = committed ? '<td></td>' : '<td><input type="checkbox" class="payroll-row-cb" data-emp="' + s.emp_code + '" checked onchange="updatePayrollCheckAll()"></td>';
     return '<tr>' +
       cbCell +
       '<td>' + s.emp_code + '</td>' +
       '<td>' + (s.name || '-') + '</td>' +
-      '<td class="num">' + s.days_worked + '/' + s.days_in_period + '</td>' +
+      '<td class="num">' + workedCell + '</td>' +
       '<td class="num">' + quotaCell + '</td>' +
       '<td class="num">' + bonusCell + '</td>' +
       '<td class="num">' + _fmt(s.base_earning) + '</td>' +
@@ -10525,7 +10529,15 @@ function showPayslip(idOrCode) {
     html += '<tr><td>โบนัสโควต้าคงเหลือ (' + (liShow.unused_quota||0) + '/' + (liShow.total_quota||0) + ' วัน)</td><td class="num" style="color:#0a7a2e;">+' + _fmt(s.leave_bonus) + '</td></tr>';
   }
   html += '<tr style="font-weight:bold; border-top:1px solid #ddd;"><td>รวมรายได้</td><td class="num">' + _fmt(s.gross) + '</td></tr>';
-  if (s.time_deduction > 0) html += '<tr><td>หักเวลา (สาย ' + s.late_minutes + '/ออกก่อน ' + s.early_minutes + '/พักเกิน ' + s.excess_break_minutes + '/ขาด ' + s.absent_deduct_minutes + ' นาที)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.time_deduction) + '</td></tr>';
+  if (s.time_deduction > 0) {
+    var timeParts = [];
+    if (Number(s.half_day_days || 0) > 0) timeParts.push('ครึ่งวัน ' + s.half_day_days + ' วัน (' + (s.half_day_deduct_minutes || 0) + ' นาที)');
+    if (Number(s.late_minutes || 0) > 0) timeParts.push('สาย/ออกก่อน ' + s.late_minutes + ' นาที');
+    if (Number(s.early_minutes || 0) > 0) timeParts.push('ออกก่อน ' + s.early_minutes + ' นาที');
+    if (Number(s.excess_break_minutes || 0) > 0) timeParts.push('พักเกิน ' + s.excess_break_minutes + ' นาที');
+    if (Number(s.absent_deduct_minutes || 0) > 0) timeParts.push('ขาด ' + s.absent_deduct_minutes + ' นาที');
+    html += '<tr><td>หักเวลา (' + (timeParts.join(' / ') || '-') + ')</td><td class="num" style="color:#c0392b;">-' + _fmt(s.time_deduction) + '</td></tr>';
+  }
   if (s.social_security > 0) html += '<tr><td>ประกันสังคม 5%</td><td class="num" style="color:#c0392b;">-' + _fmt(s.social_security) + '</td></tr>';
   if (s.advance_deduction > 0) html += '<tr><td>เบิกล่วงหน้า (' + (s.advances_included||[]).length + ' รายการ)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.advance_deduction) + '</td></tr>';
   if (s.carryover_deduction > 0) html += '<tr><td>ยอดค้างงวดก่อน</td><td class="num" style="color:#c0392b;">-' + _fmt(s.carryover_deduction) + '</td></tr>';
@@ -10537,7 +10549,7 @@ function showPayslip(idOrCode) {
   html += '<tr style="font-weight:bold; font-size:15px; border-top:2px solid #000;"><td>เงินสุทธิ</td><td class="num">' + _fmt(s.final_pay) + '</td></tr>';
   html += '</tbody></table>';
   if (s.new_carryover < 0) html += '<p style="color:#a00; font-size:12px;">⚠ ติดลบ ' + _fmt(Math.abs(s.new_carryover)) + ' ฿ — ยกไปงวดถัดไป</p>';
-  html += '<p style="font-size:12px; color:#888;">วันทำงาน ' + s.days_worked + '/' + s.days_in_period + ' วัน' + (s.days_absent>0?' · ขาด/ลา ' + s.days_absent + ' วัน':'') + '</p>';
+  html += '<p style="font-size:12px; color:#888;">วันทำงาน ' + s.days_worked + '/' + s.days_in_period + ' วัน' + (s.half_day_days>0?' · ครึ่งวัน ' + s.half_day_days + ' วัน':'') + (s.days_absent>0?' · ขาด/ลา ' + s.days_absent + ' วัน':'') + '</p>';
   body.innerHTML = html;
   document.getElementById('payslipModal').style.display = 'flex';
 }
