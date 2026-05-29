@@ -19,10 +19,10 @@
   --danger: #e74c3c;
   --info: #3498db;
 
-  --bg-app: #f8f9fa;
+  --bg-app: #f4f6f5;
   --bg-card: #ffffff;
-  --bg-hover: #f0f1f3;
-  --bg-input: #f8f9fa;
+  --bg-hover: #eef3f1;
+  --bg-input: #f7f9f8;
   --bg-sidebar: #ffffff;
 
   --text-primary: #1a1f24;
@@ -33,15 +33,15 @@
   --border: #e8eaed;
   --border-strong: #d0d4d8;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-  --shadow-xl: 0 16px 48px rgba(0,0,0,0.16);
+  --shadow-sm: 0 1px 2px rgba(18,32,27,0.04);
+  --shadow-md: 0 8px 22px rgba(18,32,27,0.08);
+  --shadow-lg: 0 14px 34px rgba(18,32,27,0.12);
+  --shadow-xl: 0 20px 56px rgba(18,32,27,0.18);
 
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -77,7 +77,10 @@
 
 body {
   font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  background: var(--bg-app);
+  background:
+    linear-gradient(180deg, rgba(10,170,140,0.06), rgba(10,170,140,0) 220px),
+    radial-gradient(circle at top right, rgba(240,165,0,0.08), transparent 280px),
+    var(--bg-app);
   color: var(--text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -97,10 +100,11 @@ body {
   padding: 0;
   z-index: 50;
   overflow: hidden;
+  box-shadow: 1px 0 0 rgba(18,32,27,0.02);
 }
 .main {
   margin-left: 260px;
-  padding: 24px;
+  padding: 22px 28px 34px;
   width: calc(100% - 260px);
   max-width: 100%;
   overflow-x: hidden;
@@ -115,7 +119,7 @@ body.kiosk #techFrame { height: 100vh !important; }
 
 /* ========== Sidebar ========== */
 .sidebar-logo {
-  padding: 20px 24px 16px;
+  padding: 18px 18px 16px;
   border-bottom: 1px solid var(--border);
 }
 .sidebar-logo h1 {
@@ -135,14 +139,23 @@ body.kiosk #techFrame { height: 100vh !important; }
 }
 .sidebar nav {
   flex: 1;
-  padding: 12px;
+  padding: 10px;
   overflow-y: auto;
+}
+.nav-section-label {
+  padding: 14px 10px 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 .sidebar nav a {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 9px 12px;
   margin-bottom: 2px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
@@ -150,6 +163,7 @@ body.kiosk #techFrame { height: 100vh !important; }
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+  position: relative;
   transition: background 0.15s, color 0.15s;
 }
 .sidebar nav a:hover {
@@ -157,9 +171,20 @@ body.kiosk #techFrame { height: 100vh !important; }
   color: var(--text-primary);
 }
 .sidebar nav a.active {
+  background: rgba(10,170,140,0.12);
+  color: var(--primary);
+  box-shadow: none;
+  font-weight: 700;
+}
+.sidebar nav a.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
   background: var(--primary);
-  color: #fff;
-  box-shadow: var(--shadow-sm);
 }
 .sidebar nav a .icon { font-size: 18px; width: 24px; text-align: center; }
 
@@ -176,9 +201,13 @@ body.kiosk #techFrame { height: 100vh !important; }
 .mobile-topbar { display: none; }
 
 /* ========== Page Header ========== */
-.page-header { margin-bottom: 24px; }
+.page-header {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
 .page-header h2 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 4px 0;
@@ -192,10 +221,10 @@ body.kiosk #techFrame { height: 100vh !important; }
 /* ========== Cards ========== */
 .card {
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  margin-bottom: 16px;
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: none;
   border: 1px solid var(--border);
 }
 .card h3, .card-title {
@@ -235,9 +264,10 @@ body.kiosk #techFrame { height: 100vh !important; }
   transition: background 0.15s, box-shadow 0.15s, transform 0.05s;
   white-space: nowrap;
   line-height: 1.2;
+  min-height: 36px;
 }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--primary); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-primary { background: var(--primary); color: #fff; box-shadow: none; }
 .btn-primary:hover { background: var(--primary-hover); box-shadow: var(--shadow-md); }
 .btn-secondary {
   background: var(--bg-card);
@@ -302,10 +332,13 @@ input:focus, textarea:focus, select:focus {
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 .data-table tbody td {
   padding: 14px 12px;
@@ -325,11 +358,32 @@ input:focus, textarea:focus, select:focus {
 .toolbar {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
   align-items: center;
 }
-.search-box { min-width: 200px; }
+.card > .toolbar {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.card > .toolbar:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.toolbar .btn { flex: 0 0 auto; }
+.toolbar input[type="text"],
+.toolbar input[type="search"],
+.toolbar input[type="date"],
+.toolbar input[type="number"],
+.toolbar select {
+  width: auto;
+}
+.toolbar select { min-width: 150px; max-width: 240px; }
+.search-box {
+  min-width: 220px;
+  max-width: 420px;
+  flex: 1 1 260px;
+}
 
 /* ========== Product Grid ========== */
 .product-grid {
@@ -339,13 +393,13 @@ input:focus, textarea:focus, select:focus {
 }
 .product-card {
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   padding: 16px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.15s, transform 0.1s;
 }
-.product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); border-color: rgba(10,170,140,0.28); }
 .product-card img {
   width: 100%;
   height: 150px;
@@ -378,13 +432,13 @@ input:focus, textarea:focus, select:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 .stat-card {
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 18px;
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: none;
   border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
@@ -393,12 +447,15 @@ input:focus, textarea:focus, select:focus {
 .stat-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
+  left: 16px;
+  right: 16px;
+  bottom: 0;
+  height: 2px;
   background: var(--primary);
+  border-radius: 999px 999px 0 0;
 }
 .stat-number {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 700;
   font-family: 'Inter', sans-serif;
   color: var(--text-primary);
@@ -428,8 +485,8 @@ input:focus, textarea:focus, select:focus {
 .modal.active { display: flex; }
 .modal-content {
   background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  padding: 28px;
+  border-radius: var(--radius-lg);
+  padding: 24px;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
@@ -697,6 +754,17 @@ input:focus, textarea:focus, select:focus {
 
   .modal-content { padding: 20px; max-height: 95vh; border-radius: var(--radius-lg); }
   .toolbar { gap: 6px; }
+  .toolbar .btn,
+  .toolbar input[type="text"],
+  .toolbar input[type="search"],
+  .toolbar input[type="date"],
+  .toolbar input[type="number"],
+  .toolbar select,
+  .search-box {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 100%;
+  }
   .search-box { min-width: 140px; font-size: 13px; }
   .toast-container { left: 16px; right: 16px; top: 16px; }
   .toast { max-width: none; }
@@ -742,17 +810,17 @@ input:focus, textarea:focus, select:focus {
     <small>Admin Dashboard</small>
   </div>
   <nav>
+    <div class="nav-section-label">การสื่อสาร</div>
     <a class="active" onclick="showPage('bot')" data-page="bot" data-perm="users:write" data-hide-for="technician">
       <span class="icon">🤖</span> <span>Bot Control</span>
     </a>
+
+    <div class="nav-section-label">งานขาย</div>
     <a onclick="showPage('products')" data-page="products" data-perm="products:read" data-hide-for="technician">
       <span class="icon">📦</span> <span>สินค้า</span>
     </a>
     <a onclick="showPage('orders')" data-page="orders" data-perm="orders:read" data-hide-for="technician">
       <span class="icon">🧾</span> <span>ออร์เดอร์</span>
-    </a>
-    <a onclick="showPage('bigseller')" data-page="bigseller" data-perm="products:read" data-hide-for="technician">
-      <span class="icon">📈</span> <span>BigSeller Sync</span>
     </a>
     <a onclick="showPage('members')" data-page="members" data-perm="members:read" data-hide-for="technician">
       <span class="icon">⭐</span> <span>สมาชิก</span>
@@ -760,9 +828,16 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('reports')" data-page="reports" data-perm="reports:read" data-hide-for="technician">
       <span class="icon">📊</span> <span>รายงาน</span>
     </a>
-    <a onclick="showPage('cameras')" data-page="cameras" data-owner-only>
-      <span class="icon">📷</span> <span>กล้อง</span>
+
+    <div class="nav-section-label">ช่องทางขาย</div>
+    <a onclick="showPage('bigseller')" data-page="bigseller" data-perm="products:read" data-hide-for="technician">
+      <span class="icon">📈</span> <span>BigSeller Sync</span>
     </a>
+    <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read" data-hide-for="technician">
+      <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
+    </a>
+
+    <div class="nav-section-label">ทีมงาน</div>
     <a onclick="showPage('hr')" data-page="hr" data-owner-only>
       <span class="icon">🧑‍💼</span> <span>พนักงาน</span>
     </a>
@@ -772,17 +847,19 @@ input:focus, textarea:focus, select:focus {
     <a onclick="showPage('tech')" data-page="tech" data-role="owner,manager,technician">
       <span class="icon">🔧</span> <span>แอปช่าง</span>
     </a>
-    <a onclick="showPage('marketplace')" data-page="marketplace" data-perm="marketplace:read" data-hide-for="technician">
-      <span class="icon">🛍️</span> <span>ช่องทางขาย</span>
-    </a>
-    <a onclick="showPage('ops')" data-page="ops" data-owner-only data-hide-for="technician">
-      <span class="icon">🧭</span> <span>สถานะระบบ</span>
-    </a>
     <a onclick="showPage('qr-att')" data-page="qr-att" data-owner-only>
       <span class="icon">📱</span> <span>QR ลงเวลา</span>
     </a>
     <a href="/admin/attendance-calendar.html" target="_blank">
       <span class="icon">📅</span> <span>ปฏิทินลงเวลา</span>
+    </a>
+
+    <div class="nav-section-label">ระบบ</div>
+    <a onclick="showPage('cameras')" data-page="cameras" data-owner-only>
+      <span class="icon">📷</span> <span>กล้อง</span>
+    </a>
+    <a onclick="showPage('ops')" data-page="ops" data-owner-only data-hide-for="technician">
+      <span class="icon">🧭</span> <span>สถานะระบบ</span>
     </a>
     <a href="/admin/sku-merge.html" target="_blank">
       <span class="icon">🔗</span> <span>ผสม SKU</span>
@@ -2660,9 +2737,12 @@ function showPage(page) {
   if (page !== 'cameras' && typeof stopCameraPoll === 'function') stopCameraPoll();
 
   document.querySelectorAll('.page').forEach(function(p) { p.style.display = 'none'; });
-  document.getElementById('page-' + page).style.display = 'block';
+  var targetPage = document.getElementById('page-' + page);
+  if (!targetPage) return;
+  targetPage.style.display = 'block';
   document.querySelectorAll('.sidebar nav a').forEach(function(a) { a.classList.remove('active'); });
-  document.querySelector('[data-page="' + page + '"]').classList.add('active');
+  var navItem = document.querySelector('[data-page="' + page + '"]');
+  if (navItem) navItem.classList.add('active');
 
   // Load data for the page
   if (page === 'bot') loadBotCustomers();
