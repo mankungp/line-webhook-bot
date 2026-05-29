@@ -10538,7 +10538,10 @@ function showPayslip(idOrCode) {
     if (Number(s.absent_deduct_minutes || 0) > 0) timeParts.push('ขาด ' + s.absent_deduct_minutes + ' นาที');
     html += '<tr><td>หักเวลา (' + (timeParts.join(' / ') || '-') + ')</td><td class="num" style="color:#c0392b;">-' + _fmt(s.time_deduction) + '</td></tr>';
   }
-  if (s.social_security > 0) html += '<tr><td>ประกันสังคม 5%</td><td class="num" style="color:#c0392b;">-' + _fmt(s.social_security) + '</td></tr>';
+  if (s.social_security > 0) {
+    var ssBaseText = s.social_security_base ? ' ฐาน ' + _fmt(s.social_security_base) : '';
+    html += '<tr><td>ประกันสังคม 5%' + ssBaseText + '</td><td class="num" style="color:#c0392b;">-' + _fmt(s.social_security) + '</td></tr>';
+  }
   if (s.advance_deduction > 0) html += '<tr><td>เบิกล่วงหน้า (' + (s.advances_included||[]).length + ' รายการ)</td><td class="num" style="color:#c0392b;">-' + _fmt(s.advance_deduction) + '</td></tr>';
   if (s.carryover_deduction > 0) html += '<tr><td>ยอดค้างงวดก่อน</td><td class="num" style="color:#c0392b;">-' + _fmt(s.carryover_deduction) + '</td></tr>';
   if (s.leave_excess_deduction && s.leave_excess_deduction > 0) {
