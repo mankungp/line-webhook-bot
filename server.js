@@ -518,7 +518,7 @@ async function searchProducts(query) {
 
 async function getAdminStatus() {
   try {
-    var res = await fetch(LOCAL_API_BASE + '/api/admin/status');
+    var res = await adminFetch(LOCAL_API_BASE + '/api/admin/status');
     if (!res.ok) throw new Error('Admin status error: ' + res.status);
     return await res.json();
   } catch (err) {
@@ -555,7 +555,7 @@ async function toggleCustomerBot(userId, turnOn) {
 
 async function isWelcomeSent(userId) {
   try {
-    var sent = await fetch(LOCAL_API_BASE + '/api/welcome-sent');
+    var sent = await adminFetch(LOCAL_API_BASE + '/api/welcome-sent');
     if (!sent.ok) return false;
     var data = await sent.json();
     return data[userId] === true;
@@ -609,7 +609,7 @@ async function pingCustomer(userId) {
 
 async function getStaffUsers() {
   try {
-    var res = await fetch(LOCAL_API_BASE + '/api/users');
+    var res = await adminFetch(LOCAL_API_BASE + '/api/users');
     if (!res.ok) return [];
     var data = await res.json();
     // data อาจเป็น object {userId: {...}} หรือ array
@@ -643,7 +643,7 @@ async function notifyStaff(message) {
 
 async function getChatHistory(userId) {
   try {
-    var res = await fetch(LOCAL_API_BASE + '/api/chat-history/' + encodeURIComponent(userId));
+    var res = await adminFetch(LOCAL_API_BASE + '/api/chat-history/' + encodeURIComponent(userId));
     if (!res.ok) return [];
     return await res.json();
   } catch (e) { return []; }
@@ -651,7 +651,7 @@ async function getChatHistory(userId) {
 
 async function getMemberTier(userId) {
   try {
-    var res = await fetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(userId));
+    var res = await adminFetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(userId));
     if (!res.ok) return null;
     var member = await res.json();
     return member.tier || null;
@@ -1182,7 +1182,7 @@ async function processWebhookEvents(events) {
         if (jobMatch) {
           var jobIdQuery = 'JOB-' + jobMatch[1];
           try {
-            var lk = await fetch(LOCAL_API_BASE + '/api/_internal/link-customer-job', {
+            var lk = await adminFetch(LOCAL_API_BASE + '/api/_internal/link-customer-job', {
               method: 'POST',
               headers: {'Content-Type':'application/json'},
               body: JSON.stringify({ job_id: jobIdQuery, line_user_id: userId })
@@ -1581,6 +1581,61 @@ app.post('/api/_internal/notify-tech-delivered', async function(req, res) {
 
 // ============ ADMIN PROXY ENDPOINTS (proxies to Local API) ============
 
+function proxyUserHasPermission(user, permission) {
+  if (!user || user.role === 'customer' || user.role === 'blocked') return false;
+  if (!permission) return true;
+  var perms = user.permissions || [];
+  return perms.indexOf('*') >= 0 || perms.indexOf(permission) >= 0;
+}
+
+function getAdminProxyPermission(req) {
+  var p = req.path;
+  var m = req.method;
+  if (!p.startsWith('/api/')) return null;
+  if (p === '/api/health' || p.startsWith('/api/shop/')) return null;
+  if (p === '/api/categories' && m === 'GET') return null;
+  if (p === '/api/brands' && m === 'GET') return null;
+  if (p === '/api/couriers' && m === 'GET') return null;
+  if (p === '/api/products/channel-summary') return 'products:read';
+  if (p === '/api/products' && m === 'GET') return null;
+  if (/^\/api\/products\/[^/]+$/.test(p) && m === 'GET') return null;
+
+  if (p.startsWith('/api/admin/')) return m === 'GET' ? 'bot:read' : 'bot:write';
+  if (p.startsWith('/api/users')) return m === 'GET' ? 'users:read' : 'users:write';
+  if (p.startsWith('/api/orders')) return m === 'GET' ? 'orders:read' : 'orders:write';
+  if (p.startsWith('/api/customers')) return m === 'GET' ? 'members:read' : 'members:write';
+  if (p.startsWith('/api/members')) return m === 'GET' ? 'members:read' : 'members:write';
+  if (p === '/api/reports/profit') return 'reports:profit:read';
+  if (p.startsWith('/api/reports') || p === '/api/stats') return 'reports:read';
+  if (p.startsWith('/api/stock-movements')) return m === 'GET' ? 'products:read' : 'products:write';
+  if (p.startsWith('/api/bigseller')) return m === 'GET' ? 'marketplace:read' : 'marketplace:write';
+  if (p.startsWith('/api/settings/notifications')) return m === 'GET' ? 'bot:read' : 'users:write';
+  if (p.startsWith('/api/cameras') || p.startsWith('/api/videos')) return 'cameras:read';
+  if (/^\/api\/(categories|brands|couriers|products)(\/|$)/.test(p) && m !== 'GET') return 'products:write';
+  if (p === '/api/marketplace/lazada/disconnect' || p === '/api/marketplace/tiktok/disconnect') return 'marketplace:write';
+  return null;
+}
+
+app.use(async function(req, res, next) {
+  var permission = getAdminProxyPermission(req);
+  if (!permission) return next();
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/auth/me', {
+      headers: { 'cookie': req.headers.cookie || '' }
+    });
+    if (!r.ok) return res.status(401).json({ error: 'Unauthorized', loginUrl: '/auth/login' });
+    var data = await r.json();
+    var user = data && data.user;
+    if (!proxyUserHasPermission(user, permission)) {
+      return res.status(403).json({ error: 'Forbidden', required: permission });
+    }
+    req.proxyUser = user;
+    next();
+  } catch (err) {
+    res.status(500).json({ error: 'Auth check failed', detail: err.message });
+  }
+});
+
 app.get('/api/admin/status', async function(req, res) {
   try {
     var result = await getAdminStatus();
@@ -1663,7 +1718,7 @@ app.delete('/api/categories/:id', async function(req, res) {
 // ============ BIGSELLER SYNC PROXY ============
 app.get('/api/bigseller/status', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/status');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/status');
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1671,7 +1726,7 @@ app.get('/api/bigseller/status', async function(req, res) {
 app.get('/api/bigseller/mirror', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/mirror' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/mirror' + (qs ? '?' + qs : ''));
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1713,14 +1768,14 @@ app.post('/api/bigseller/clear-stale-lock', async function(req, res) {
 app.get('/api/bigseller/reports', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/reports' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/reports' + (qs ? '?' + qs : ''));
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/bigseller/pending-audit', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/pending-audit');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/pending-audit');
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1728,7 +1783,7 @@ app.get('/api/bigseller/pending-audit', async function(req, res) {
 app.get('/api/bigseller/suggest', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/suggest' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/suggest' + (qs ? '?' + qs : ''));
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1736,7 +1791,7 @@ app.get('/api/bigseller/suggest', async function(req, res) {
 app.get('/api/bigseller/search', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/bigseller/search' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/search' + (qs ? '?' + qs : ''));
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1963,7 +2018,7 @@ app.post('/api/orders/:id/shipment-photo', async function(req, res) {
 
 // BigSeller edit queue
 app.get('/api/bigseller/edit-queue', async function(req, res) {
-  try { var r = await fetch(LOCAL_API_BASE + '/api/bigseller/edit-queue'); res.status(r.status).json(await r.json()); }
+  try { var r = await adminFetch(LOCAL_API_BASE + '/api/bigseller/edit-queue'); res.status(r.status).json(await r.json()); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.post('/api/bigseller/edit-queue', async function(req, res) {
@@ -2052,7 +2107,7 @@ app.post('/api/products/:id/push-to-channel', async function(req, res) {
 
 app.get('/api/products/channel-summary', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/products/channel-summary');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/products/channel-summary');
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2060,7 +2115,7 @@ app.get('/api/products/channel-summary', async function(req, res) {
 // Notifications settings
 app.get('/api/settings/notifications', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/settings/notifications');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/settings/notifications');
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2139,7 +2194,7 @@ app.post('/api/products/:id/image/main', async function(req, res) {
 app.get('/api/orders', async function(req, res) {
   try {
     var url = LOCAL_API_BASE + '/api/orders?' + (req.url.split('?')[1] || '');
-    var r = await fetch(url);
+    var r = await adminFetch(url);
     var data = await r.json();
     res.json(data);
   } catch (err) {
@@ -2245,7 +2300,7 @@ app.delete('/api/orders/:id', async function(req, res) {
 
 app.get('/api/orders/:id/invoice', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice');
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2263,7 +2318,7 @@ app.post('/api/orders/:id/invoice/issue', async function(req, res) {
 
 app.get('/api/orders/:id/invoice/data', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice/data');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice/data');
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2273,7 +2328,7 @@ app.get('/api/orders/:id/invoice/pdf', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
     var url = LOCAL_API_BASE + '/api/orders/' + req.params.id + '/invoice/pdf' + (qs ? '?' + qs : '');
-    var r = await fetch(url);
+    var r = await adminFetch(url);
     if (!r.ok) {
       var t = await r.text();
       return res.status(r.status).send(t);
@@ -2287,8 +2342,9 @@ app.get('/api/orders/:id/invoice/pdf', async function(req, res) {
 
 app.get('/api/orders/:id/shipping-label/pdf', async function(req, res) {
   try {
-    var url = LOCAL_API_BASE + '/api/orders/' + req.params.id + '/shipping-label/pdf';
-    var r = await fetch(url);
+    var qs = req.url.split('?')[1] || '';
+    var url = LOCAL_API_BASE + '/api/orders/' + req.params.id + '/shipping-label/pdf' + (qs ? '?' + qs : '');
+    var r = await adminFetch(url);
     if (!r.ok) return res.status(r.status).send(await r.text());
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', r.headers.get('content-disposition') || 'inline');
@@ -2334,7 +2390,7 @@ app.delete('/api/couriers/:id', async function(req, res) {
 app.get('/api/customers', async function(req, res) {
   try {
     var url = LOCAL_API_BASE + '/api/customers?' + (req.url.split('?')[1] || '');
-    var r = await fetch(url);
+    var r = await adminFetch(url);
     var data = await r.json();
     res.json(data);
   } catch (err) {
@@ -2346,7 +2402,7 @@ app.get('/api/customers', async function(req, res) {
 app.get('/api/members', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/members' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members' + (qs ? '?' + qs : ''));
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2354,21 +2410,21 @@ app.get('/api/members', async function(req, res) {
 app.get('/api/members/search', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/members/search' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members/search' + (qs ? '?' + qs : ''));
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/members/:id', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id));
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/members/:id/orders', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id) + '/orders');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/members/' + encodeURIComponent(req.params.id) + '/orders');
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2422,7 +2478,7 @@ app.post('/api/members/:id/recalc-stats', async function(req, res) {
   app.get(path, async function(req, res) {
     try {
       var qs = req.url.split('?')[1] || '';
-      var r = await fetch(LOCAL_API_BASE + path + (qs ? '?' + qs : ''));
+      var r = await adminFetch(LOCAL_API_BASE + path + (qs ? '?' + qs : ''));
       res.json(await r.json());
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -2446,7 +2502,7 @@ app.post('/api/members/:id/recalc-stats', async function(req, res) {
 app.get('/api/stock-movements', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/stock-movements' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/stock-movements' + (qs ? '?' + qs : ''));
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2478,14 +2534,14 @@ app.post('/api/members/import-from-customers', async function(req, res) {
 // ============ SURVEILLANCE PROXY ============
 app.get('/api/cameras', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/cameras');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/cameras');
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/cameras/:id/snapshot', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/cameras/' + encodeURIComponent(req.params.id) + '/snapshot');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/cameras/' + encodeURIComponent(req.params.id) + '/snapshot');
     if (!r.ok) return res.status(r.status).send('snapshot failed');
     res.setHeader('Content-Type', 'image/jpeg');
     var buf = Buffer.from(await r.arrayBuffer());
@@ -2496,14 +2552,14 @@ app.get('/api/cameras/:id/snapshot', async function(req, res) {
 app.get('/api/orders/:id/videos', async function(req, res) {
   try {
     var qs = req.url.split('?')[1] || '';
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/videos' + (qs ? '?' + qs : ''));
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id + '/videos' + (qs ? '?' + qs : ''));
     res.json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/videos/:recordingId/stream', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/videos/' + req.params.recordingId + '/stream');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/videos/' + req.params.recordingId + '/stream');
     if (!r.ok) return res.status(r.status).send('Stream failed');
     res.setHeader('Content-Type', r.headers.get('content-type') || 'video/mp4');
     res.setHeader('Content-Disposition', 'inline');
@@ -2564,7 +2620,7 @@ app.post('/api/orders/:id/snapshot', async function(req, res) {
 // GET single order (helper for video modal)
 app.get('/api/orders/:id', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/orders/' + req.params.id);
+    var r = await adminFetch(LOCAL_API_BASE + '/api/orders/' + req.params.id);
     res.status(r.status).json(await r.json());
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2572,7 +2628,7 @@ app.get('/api/orders/:id', async function(req, res) {
 // ============ STATS PROXY ============
 app.get('/api/stats', async function(req, res) {
   try {
-    var r = await fetch(LOCAL_API_BASE + '/api/stats');
+    var r = await adminFetch(LOCAL_API_BASE + '/api/stats');
     res.json(await r.json());
   } catch (err) {
     res.status(500).json({ error: err.message });
