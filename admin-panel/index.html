@@ -10552,7 +10552,8 @@ function showPayslip(idOrCode) {
   html += '<tr style="font-weight:bold; font-size:15px; border-top:2px solid #000;"><td>เงินสุทธิ</td><td class="num">' + _fmt(s.final_pay) + '</td></tr>';
   html += '</tbody></table>';
   if (s.new_carryover < 0) html += '<p style="color:#a00; font-size:12px;">⚠ ติดลบ ' + _fmt(Math.abs(s.new_carryover)) + ' ฿ — ยกไปงวดถัดไป</p>';
-  html += '<p style="font-size:12px; color:#888;">วันทำงาน ' + s.days_worked + '/' + s.days_in_period + ' วัน' + (s.half_day_days>0?' · ครึ่งวัน ' + s.half_day_days + ' วัน':'') + (s.days_absent>0?' · ขาด/ลา ' + s.days_absent + ' วัน':'') + '</p>';
+  html += '<p style="font-size:12px; color:#888;">วันทำงาน ' + s.days_worked + '/' + s.days_in_period + ' วัน' + (s.half_day_days>0?' · ครึ่งวัน ' + s.half_day_days + ' วัน':'') + (s.days_absent>0?' · ไม่มีเวลาเข้าออก ' + s.days_absent + ' วัน':'') + '</p>';
+  if (s.leave_info) html += '<p style="font-size:12px; color:#888;">โควต้าใช้รวม ' + (s.leave_info.days_absent||0) + ' วัน' + (s.leave_info.settlement_remaining_absent_days>0?' · หลังตัดรอบ ' + s.leave_info.settlement_remaining_absent_days + ' วัน':'') + '</p>';
   body.innerHTML = html;
   document.getElementById('payslipModal').style.display = 'flex';
 }
