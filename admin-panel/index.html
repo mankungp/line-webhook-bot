@@ -10323,7 +10323,7 @@ function updatePayrollModeHint() {
   var el = document.getElementById('payrollModeHint');
   if (!el) return;
   if (isPayrollSettlementMode()) {
-    el.textContent = 'โหมดเบิกก่อนสิ้นเดือน: พนักงานเงินเดือนจะคิดตามสัดส่วน 30 วัน และไม่นับวันที่หลังวันสิ้นรอบเป็นวันขาด';
+    el.textContent = 'โหมดเบิกก่อนสิ้นเดือน: พนักงานเงินเดือนจะคิดตามสัดส่วน 30 วัน, ไม่นับวันที่หลังวันสิ้นรอบเป็นวันขาด และรวมโควต้าวันหยุดคงเหลือ';
   } else {
     el.textContent = '';
   }
