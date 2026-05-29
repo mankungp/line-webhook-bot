@@ -61,6 +61,13 @@ app.get('/shop/', function(req, res) {
 });
 
 // Shop API proxy
+app.get('/api/shop', async function(req, res) {
+  try {
+    var r = await fetch(LOCAL_API_BASE + '/api/shop');
+    res.status(r.status).json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/shop/orders', async function(req, res) {
   try {
     var r = await fetch(LOCAL_API_BASE + '/api/shop/orders', {
