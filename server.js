@@ -31,6 +31,28 @@ function adminFetch(url, opts) {
   return fetch(url, opts);
 }
 
+// Cookie domain สำหรับ SSO ข้าม subdomain (cockpit บน chat.kerdkankaset.com)
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || '.kerdkankaset.com';
+
+// Helper: อ่าน Set-Cookie จาก upstream แบบ array (getSetCookie ไม่ fold)
+// แล้วเติม Domain=.kerdkankaset.com ต่อ cookie (ถ้ายังไม่มี) เพื่อให้ cookie
+// ใช้ได้ข้าม subdomain — คง HttpOnly/SameSite/Max-Age/Path เดิมทุกอย่าง
+function forwardSetCookieWithDomain(upstreamRes, res) {
+  var cookies = [];
+  if (typeof upstreamRes.headers.getSetCookie === 'function') {
+    cookies = upstreamRes.headers.getSetCookie();
+  } else {
+    var single = upstreamRes.headers.get('set-cookie');
+    if (single) cookies = [single];
+  }
+  if (!cookies.length) return;
+  var withDomain = cookies.map(function(c) {
+    if (/;\s*Domain=/i.test(c)) return c; // มี Domain แล้ว ไม่แตะ
+    return c + '; Domain=' + COOKIE_DOMAIN;
+  });
+  res.setHeader('Set-Cookie', withDomain);
+}
+
 // Welcome message
 const WELCOME_MSG = '🌾 สวัสดีค่ะ! ยินดีต้อนรับเข้าสู่ร้านเกิดการเกษตรค่ะ\n\n📍 ที่อยู่ร้าน: อ.โพนทอง จ.ร้อยเอ็ด\n📞 โทร: 091-414-5767\n🗺️ แผนที่: https://maps.app.goo.gl/yq9LvRcEp3xrb7p28\n⏰ เปิดทำการ: ทุกวัน 08:00-17:00 น.\n\n🤖 AI ผู้ช่วยอัจฉริยะ สามารถ:\n• เช็คราคาสินค้าได้ทันที (ราคาปลีก/ราคาส่ง*)\n• สั่งซื้อสินค้าออนไลน์ได้เลย\n• ตอบคำถามทั่วไปเกี่ยวกับสินค้า\n\n*ราคาส่ง ต้องสมัครสมาชิกร้านค้าค่ะ\n\n💬 ติดต่อแอดมิน: 08:00-17:00 น.\n\nมีอะไรให้ช่วยไหมคะ?';
 
@@ -171,8 +193,7 @@ app.get('/auth/line/callback', async function(req, res) {
     var url = LOCAL_API_BASE + '/auth/line/callback' + (qs ? '?' + qs : '');
     var r = await fetch(url, { redirect: 'manual' });
 
-    var setCookie = r.headers.get('set-cookie');
-    if (setCookie) res.setHeader('Set-Cookie', setCookie);
+    forwardSetCookieWithDomain(r, res);
 
     var loc = r.headers.get('location');
     if (loc) return res.redirect(loc);
@@ -202,8 +223,7 @@ app.post('/auth/logout', async function(req, res) {
       method: 'POST',
       headers: { 'cookie': req.headers.cookie || '' }
     });
-    var setCookie = r.headers.get('set-cookie');
-    if (setCookie) res.setHeader('Set-Cookie', setCookie);
+    forwardSetCookieWithDomain(r, res);
     var ct = r.headers.get('content-type') || 'application/json';
     res.status(r.status).set('Content-Type', ct).send(await r.text());
   } catch (err) {
